@@ -12,7 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <!-- Crypto JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-<!-- Chart.js (YENİ EKLENDİ - Dashboard Grafikleri İçin) -->
+<!-- Chart.js (YENİ: Dashboard Grafikleri İçin) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -98,7 +98,7 @@
                     <button class="filter-btn link-btn" onclick="openWizard()"><i class="fas fa-robot"></i> İade Asistanı</button>
                     <button class="filter-btn link-btn" onclick="openSales()"><i class="fas fa-headset"></i> TeleSatış</button>
                     <button class="filter-btn link-btn" onclick="openPenaltyGame()"><i class="fas fa-futbol"></i> Oyun</button>
-                    <!-- Kalite Butonu -->
+                    <!-- YENİ: Kalite Dashboard Butonu -->
                     <button class="filter-btn link-btn" onclick="openQualityArea()"><i class="fas fa-chart-pie"></i> Kalite</button>
                 </div>
             </div>
@@ -131,7 +131,7 @@
     </div>
 </div>
 
-<!-- WIZARD MODAL -->
+<!-- WIZARD MODAL (İade Asistanı) -->
 <div id="wizard-modal" class="modal-overlay">
     <div class="modal-content">
         <span class="close-modal" onclick="closeModal('wizard-modal')">&times;</span>
@@ -157,7 +157,7 @@
     </div>
 </div>
 
-<!-- OYUN MODAL (PENALTY) -->
+<!-- OYUN MODAL (PENALTY - ORİJİNAL VERİ KORUNDU) -->
 <div id="penalty-modal" class="modal-overlay">
     <div class="modal-content" style="max-width: 650px; background: #1a1a1a; border: 1px solid #333; min-height:600px; display:flex; flex-direction:column;">
         <span class="close-modal" onclick="closeModal('penalty-modal')">&times;</span>
@@ -261,7 +261,7 @@
             </div>
         </div>
         
-        <!-- Gizli yedek liste (eski yapıdan kalma) -->
+        <!-- Gizli yedek liste (Veri kaybı olmaması için kodda tutuyoruz) -->
         <div id="evaluations-list" style="display:none;"></div>
 
     </div>
@@ -269,5 +269,28 @@
 
 <div class="crafted-by-badge">Crafted by Doğuş Yalçınkaya</div>
 <script src="app.js"></script>
+<script>
+    // Header Dropdown Kontrolü
+    function toggleUserDropdown() {
+        const dropdown = document.getElementById('userDropdown');
+        const arrow = document.getElementById('user-menu-arrow');
+        dropdown.classList.toggle('show');
+        if (dropdown.classList.contains('show')) {
+            arrow.style.transform = 'rotate(180deg)';
+        } else {
+            arrow.style.transform = 'rotate(0deg)';
+        }
+    }
+    window.addEventListener('click', function(e) {
+        if (!document.getElementById('adminBtn').contains(e.target)) {
+            const dropdown = document.getElementById('userDropdown');
+            const arrow = document.getElementById('user-menu-arrow');
+            if (dropdown && dropdown.classList.contains('show')) {
+                dropdown.classList.remove('show');
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        }
+    });
+</script>
 </body>
 </html>
