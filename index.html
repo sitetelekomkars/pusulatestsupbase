@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>S Sport Plus - Pusula</title>
-<!-- DÜZELTME: CSS dosyası 'css' klasöründen çağrılıyor -->
+<!-- CSS Dosyası -->
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" type="image/png" href="favicon.png">
 <!-- Font Awesome -->
@@ -13,7 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <!-- Crypto JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-<!-- Chart.js (YENİ: Dashboard Grafikleri İçin Eklendi) -->
+<!-- Chart.js (Artık kullanılmasa da kütüphane olarak tutuyoruz, belki ileride lazım olur) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -123,7 +123,7 @@
     </div>
 </div>
 
-<!-- NEWS MODAL -->
+<!-- MODALS -->
 <div id="news-modal" class="modal-overlay">
     <div class="modal-content">
         <span class="close-modal" onclick="closeModal('news-modal')">&times;</span>
@@ -132,7 +132,6 @@
     </div>
 </div>
 
-<!-- WIZARD MODAL (İade Asistanı) -->
 <div id="wizard-modal" class="modal-overlay">
     <div class="modal-content">
         <span class="close-modal" onclick="closeModal('wizard-modal')">&times;</span>
@@ -140,7 +139,6 @@
     </div>
 </div>
 
-<!-- SPOR REHBERİ MODAL -->
 <div id="guide-modal" class="modal-overlay">
     <div class="modal-content">
         <span class="close-modal" onclick="closeModal('guide-modal')">&times;</span>
@@ -149,7 +147,6 @@
     </div>
 </div>
 
-<!-- SATIŞ SCRIPTLERI MODAL -->
 <div id="sales-modal" class="modal-overlay">
     <div class="modal-content">
         <span class="close-modal" onclick="closeModal('sales-modal')">&times;</span>
@@ -158,7 +155,7 @@
     </div>
 </div>
 
-<!-- OYUN MODAL (PENALTY - ORİJİNAL VERİ KORUNDU) -->
+<!-- OYUN MODAL -->
 <div id="penalty-modal" class="modal-overlay">
     <div class="modal-content" style="max-width: 650px; background: #1a1a1a; border: 1px solid #333; min-height:600px; display:flex; flex-direction:column;">
         <span class="close-modal" onclick="closeModal('penalty-modal')">&times;</span>
@@ -191,9 +188,9 @@
     </div>
 </div>
 
-<!-- YENİ KALİTE DASHBOARD MODALI -->
+<!-- KALİTE DASHBOARD MODALI -->
 <div id="quality-modal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 1000px; background: #f8f9fa;">
+    <div class="modal-content" style="max-width: 1100px; background: #f8f9fa;">
         <span class="close-modal" onclick="closeModal('quality-modal')">&times;</span>
         
         <!-- Dashboard Header -->
@@ -203,7 +200,7 @@
                 <p style="margin:5px 0 0 0; font-size:0.85rem; color:#666;">Performans metrikleri ve değerlendirme takibi</p>
             </div>
             
-            <!-- Admin Kontrolleri (Varsa) -->
+            <!-- Admin Kontrolleri -->
             <div id="admin-quality-controls" style="display:none; gap:10px;">
                 <div style="font-weight:bold; display:flex; align-items:center; gap: 5px;">
                     <select id="agent-select-admin" class="swal2-input" onchange="fetchEvaluationsForAgent()" style="width: 200px; padding:5px; height: 35px; margin:0; font-size: 0.8rem;"></select>
@@ -225,10 +222,27 @@
                     dönemi
                 </div>
             </div>
+
+            <!-- Kart 2: Toplam Adet -->
+            <div class="dash-card" style="border-left: 4px solid var(--success);">
+                <div class="dash-card-icon" style="background: var(--success); color: var(--success);"><i class="fa-solid fa-headset"></i></div>
+                <div class="dash-card-title">Değerlendirilen Çağrı</div>
+                <div class="dash-card-value" id="dash-total-count">--</div>
+                <div class="dash-card-sub"><span style="color:var(--success);">Aktif</span> performans kaydı</div>
+            </div>
+
+            <!-- Kart 3: Hedef -->
+            <div class="dash-card" style="border-left: 4px solid var(--warning);">
+                <div class="dash-card-icon" style="background: var(--warning); color: var(--warning);"><i class="fa-solid fa-bullseye"></i></div>
+                <div class="dash-card-title">Hedef Tutma Oranı</div>
+                <div class="dash-card-value" id="dash-target-rate">--%</div>
+                <div class="dash-card-sub">Hedef puan: 90+</div>
+            </div>
+
             <!-- Ana İçerik: ÇAĞRI LİSTESİ (SOL) - GRUP SIRALAMASI (SAĞ) -->
             <div class="dash-main-area">
                 
-                <!-- SOL: ÇAĞRI LİSTESİ (ESKİ CHART YERİ) -->
+                <!-- SOL: ÇAĞRI LİSTESİ (ESKİ CHART YERİ, ARTIK LİSTE) -->
                 <div class="dash-chart-box" style="overflow: hidden; display:flex; flex-direction:column; padding:0;">
                     <div class="dash-list-header" style="background:white; border-bottom:1px solid #eee; padding: 15px;">
                         <span><i class="fas fa-list-ul"></i> Değerlendirme Geçmişi</span>
@@ -239,7 +253,7 @@
                     </div>
                 </div>
 
-                <!-- SAĞ: GRUP SIRALAMASI (ESKİ LİSTE YERİ) -->
+                <!-- SAĞ: GRUP SIRALAMASI (ESKİ LİSTE YERİ, ARTIK RANKING) -->
                 <div class="dash-list-box">
                     <div class="dash-list-header">
                         <span><i class="fas fa-trophy" style="color:gold;"></i> Grup Sıralaması</span>
@@ -263,17 +277,16 @@
             </div>
         </div>
         
-        <!-- Gizli yedek liste (eski yapıdan kalma, gerekirse açılabilir) -->
+        <!-- Gizli yedek liste (eski yapıdan kalma) -->
         <div id="evaluations-list" style="display:none;"></div>
 
     </div>
 </div>
 
 <div class="crafted-by-badge">Crafted by Doğuş Yalçınkaya</div>
-<!-- DÜZELTME: JS dosyası 'js' klasöründen çağrılıyor -->
+<!-- JS Dosyası -->
 <script src="js/app.js"></script>
 <script>
-    // Header Dropdown Kontrolü
     function toggleUserDropdown() {
         const dropdown = document.getElementById('userDropdown');
         const arrow = document.getElementById('user-menu-arrow');
