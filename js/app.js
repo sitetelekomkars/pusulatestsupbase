@@ -725,16 +725,46 @@ function openQualityArea() {
         selectEl.appendChild(opt);
     }
     
+    // Grup Filtresini Temizle ve Doldur
+    const groupSelect = document.getElementById('group-select-filter');
+    groupSelect.innerHTML = '<option value="all">Tüm Gruplar</option>';
+    
     if (isAdminMode) {
         fetchUserListForAdmin().then(users => {
-            const selectEl = document.getElementById('agent-select-admin');
-            selectEl.innerHTML = `<option value="all" data-group="all">-- Tüm Temsilciler --</option>` +
-            users.map(u => `<option value="${u.name}" data-group="${u.group}">${u.name} (${u.group})</option>`).join('');
+            // Grupları doldur
+            const groups = [...new Set(users.map(u => u.group).filter(g => g))];
+            groups.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = g; opt.textContent = g;
+                groupSelect.appendChild(opt);
+            });
+
+            // İlk yüklemede tüm temsilcileri listele
+            populateAgentSelect(users);
             fetchEvaluationsForAgent('all');
         });
     } else {
         fetchEvaluationsForAgent(currentUser);
     }
+}
+
+function populateAgentSelect(users) {
+    const selectEl = document.getElementById('agent-select-admin');
+    selectEl.innerHTML = `<option value="all">-- Tüm Temsilciler --</option>` +
+        users.map(u => `<option value="${u.name}" data-group="${u.group}">${u.name} (${u.group})</option>`).join('');
+}
+
+function filterAgentsByGroup() {
+    const selectedGroup = document.getElementById('group-select-filter').value;
+    let filteredUsers = adminUserList;
+    
+    if (selectedGroup !== 'all') {
+        filteredUsers = adminUserList.filter(u => u.group === selectedGroup);
+    }
+    
+    populateAgentSelect(filteredUsers);
+    // Grup değişince otomatik olarak "Tüm Temsilciler" (o gruptaki) verisini getir
+    fetchEvaluationsForAgent('all');
 }
 
 function fetchEvaluationsForAgent(forcedName) {
@@ -761,10 +791,27 @@ function fetchEvaluationsForAgent(forcedName) {
 
 function updateDashboardUI() {
     const monthFilter = document.getElementById('month-select-filter').value;
+    const selectedGroup = isAdminMode ? document.getElementById('group-select-filter').value : null;
+    
+    // 1. Filtreleme (Ay ve Grup)
     const filtered = allEvaluationsData.filter(item => {
         if(!item.date) return false;
         const parts = item.date.split('.'); 
-        return (parts.length >= 3 && `${parts[1]}.${parts[2]}` === monthFilter);
+        const isMonthMatch = (parts.length >= 3 && `${parts[1]}.${parts[2]}` === monthFilter);
+        
+        if (!isMonthMatch) return false;
+        
+        // Eğer admin modunda ve bir grup seçiliyse, sadece o gruba ait kayıtları göster
+        if (isAdminMode && selectedGroup && selectedGroup !== 'all') {
+            // Kaydın grubu varsa kullan, yoksa admin listesinden bul
+            let itemGroup = item.group;
+            if (!itemGroup) {
+                const user = adminUserList.find(u => u.name === (item.agent || item.agentName));
+                if(user) itemGroup = user.group;
+            }
+            return itemGroup === selectedGroup;
+        }
+        return true;
     });
 
     // İstatistikler
@@ -781,26 +828,34 @@ function updateDashboardUI() {
     document.getElementById('dash-total-count').innerText = count;
     document.getElementById('dash-target-rate').innerText = `%${targetRate}`;
 
-    // LİSTELEME VE GRUP SIRALAMASI
+    // LİSTELEME (SOL TARAFA ÇAĞRI LİSTESİ - FULL)
     const listEl = document.getElementById('evaluations-list-dashboard');
     listEl.innerHTML = '';
     
     const rankBody = document.getElementById('group-ranking-body');
     rankBody.innerHTML = '';
 
-    // SOL TARAF: ÇAĞRI LİSTESİ (FULL LİSTE)
+    // SOL TARAF: ÇAĞRI LİSTESİ
     if(count === 0) {
         listEl.innerHTML = '<div style="text-align:center; padding:20px; color:#ccc;">Bu dönem kayıt yok.</div>';
     } else {
         const sortedList = filtered.slice().reverse();
         sortedList.forEach(item => {
             let badgeClass = item.score >= 90 ? 'score-green' : (item.score >= 70 ? 'score-yellow' : 'score-red');
+            let agentDisplay = item.agent || item.agentName; // İsim gösterimi
+            
             let html = `
-                <div class="dash-list-item" onclick="showEvaluationDetail('${item.callId}')" style="cursor:pointer;">
-                    <div>
-                        <div style="font-weight:bold; color:#333;">${item.callId || 'ID Yok'}</div>
-                        <div style="font-size:0.75rem; color:#999;">${item.date}</div>
+                <div class="dash-list-item" onclick="showEvaluationDetail('${item.callId}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:12px;">
+                    <div style="display:flex; gap:10px; align-items:center; width:40%;">
+                         <div style="width:30px; height:30px; background:#eee; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#555;">
+                            ${agentDisplay.charAt(0)}
+                         </div>
+                         <div>
+                            <div style="font-weight:bold; font-size:0.9rem; color:#333;">${agentDisplay}</div>
+                            <div style="font-size:0.75rem; color:#999;">${item.callId || 'ID Yok'}</div>
+                         </div>
                     </div>
+                    <div style="color:#666; font-size:0.85rem;">${item.date}</div>
                     <div>
                         <span class="dash-score-badge ${badgeClass}">${item.score}</span>
                         <i class="fas fa-chevron-right" style="font-size:0.8rem; color:#ccc; margin-left:10px;"></i>
@@ -811,64 +866,73 @@ function updateDashboardUI() {
     }
 
     // SAĞ TARAF: GRUP SIRALAMASI
-    let rankingTargetGroup = ""; // Renamed variable to avoid redeclaration error
-    if(isAdminMode) {
-        const sel = document.getElementById('agent-select-admin');
-        const opt = sel.options[sel.selectedIndex];
-        if(opt) rankingTargetGroup = opt.getAttribute('data-group');
-    } else {
-        const myData = allEvaluationsData.find(d => d.agent === currentUser || d.agentName === currentUser);
-        if(myData) rankingTargetGroup = myData.group; 
+    // Hedef Grubu Belirle
+    let rankingTargetGroup = selectedGroup;
+    if (!rankingTargetGroup || rankingTargetGroup === 'all') {
+         // Eğer admin belirli bir kişi seçtiyse onun grubunu baz al
+         const selectedAgentVal = isAdminMode ? document.getElementById('agent-select-admin').value : currentUser;
+         if(selectedAgentVal !== 'all') {
+             const user = adminUserList.find(u => u.name === selectedAgentVal);
+             if(user) rankingTargetGroup = user.group;
+         } else if (!isAdminMode) {
+             // Normal kullanıcı ise kendi grubu
+             const myData = allEvaluationsData.find(d => d.agent === currentUser || d.agentName === currentUser);
+             if(myData) rankingTargetGroup = myData.group;
+         }
     }
-    
-    document.getElementById('ranking-group-name').innerText = rankingTargetGroup ? `(${rankingTargetGroup})` : '';
 
-    if(!rankingTargetGroup) {
-        rankBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px; color:#999;">Grup bilgisi yok.</td></tr>';
-    } else {
-        const groupData = allEvaluationsData.filter(item => {
-            if(!item.date) return false;
-            const parts = item.date.split('.');
-            const isMonth = (parts.length >= 3 && `${parts[1]}.${parts[2]}` === monthFilter);
+    document.getElementById('ranking-group-name').innerText = rankingTargetGroup && rankingTargetGroup !== 'all' ? `(${rankingTargetGroup})` : '(Tümü)';
+
+    // Sıralama Verisini Hazırla
+    const rankingData = allEvaluationsData.filter(item => {
+        if(!item.date) return false;
+        const parts = item.date.split('.');
+        const isMonth = (parts.length >= 3 && `${parts[1]}.${parts[2]}` === monthFilter);
+        
+        if (!isMonth) return false;
+
+        if (rankingTargetGroup && rankingTargetGroup !== 'all') {
             let itemGroup = item.group; 
             if(!itemGroup && adminUserList.length > 0) {
                 const u = adminUserList.find(u => u.name === (item.agent || item.agentName));
                 if(u) itemGroup = u.group;
             }
-            return isMonth && itemGroup === rankingTargetGroup;
-        });
-
-        let agentStats = {};
-        groupData.forEach(d => {
-            let name = d.agent || d.agentName;
-            if(!agentStats[name]) agentStats[name] = { total: 0, count: 0 };
-            agentStats[name].total += (parseInt(d.score)||0);
-            agentStats[name].count++;
-        });
-
-        let ranking = Object.keys(agentStats).map(name => {
-            return {
-                name: name,
-                avg: (agentStats[name].total / agentStats[name].count).toFixed(1),
-                count: agentStats[name].count
-            };
-        }).sort((a,b) => b.avg - a.avg);
-
-        if(ranking.length === 0) {
-            rankBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px; color:#999;">Veri yok.</td></tr>';
-        } else {
-            ranking.forEach((r, idx) => {
-                let rankIcon = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `#${idx+1}`));
-                let highlight = (r.name === (isAdminMode ? document.getElementById('agent-select-admin').value : currentUser)) ? 'background:#fff8e1;' : '';
-                
-                rankBody.innerHTML += `
-                <tr style="border-bottom:1px solid #eee; ${highlight}">
-                    <td style="padding:8px; font-weight:bold;">${rankIcon}</td>
-                    <td style="padding:8px; font-size:0.8rem;">${r.name}</td>
-                    <td style="padding:8px; text-align:right; font-weight:bold;">${r.avg}</td>
-                </tr>`;
-            });
+            return itemGroup === rankingTargetGroup;
         }
+        return true; 
+    });
+
+    let agentStats = {};
+    rankingData.forEach(d => {
+        let name = d.agent || d.agentName;
+        if(!agentStats[name]) agentStats[name] = { total: 0, count: 0 };
+        agentStats[name].total += (parseInt(d.score)||0);
+        agentStats[name].count++;
+    });
+
+    let ranking = Object.keys(agentStats).map(name => {
+        return {
+            name: name,
+            avg: (agentStats[name].total / agentStats[name].count).toFixed(1),
+            count: agentStats[name].count
+        };
+    }).sort((a,b) => b.avg - a.avg);
+
+    if(ranking.length === 0) {
+        rankBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px; color:#999;">Veri yok.</td></tr>';
+    } else {
+        ranking.forEach((r, idx) => {
+            let rankIcon = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `#${idx+1}`));
+            let currentSelected = isAdminMode ? document.getElementById('agent-select-admin').value : currentUser;
+            let highlight = (r.name === currentSelected) ? 'background:#fff8e1;' : '';
+            
+            rankBody.innerHTML += `
+            <tr style="border-bottom:1px solid #eee; ${highlight}">
+                <td style="padding:8px; font-weight:bold;">${rankIcon}</td>
+                <td style="padding:8px; font-size:0.8rem;">${r.name}</td>
+                <td style="padding:8px; text-align:right; font-weight:bold;">${r.avg}</td>
+            </tr>`;
+        });
     }
 }
 
