@@ -98,6 +98,14 @@ body {
 .brand-text .main-text { font-size: 1.0rem; font-weight: 700; color: #fff; letter-spacing: 0.5px; white-space: nowrap; }
 .brand-text .sub-text { font-size: 1.0rem; font-weight: 300; color: rgba(255,255,255,0.6); white-space: nowrap; border-left: 1px solid rgba(255,255,255,0.3); padding-left: 8px; }
 .header-controls { display: flex; align-items: center; gap:10px; }
+.action-btn { 
+    background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); 
+    color: #ccc; padding: 5px 10px; border-radius: 4px; cursor: pointer; 
+    font-weight: 500; font-size: 0.75rem; display: flex; align-items: center; 
+    gap: 6px; transition: all 0.2s; 
+}
+.action-btn:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
+.action-btn.active { background: var(--secondary); border-color: var(--secondary); color: #0e1b42; }
 
 /* KULLANICI MENÜSÜ & DROPDOWN */
 .user-menu-wrapper { position: relative; }
@@ -179,6 +187,7 @@ body {
     border-color: rgba(255, 255, 255, 0.4); 
     transform: translateY(-1px);
 }
+/* Aktif Buton */
 .filter-btn.active { 
     background-color: #fabb00 !important; 
     color: #0e1b42 !important; 
@@ -280,7 +289,7 @@ body.editing .edit-icon { display: block !important; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* NEWS ITEMS */
+/* NEWS ITEMS & BADGES */
 .news-item { border-left: 4px solid var(--primary); padding: 15px 15px 15px 20px; margin-bottom: 20px; position: relative; background-color: #fcfcfc; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #eee; border-left-width: 4px; }
 .news-date { font-size: 0.75rem; color: #999; font-weight: 700; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
 .news-title { font-size: 1.1rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 8px; line-height: 1.3; }
@@ -290,7 +299,7 @@ body.editing .edit-icon { display: block !important; }
 .tag-update { background: #fff3e0; color: #ef6c00; border: 1px solid #ffe0b2; }
 .tag-info { background: #e3f2fd; color: #0277bd; border: 1px solid #bbdefb; }
 
-/* PENALTY GAME (Korundu) */
+/* PENALTY & FUNCTIONAL STYLES */
 .penalty-stats { background: #111; color: #fff; padding: 10px 15px; border-radius: 6px; display:flex; justify-content:space-between; font-weight:700; margin-bottom: 15px; border: 1px solid #333; }
 .penalty-stats span span { color: var(--secondary); }
 .joker-btn { background: #6a1b9a; color: white; padding: 10px; border-radius: 6px; border:none; cursor:pointer; flex:1; margin:0 5px; font-weight: bold; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem; }
@@ -409,7 +418,7 @@ body.editing .edit-icon { display: block !important; }
 .sales-text { display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #a7f3d0; font-size: 1rem; color: #374151; line-height: 1.6; animation: fadeIn 0.4s ease-in; }
 .sales-item.active .sales-text { display: block; }
 
-/* --- YENİ DASHBOARD STİLLERİ --- */
+/* --- YENİ EKLENEN DASHBOARD CSS (Sorunsuz) --- */
 
 .dash-grid-container {
     display: grid;
@@ -453,9 +462,10 @@ body.editing .edit-icon { display: block !important; }
     display: grid;
     grid-template-columns: 2fr 1fr; /* Sol geniş, Sağ dar */
     gap: 20px;
-    height: 500px; /* Sabit yükseklik */
+    height: 500px;
 }
 
+/* Ortak Kutu Stili */
 .dash-chart-box, .dash-list-box {
     background: white;
     border-radius: 12px;
@@ -484,7 +494,7 @@ body.editing .edit-icon { display: block !important; }
     background: #f8fafc;
 }
 
-/* Yeni Liste Görünümü (Güzelleştirilmiş) */
+/* Liste Elemanları */
 .dash-list-item {
     background: white;
     border: 1px solid #e2e8f0;
@@ -518,6 +528,7 @@ body.editing .edit-icon { display: block !important; }
 .score-yellow { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
 .score-red { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
 
+/* Responsive */
 @media (max-width: 900px) {
     .dash-grid-container { grid-template-columns: 1fr; }
     .dash-main-area { grid-template-columns: 1fr; height: auto; }
