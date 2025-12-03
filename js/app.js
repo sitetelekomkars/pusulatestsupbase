@@ -1243,15 +1243,23 @@ async function fetchEvaluationsForAgent(forcedName) {
 }
 
 // --- YENİ RAPOR EXPORT FONKSİYONU ---
+// --- YENİ RAPOR EXPORT FONKSİYONU (DÜZELTİLMİŞ) ---
 async function exportEvaluations() {
     if (!isAdminMode) {
         Swal.fire('Hata', 'Bu işlem için yönetici yetkisi gereklidir.', 'error');
         return;
     }
-    const selectEl = document.getElementById('agent-select-admin');
-    const targetAgent = selectEl.value;
-    const agentName = targetAgent === 'all' ? 'Tüm Temsilciler' : targetAgent;
+
+    // --- DEĞİŞİKLİK BAŞLANGICI ---
+    const agentSelect = document.getElementById('agent-select-admin');
+    const groupSelect = document.getElementById('group-select-admin'); // Grup seçim elementini alıyoruz
     
+    const targetAgent = agentSelect ? agentSelect.value : 'all';
+    const targetGroup = groupSelect ? groupSelect.value : 'all'; // Grup değerini alıyoruz (yoksa 'all' varsayıyoruz)
+    // --- DEĞİŞİKLİK BİTİŞİ ---
+
+    const agentName = targetAgent === 'all' ? (targetGroup === 'all' ? 'Tüm Şirket' : targetGroup + ' Ekibi') : targetAgent;
+
     const { isConfirmed } = await Swal.fire({
         icon: 'question',
         title: 'Raporu Onayla',
@@ -1262,20 +1270,22 @@ async function exportEvaluations() {
     });
 
     if (!isConfirmed) return;
+    
     Swal.fire({ title: 'Kırılım Raporu Hazırlanıyor...', didOpen: () => Swal.showLoading() });
-
+    
     try {
         const response = await fetch(SCRIPT_URL, {
             method: 'POST',
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({
                 action: "exportEvaluations",
-                targetAgent: targetAgent, 
+                targetAgent: targetAgent,
+                targetGroup: targetGroup, // <-- KRİTİK NOKTA: Buraya targetGroup eklendi
                 username: currentUser,
                 token: getToken()
             })
         });
-
+        
         const data = await response.json();
         if (data.result === "success" && data.csvData) {
             const blob = new Blob(["\ufeff" + data.csvData], { type: 'text/csv;charset=utf-8;' });
