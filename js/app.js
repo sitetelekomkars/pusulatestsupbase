@@ -1504,10 +1504,11 @@ async function logEvaluationPopup() {
             const feedback = document.getElementById('eval-feedback').value;
             const feedbackType = document.getElementById('feedback-type').value; 
             
-            if (!callId || !callDateRaw || !feedback) {
-                Swal.showValidationMessage('Lütfen Çağrı ID, Tarih ve Genel Geri Bildirim alanlarını doldurun.');
-                return false;
-            }
+       
+if (!callId || !callDateRaw) {
+    Swal.showValidationMessage('Lütfen Çağrı ID ve Tarih alanlarını doldurun.');
+    return false;
+}
             
             const dateParts = callDateRaw.split('-');
             const formattedCallDate = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : callDateRaw;
