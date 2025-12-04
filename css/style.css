@@ -74,28 +74,22 @@ body {
     display: flex;
     flex-direction: column;
 }
-
 .header-content-limit {
     width: 100%;
     max-width: 1600px; 
-    /* Sol tarafa kaydırma için ayar */
     margin-right: auto; 
     margin-left: 0; 
-  
     padding: 5px 25px 0px 10px; 
     box-sizing: border-box;
 }
-
 .header-top { 
     display: flex; justify-content: space-between; align-items: center; 
-    /* Kırmızı boşlukları silmek için marjini sıfırladık */
     margin-bottom: 0px; 
 }
 
 /* MARKA ALANI */
 .brand-area { display: flex; align-items: center; gap: 10px; }
 .brand-img { 
-    /* Logo boyutunu dikey alana yayılacak şekilde artırdık */
     height: 65px; 
     width: 65px; 
     object-fit: contain;
@@ -104,9 +98,7 @@ body {
 .brand-text { display: flex; flex-direction: row; align-items: center; gap: 8px; }
 .brand-text .main-text { font-size: 1.0rem; font-weight: 700; color: #fff; letter-spacing: 0.5px; white-space: nowrap; }
 .brand-text .sub-text { font-size: 1.0rem; font-weight: 300; color: rgba(255,255,255,0.6); white-space: nowrap; border-left: 1px solid rgba(255,255,255,0.3); padding-left: 8px; }
-
 .header-controls { display: flex; align-items: center; gap:10px; }
-
 .action-btn { 
     background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); 
     color: #ccc; padding: 5px 10px; border-radius: 4px; cursor: pointer; 
@@ -121,7 +113,6 @@ body {
 .user-btn { background: transparent; border: none; color: #eee; padding: 6px 10px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; border-radius: 4px; border: 1px solid transparent; transition: all 0.2s; }
 .user-btn:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); }
 .user-avatar { width: 26px; height: 26px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--secondary); font-size: 0.8rem; }
-
 .dropdown-menu { display: none; position: absolute; right: 0; top: 110%; background-color: #1c2438; min-width: 180px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); z-index: 2000; overflow: hidden; animation: fadeInDropdown 0.2s ease; }
 .dropdown-menu.show { display: block; }
 .dropdown-header { padding: 10px 15px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -138,15 +129,12 @@ body {
 .control-wrapper { 
     display: flex; 
     align-items: center; 
-    /* Sola hizalı */
     justify-content: flex-start; 
     gap: 15px; 
-    /* Kırmızı boşlukları silmek için padding'i sıfırladık */
     padding-bottom: 0; 
     position: relative;
     flex-wrap: wrap; 
 }
-
 .search-container { position: relative; width: 300px; flex-shrink: 0; }
 #searchInput { 
     width: 100%; padding: 6px 15px 6px 35px;
@@ -200,7 +188,6 @@ body {
     border-color: rgba(255, 255, 255, 0.4); 
     transform: translateY(-1px);
 }
-/* Aktif Buton */
 .filter-btn.active { 
     background-color: #fabb00 !important; 
     color: #0e1b42 !important; 
@@ -208,19 +195,17 @@ body {
     font-weight: 700;
     box-shadow: 0 2px 8px rgba(250, 187, 0, 0.3);
 }
-
 .divider { width: 1px; height: 18px; background: rgba(255,255,255,0.15); margin: 0 4px; }
 .link-btn { color: rgba(255, 255, 255, 0.7); }
 .link-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
 
-/* --- TICKER (Duyuru Barı İyileştirmesi) --- */
+/* --- TICKER --- */
 .news-ticker-box { 
     width: 100%;
-    /* Rengi üst barın ana rengine yakın, hafif koyu yaptık */
     background: #0a1532; 
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     padding: 0 25px; 
-    height: 25px; /* Duyuru barını daralttık */
+    height: 25px; 
     display: flex; 
     align-items: center; 
     gap: 15px; 
@@ -231,15 +216,13 @@ body {
     overflow: hidden; 
 }
 .news-ticker-box:hover { background: #1c2438; } 
-
 .ticker-label { 
     font-size: 0.65rem; color: #fabb00; font-weight: 800; display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px; min-width: fit-content; z-index: 5; 
-    background: #0a1532; /* Arka planı kutu arka planıyla eşleştirdik */
+    background: #0a1532;
     padding-right: 15px; height: 100%; 
     display: flex; align-items: center;
 }
 .pulse-dot { width: 5px; height: 5px; background: var(--secondary); border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
-
 .ticker-scroll-wrapper {
     flex-grow: 1;
     overflow: hidden;
@@ -248,10 +231,8 @@ body {
     display: flex;
     align-items: center;
 }
-
-/* KAYAN YAZI ANİMASYONU */
 .ticker-content { 
-    font-size: 0.7rem; /* Metin boyutunu küçülttük */
+    font-size: 0.7rem; 
     color: rgba(255, 255, 255, 0.9); 
     white-space: nowrap; 
     position: absolute; 
@@ -259,7 +240,6 @@ body {
     animation: ticker-scroll 30s linear infinite; 
     font-weight: 400; font-family: 'Segoe UI', sans-serif; 
 }
-
 @keyframes ticker-scroll {
     0% { transform: translateX(0); }
     100% { transform: translateX(-100%) translateX(-200px); } 
@@ -305,6 +285,7 @@ body.editing .edit-icon { display: block !important; }
 ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
 .crafted-by-badge { position: fixed; bottom: 5px; right: 10px; font-family: sans-serif; font-size: 0.65rem; color: #0e1b42; opacity: 0.2; z-index: 9999; pointer-events: none; }
+
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -319,7 +300,7 @@ body.editing .edit-icon { display: block !important; }
 .tag-update { background: #fff3e0; color: #ef6c00; border: 1px solid #ffe0b2; }
 .tag-info { background: #e3f2fd; color: #0277bd; border: 1px solid #bbdefb; }
 
-/* PENALTY & FUNCTIONAL STYLES (Restored) */
+/* PENALTY & GAME STYLES */
 .penalty-stats { background: #111; color: #fff; padding: 10px 15px; border-radius: 6px; display:flex; justify-content:space-between; font-weight:700; margin-bottom: 15px; border: 1px solid #333; }
 .penalty-stats span span { color: var(--secondary); }
 .joker-btn { background: #6a1b9a; color: white; padding: 10px; border-radius: 6px; border:none; cursor:pointer; flex:1; margin:0 5px; font-weight: bold; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem; }
@@ -330,6 +311,8 @@ body.editing .edit-icon { display: block !important; }
 .penalty-btn:hover:not(:disabled) { background: #ffc933; transform: translateY(-1px); }
 .penalty-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .penalty-btn.wrong-first-try { background: #d32f2f !important; color: white !important; opacity: 0.8; cursor: not-allowed; }
+
+/* PENALTY FIELD ANIMATION STYLES */
 .penalty-field { background: radial-gradient(circle at 50% 30%, #4caf50 0%, #388e3c 40%, #1b5e20 100%); border: 4px solid #fff; border-radius: 8px; height: 480px; position: relative; overflow: hidden; perspective: 1000px; box-shadow: inset 0 0 80px rgba(0,0,0,0.8); display: flex; flex-direction: column; justify-content: flex-start; }
 .stadium-stands { position: absolute; top: 0; left: 0; width: 100%; height: 120px; background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(to bottom, #0d1117 0%, #161b22 100%); background-size: 10px 10px, 100% 100%; z-index: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
 .grass-stripes { position: absolute; top: 120px; left: 0; width: 100%; height: 100%; background: repeating-linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.03) 40px, transparent 40px, transparent 80px); z-index: 0; transform: rotateX(20deg) scale(1.1); transform-origin: top; }
@@ -393,6 +376,8 @@ body.editing .edit-icon { display: block !important; }
 .evaluation-details-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-in-out; margin-top: 0; }
 .evaluation-summary { transition: background 0.2s; }
 .evaluation-summary:hover { background: #fcfcfc; }
+
+/* KALİTE PANELİ VE DİĞER MODAL STİLLERİ */
 .quality-controls-top { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; margin-bottom: 15px; flex-wrap: wrap; gap: 15px; }
 .quality-filter-group { display: flex; gap: 15px; align-items: center; flex-grow: 1; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 1rem; background: #f0f4ff; border: 1px solid #d0d8f0; justify-content: space-around; }
 .eval-modal-wrapper { display: flex; flex-direction: column; gap: 15px; text-align: left; font-family: 'Segoe UI', sans-serif; }
@@ -412,6 +397,8 @@ body.editing .edit-icon { display: block !important; }
 .quiz-btn-opt { padding: 15px; border: 2px solid #eee; background: white; border-radius: 8px; cursor: pointer; }
 .quiz-btn-opt.correct { background: #c8e6c9; border-color: #2e7d32; color: #1b5e20; }
 .quiz-btn-opt.wrong { background: #ffcdd2; border-color: #c62828; color: #b71c1c; }
+
+/* WIZARD & TECHNICAL ASSISTANT */
 .wizard-options { display: flex; flex-direction: column; gap: 10px; }
 .option-btn { padding: 15px; border: 2px solid #eee; border-radius: 8px; background: white; font-size: 1rem; cursor: pointer; text-align: left; }
 .option-btn:hover { border-color: var(--primary); background: #f0f4ff; }
@@ -437,9 +424,8 @@ body.editing .edit-icon { display: block !important; }
 .sales-title { font-weight: 800; color: #065f46; font-size: 1.1rem; margin: 0; padding-right: 25px; }
 .sales-text { display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #a7f3d0; font-size: 1rem; color: #374151; line-height: 1.6; animation: fadeIn 0.4s ease-in; }
 .sales-item.active .sales-text { display: block; }
-/* --- KOMPAKT KALİTE DASHBOARD STİLLERİ --- */
 
-/* Başlık Alanı - Daha az boşluk */
+/* KALİTE DASHBOARD STİLLERİ */
 .q-dashboard-header {
     margin-bottom: 15px;
     border-bottom: 1px solid #eee;
@@ -456,16 +442,12 @@ body.editing .edit-icon { display: block !important; }
     color: #888;
     margin: 2px 0 0 0;
 }
-
-/* Grid Yapısı - Boşluklar azaltıldı */
 .q-stats-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr); /* Mobilde taşarsa auto-fit yaparız */
+    grid-template-columns: repeat(3, 1fr); 
     gap: 12px;
     margin-bottom: 15px;
 }
-
-/* Kart Genel Yapısı - Daha alçak ve kompakt */
 .q-stat-card {
     background: #fff;
     border-radius: 8px;
@@ -477,15 +459,11 @@ body.editing .edit-icon { display: block !important; }
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-height: 80px; /* Yüksekliği azalttık */
+    min-height: 80px; 
 }
-
-/* Sol Kenar Çizgileri */
 .card-blue { border-left: 4px solid #0288d1; }
 .card-green { border-left: 4px solid #2e7d32; }
 .card-orange { border-left: 4px solid #ed6c02; }
-
-/* Kart İçerikleri - Fontlar küçültüldü */
 .q-card-title {
     font-size: 0.65rem;
     font-weight: 700;
@@ -494,17 +472,14 @@ body.editing .edit-icon { display: block !important; }
     letter-spacing: 0.5px;
     margin-bottom: 5px;
 }
-
 .q-card-value {
-    font-size: 1.6rem; /* 2.5rem'den düşürüldü */
+    font-size: 1.6rem; 
     font-weight: 800;
     line-height: 1;
     color: #0e1b42;
     margin-bottom: 5px;
 }
-
 .card-blue .q-card-value { color: #1e293b; }
-
 .q-card-footer {
     font-size: 0.75rem;
     color: #94a3b8;
@@ -512,23 +487,19 @@ body.editing .edit-icon { display: block !important; }
     align-items: center;
     gap: 4px;
 }
-
-/* İkon - Daha silik ve küçük */
 .q-card-icon-bg {
     position: absolute;
     right: -5px;
-    bottom: -5px; /* Ortadan alta aldık */
+    bottom: -5px; 
     top: auto;
     transform: none;
-    font-size: 3.5rem; /* 5rem'den düşürüldü */
+    font-size: 3.5rem; 
     opacity: 0.08;
     pointer-events: none;
 }
 .card-blue .q-card-icon-bg { color: #0288d1; }
 .card-green .q-card-icon-bg { color: #2e7d32; }
 .card-orange .q-card-icon-bg { color: #ed6c02; }
-
-/* Select Box */
 .minimal-select {
     border: none;
     background: transparent;
@@ -543,8 +514,6 @@ body.editing .edit-icon { display: block !important; }
     height: auto;
 }
 .minimal-select:hover { border-bottom-color: #0e1b42; }
-
-/* Liste Alanı Başlığı */
 .list-section-title {
     font-size: 0.85rem;
     font-weight: 700;
