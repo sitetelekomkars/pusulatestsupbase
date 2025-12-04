@@ -1972,7 +1972,7 @@ function twRenderStep() {
         const safeScript = encodeURIComponent(stepData.script);
         html += `
         <div class="tech-script-box">
-            <span class="tech-script-label">Müşteriye Okunacak:</span>
+            <span class="tech-script-label">Müşteriye iletilecek:</span>
             "${stepData.script}"
             <div style="margin-top:10px; text-align:right;">
                 <button class="btn btn-copy" style="font-size:0.8rem; padding:5px 10px;" onclick="copyScriptContent('${safeScript}')">
