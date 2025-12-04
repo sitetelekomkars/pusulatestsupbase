@@ -7,6 +7,7 @@ let firstAnswerIndex = -1;
 const VALID_CATEGORIES = ['Teknik', 'İkna', 'Kampanya', 'Bilgi'];
 // --- GLOBAL DEĞİŞKENLER ---
 let database = [], newsData = [], sportsData = [], salesScripts = [], quizQuestions = [];
+let techWizardData = {}; // YENİ: Teknik Sihirbaz Verisi
 let currentUser = "";
 let isAdminMode = false;    
 let isEditingActive = false;
@@ -144,6 +145,7 @@ function checkSession() {
             document.getElementById("main-app").style.display = "block";
             loadContentData();
             loadWizardData();
+            loadTechWizardData(); // YENİ: Otomatik yükle
         }
     }
 }
@@ -197,6 +199,7 @@ function girisYap() {
                     document.getElementById("main-app").style.display = "block";
                     loadContentData();
                     loadWizardData();
+                    loadTechWizardData(); // YENİ: Yükle
                 }
             }
         } else {
@@ -400,6 +403,28 @@ function loadWizardData() {
         .catch(error => {
             wizardStepsData = {};
             reject(error);
+        });
+    });
+}
+function loadTechWizardData() {
+    return new Promise((resolve, reject) => {
+        fetch(SCRIPT_URL, {
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "getTechWizardData" })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.result === "success" && data.steps) {
+                techWizardData = data.steps;
+                resolve();
+            } else {
+                techWizardData = {};
+                // Hata mesajı vermiyoruz, sessizce geçebilir veya loglayabiliriz
+            }
+        })
+        .catch(error => {
+            techWizardData = {};
         });
     });
 }
@@ -1888,11 +1913,10 @@ function renderStep(k){
     b.innerHTML = h;
 }
 
-// --- TEKNİK SİHİRBAZ MODÜLÜ ---
+// --- TEKNİK SİHİRBAZ MODÜLÜ (DİNAMİK VERİ İLE) ---
 
 // State Yönetimi
 const twState = {
-    platform: null,
     currentStep: 'start',
     history: []
 };
@@ -1900,274 +1924,62 @@ const twState = {
 // Modal Açma Fonksiyonu
 function openTechWizard() {
     document.getElementById('tech-wizard-modal').style.display = 'flex';
-    twRenderStep(); // Modalı açarken render et
+    // Eğer veri henüz yüklenmediyse tekrar dene
+    if (Object.keys(techWizardData).length === 0) {
+        Swal.fire({ title: 'Veriler Yükleniyor...', didOpen: () => Swal.showLoading() });
+        loadTechWizardData().then(() => {
+            Swal.close();
+            twResetWizard();
+        });
+    } else {
+        twRenderStep();
+    }
 }
 
 // Navigasyon ve Render Mantığı
 function twRenderStep() {
     const contentDiv = document.getElementById('tech-wizard-content');
     const backBtn = document.getElementById('tw-btn-back');
-    let html = '';
+    const stepData = techWizardData[twState.currentStep];
 
-    // Geri butonu görünürlüğü
-    if (twState.history.length > 0) {
-        backBtn.style.display = 'block';
-    } else {
-        backBtn.style.display = 'none';
+    // Geri butonu kontrolü
+    if (twState.history.length > 0) backBtn.style.display = 'block';
+    else backBtn.style.display = 'none';
+
+    if (!stepData) {
+        contentDiv.innerHTML = `<div class="alert" style="color:red;">Hata: Adım bulunamadı (${twState.currentStep}). Lütfen tabloyu kontrol edin.</div>`;
+        return;
     }
 
-    switch (twState.currentStep) {
-        case 'start':
-            html = `
-                <div class="tech-step-title">Sorun Yaşanan Platform</div>
-                <p style="font-size:1.1rem">Müşterinin yayın donma sorunu yaşadığı cihazı seçiniz:</p>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-primary" onclick="twSetPlatform('TV')">📺 TV (Smart/Box)</button>
-                    <button class="tech-btn tech-btn-primary" onclick="twSetPlatform('MOBIL')">📱 Mobil (App)</button>
-                    <button class="tech-btn tech-btn-primary" onclick="twSetPlatform('PC')">💻 Bilgisayar (Web)</button>
-                </div>
-            `;
-            break;
+    let html = `<div class="tech-step-title">${stepData.title || ''}</div>`;
 
-        case 'check_broadcast':
-            html = `
-                <div class="tech-step-title">1. Adım: Yayın Kontrolü</div>
-                <div class="tech-script-box">
-                    <span class="tech-script-label">Müşteriye Sorun:</span>
-                    "Hangi yayında bu sorunu yaşamaktasınız?"
-                </div>
-                <div class="tech-alert">
-                    <strong>⚠️ DİKKAT:</strong> Yayın odasını ve teknik kanalları kontrol edin. 
-                    Bu yayında <u>GENEL</u> bir sorun var mı?
-                </div>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-option" onclick="twChangeStep('general_issue')">EVET, Genel Sorun Var</button>
-                    <button class="tech-btn tech-btn-primary" onclick="twChangeStep('no_general_issue')">HAYIR, Yayın Normal</button>
-                </div>
-            `;
-            break;
+    // Metin (Varsa)
+    if (stepData.text) {
+        html += `<p style="font-size:1rem; margin-bottom:15px;">${stepData.text}</p>`;
+    }
 
-        case 'general_issue':
-            html = `
-                <div class="tech-step-title">Sonuç: Yayın Kaynaklı Sorun</div>
-                <div class="tech-script-box">
-                    <span class="tech-script-label">Müşteriye Okunacak:</span>
-                    "Yaşanan aksaklık için özür dileriz. Teknik ekibimiz sorunun çözümü için çalışma yapmaktadır. Kısa süre içerisinde sorun düzelecektir."
-                </div>
-                <div class="tech-alert">Görüşme sonlandırılabilir.</div>
-            `;
-            break;
+    // Script Kutusu (Varsa)
+    if (stepData.script) {
+        html += `
+        <div class="tech-script-box">
+            <span class="tech-script-label">Müşteriye Okunacak:</span>
+            "${stepData.script}"
+        </div>`;
+    }
 
-        case 'no_general_issue':
-            html = `
-                <div class="tech-step-title">2. Adım: Birlikte Kontrol</div>
-                <div class="tech-script-box">
-                    <span class="tech-script-label">Müşteriye Okunacak:</span>
-                    "İlgili yayında genel bir sorun bulunmuyor fakat birlikte kontrol sağlayalım."
-                </div>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-primary" onclick="twGoToPlatformSpecific()">Teknik Adımları Başlat ➡</button>
-                </div>
-            `;
-            break;
+    // Uyarı/Alert (Varsa)
+    if (stepData.alert) {
+        html += `<div class="tech-alert">${stepData.alert}</div>`;
+    }
 
-        // --- TV SENARYOSU ---
-        case 'tv_step_1':
-            html = `
-                <div class="tech-step-title">TV: Güç Döngüsü (Power Cycle)</div>
-                <div class="tech-script-box">
-                    <span class="tech-script-label">Müşteriye Okunacak:</span>
-                    "Arka planda bir işlem sağlıyorum. Bu esnada TV ve modemi fişlerinden çıkartarak kapatıp 1 dakika kadar kapalı kalmasını sağlayabilir misiniz?"
-                </div>
-                <p><em>Amaç: İnternet sinyal kalitesini iyileştirmek.</em></p>
-                <hr style="border-top:1px dashed #ccc; margin:15px 0;">
-                <p><strong>Cihazları açtıktan sonra yayın düzeldi mi?</strong></p>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-option" onclick="twChangeStep('solved')">EVET (Düzeldi)</button>
-                    <button class="tech-btn tech-btn-primary" onclick="twChangeStep('tv_step_2')">HAYIR (Devam Ediyor)</button>
-                </div>
-            `;
-            break;
-
-        case 'tv_step_2':
-            html = `
-                <div class="tech-step-title">TV: Hız Testi Verileri</div>
-                <p>Kullanıcıdan <strong>"tvhıztesti"</strong> kısayolu ile verileri isteyin.</p>
-                <div class="tech-alert">
-                    <strong>Referans Değerler:</strong><br>
-                    ⬇ Download: <strong>8 Mbps</strong> ve üstü<br>
-                    ⟳ Ping: <strong>40 ms</strong> ve altı
-                </div>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-option" onclick="twChangeStep('isp_issue')">HAYIR (İnternet Kötü)</button>
-                    <button class="tech-btn tech-btn-primary" onclick="twChangeStep('escalate_tech')">EVET (Normal)</button>
-                </div>
-            `;
-            break;
-
-        // --- MOBİL SENARYOSU ---
-        case 'mobil_step_1':
-            html = `
-                <div class="tech-step-title">Mobil: Kontrol ve Hız Testi</div>
-                <p>Kullanıcıdan <strong>"mobilhıztesti"</strong> kısayolu ile verileri isteyin.</p>
-                <ul class="tech-steps-list">
-                    <li><strong>TvManager Kontrolü:</strong> Cihaz işletim sistemi ve App sürümünü kontrol et.</li>
-                    <li><strong>Güncelleme:</strong> Uygulama güncel değilse silip tekrar yükletin.</li>
-                </ul>
-                <div class="tech-alert">
-                    <strong>Referans Değerler:</strong><br>
-                    ⬇ Download: <strong>8 Mbps</strong> ve üstü<br>
-                    ⟳ Ping: <strong>40 ms</strong> ve altı
-                </div>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-option" onclick="twChangeStep('isp_issue')">HAYIR (İnternet Kötü)</button>
-                    <button class="tech-btn tech-btn-primary" onclick="twChangeStep('mobil_step_2')">EVET (Normal)</button>
-                </div>
-            `;
-            break;
-            
-        case 'mobil_step_2':
-             html = `
-                <div class="tech-step-title">Mobil: Önbellek ve Reset</div>
-                <ul class="tech-steps-list">
-                    <li><strong>Önbellek (Android):</strong> Uygulama ayarlarından önbelleği temizletin.</li>
-                    <li><strong>Yeniden Başlatma:</strong> Cihazı tamamen kapatıp açtırın.</li>
-                    <li><strong>Tarayıcı Testi:</strong> Mobil tarayıcı üzerinden girmeyi denesin.</li>
-                </ul>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-option" onclick="twChangeStep('solved')">EVET (Düzeldi)</button>
-                    <button class="tech-btn tech-btn-primary" onclick="twChangeStep('escalate_tech')">HAYIR (Devam Ediyor)</button>
-                </div>
-            `;
-            break;
-
-        // --- PC SENARYOSU ---
-        case 'pc_step_1':
-            html = `
-                <div class="tech-step-title">Bilgisayar: Hız Testi</div>
-                <p>Kullanıcıdan <strong>"webhıztesti"</strong> kısayolu ile verileri isteyin.</p>
-                <div class="tech-alert">
-                    <strong>Referans Değerler:</strong><br>
-                    ⬇ Download: <strong>8 Mbps</strong> ve üstü<br>
-                    ⟳ Ping: <strong>40 ms</strong> ve altı
-                </div>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-option" onclick="twChangeStep('isp_issue')">HAYIR (İnternet Kötü)</button>
-                    <button class="tech-btn tech-btn-primary" onclick="twChangeStep('pc_step_2')">EVET (Normal)</button>
-                </div>
-            `;
-            break;
-
-        case 'pc_step_2':
-            html = `
-                <div class="tech-step-title">Bilgisayar: İşletim Sistemi</div>
-                <p>Kullanıcının cihazı hangisi?</p>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-primary" onclick="twChangeStep('pc_win_ping')">Windows</button>
-                    <button class="tech-btn tech-btn-primary" onclick="twChangeStep('pc_mac_ping')">Macbook (macOS)</button>
-                </div>
-            `;
-            break;
-
-        // --- PC WINDOWS ---
-        case 'pc_win_ping':
-            html = `
-                <div class="tech-step-title">Windows: CMD Ping Testi</div>
-                <p>Kullanıcıya <strong>"pingWindows10"</strong> kısayolunu iletin:</p>
-                <div class="tech-code-block">ping cdn.ssportplus.com -n 20</div>
-                <div class="tech-alert">
-                    <strong>Kontrol:</strong> Sonuçlarda "Time" (Süre) kısmı <strong>35ms ve üzeri</strong> mi?
-                </div>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-primary" onclick="twChangeStep('pc_win_host')">EVET (Yüksek Ping)</button>
-                    <button class="tech-btn tech-btn-option" onclick="twChangeStep('escalate_tech')">HAYIR (Ping Normal)</button>
-                </div>
-            `;
-            break;
-
-        case 'pc_win_host':
-            html = `
-                <div class="tech-step-title">Windows: Host Dosyası</div>
-                <ul class="tech-steps-list">
-                    <li><strong>HOST Kısayolları:</strong> Kullanıcıya <code>HOST1</code> ve <code>HOST2</code> gönderin.</li>
-                    <li><strong>Tarayıcı:</strong> Farklı bir tarayıcı açmasını isteyin.</li>
-                    <li><strong>Çözünürlük:</strong> Player ayarlarından 1080p veya 720p'ye sabitlesin.</li>
-                </ul>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-option" onclick="twChangeStep('solved')">EVET (Düzeldi)</button>
-                    <button class="tech-btn tech-btn-primary" onclick="twChangeStep('escalate_tech')">HAYIR (Devam Ediyor)</button>
-                </div>
-            `;
-            break;
-
-        // --- PC MAC ---
-        case 'pc_mac_ping':
-            html = `
-                <div class="tech-step-title">Macbook: Terminal Ping Testi</div>
-                <p>Kullanıcıya <strong>"pingmacOS"</strong> kısayolunu iletin:</p>
-                <div class="tech-code-block">ping cdn.ssportplus.com -c 20</div>
-                <div class="tech-alert">
-                    <strong>Kontrol:</strong> Sonuçlarda "Time" (Süre) kısmı <strong>35ms ve üzeri</strong> mi?
-                </div>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-primary" onclick="twChangeStep('pc_mac_host')">EVET (Yüksek Ping)</button>
-                    <button class="tech-btn tech-btn-option" onclick="twChangeStep('escalate_tech')">HAYIR (Ping Normal)</button>
-                </div>
-            `;
-            break;
-
-        case 'pc_mac_host':
-            html = `
-                <div class="tech-step-title">Macbook: Host Dosyası</div>
-                <p>Kısayol: <code>pingmacoshost</code>. Adımları uygulatın.</p>
-                <div class="tech-code-block">sudo nano /etc/hosts</div>
-                <div class="tech-code-block">ping 193.192.103.249 -c 20 cdn.ssportplus.com</div>
-                <div class="tech-buttons-area">
-                    <button class="tech-btn tech-btn-option" onclick="twChangeStep('solved')">EVET (Düzeldi)</button>
-                    <button class="tech-btn tech-btn-primary" onclick="twChangeStep('escalate_tech')">HAYIR (Devam Ediyor)</button>
-                </div>
-            `;
-            break;
-
-        // --- SONUÇLAR ---
-        case 'isp_issue':
-            html = `
-                <div class="tech-step-title">Sonuç: İnternet Kaynaklı Sorun</div>
-                <div class="tech-alert" style="background-color:#f8d7da; border-color:#f5c6cb; color:#721c24;">
-                    <strong>Hız/Ping Yetersiz:</strong> Download < 8mbps VEYA Ping > 40ms.
-                </div>
-                <div class="tech-script-box">
-                    <span class="tech-script-label">Müşteriye Okunacak:</span>
-                    "S Sport Plus'ı sağlıklı bir şekilde izleyebilmeniz için en az 8 mb hıza ve 40 ms altında ping değerine sahip olmalısınız. Sorunu internet kaynaklı yaşadığınız gözükmekte."
-                </div>
-                <button class="tech-btn tech-btn-primary" onclick="twResetWizard()">Yeni İşlem</button>
-            `;
-            break;
-
-        case 'escalate_tech':
-            html = `
-                <div class="tech-step-title">Sonuç: Teknik Ekibe Yönlendirme</div>
-                <div class="tech-alert">
-                    Tüm teknik müdahaleler yapıldı ancak sorun çözülemedi.
-                </div>
-                <div class="tech-script-box">
-                    <span class="tech-script-label">Müşteriye Okunacak:</span>
-                    "Gerekli bilgileri aldım; konuyu incelemesi için teknik ekibe ileteceğim."
-                </div>
-                <div class="tech-alert"><strong>Aksiyon:</strong> Kaydı teknik ekibe atayın.</div>
-                <button class="tech-btn tech-btn-primary" onclick="twResetWizard()">Yeni İşlem</button>
-            `;
-            break;
-
-        case 'solved':
-            html = `
-                <div class="tech-step-title">✅ Sorun Çözüldü</div>
-                <div class="tech-alert" style="background-color:#d4edda; border-color:#c3e6cb; color:#155724;">
-                    Müşterinin sorunu giderildi.
-                </div>
-                <button class="tech-btn tech-btn-primary" onclick="twResetWizard()">Yeni İşlem</button>
-            `;
-            break;
+    // Butonlar
+    if (stepData.buttons && stepData.buttons.length > 0) {
+        html += `<div class="tech-buttons-area">`;
+        stepData.buttons.forEach(btn => {
+            let btnClass = btn.style === 'option' ? 'tech-btn-option' : 'tech-btn-primary';
+            html += `<button class="tech-btn ${btnClass}" onclick="twChangeStep('${btn.next}')">${btn.text}</button>`;
+        });
+        html += `</div>`;
     }
 
     contentDiv.innerHTML = html;
@@ -2175,6 +1987,7 @@ function twRenderStep() {
 
 // Navigasyon Fonksiyonları
 function twChangeStep(newStep) {
+    // Özel komutlar (Eski hardcoded mantıktan kalanlar varsa buraya eklenebilir ama şu an hepsi tabloda)
     twState.history.push(twState.currentStep);
     twState.currentStep = newStep;
     twRenderStep();
@@ -2187,19 +2000,7 @@ function twGoBack() {
     }
 }
 
-function twSetPlatform(p) {
-    twState.platform = p;
-    twChangeStep('check_broadcast');
-}
-
-function twGoToPlatformSpecific() {
-    if (twState.platform === 'TV') twChangeStep('tv_step_1');
-    else if (twState.platform === 'MOBIL') twChangeStep('mobil_step_1');
-    else if (twState.platform === 'PC') twChangeStep('pc_step_1');
-}
-
 function twResetWizard() {
-    twState.platform = null;
     twState.currentStep = 'start';
     twState.history = [];
     twRenderStep();
