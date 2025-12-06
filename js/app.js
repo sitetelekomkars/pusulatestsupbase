@@ -1,6 +1,6 @@
 const BAKIM_MODU = false;
 // Apps Script URL'si
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby3kd04k2u9XdVDD1-vdbQQAsHNW6WLIn8bNYxTlVCL3U1a0WqZo6oPp9zfBWIpwJEinQ/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwlgY2KcewgCh5q60KWsEacRPlniVJFP7Il-4kIMcNvCOXb9NRyU2f3beiWT9n4klt7MQ/exec";
 let jokers = { call: 1, half: 1, double: 1 };
 let doubleChanceUsed = false;
 let firstAnswerIndex = -1;
