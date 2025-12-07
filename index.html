@@ -28,9 +28,9 @@
     <!-- BAKIM EKRANI -->
     <div id="maintenance-screen">
         <div class="maintenance-content" style="text-align:center; color:white;">
-            <span style="font-size: 4rem;"> 👨‍🏫 </span>
+            <span style="font-size: 4rem;">👨‍🏫</span>
             <h1>Sistem Mola Verdi!</h1>
-            <p>Bakım çalışması sürüyor... 🚀 </p>
+            <p>Bakım çalışması sürüyor... 🚀</p>
         </div>
     </div>
 
@@ -92,9 +92,6 @@
                         <button class="filter-btn link-btn" onclick="openGuide()"><i class="fas fa-book"></i> Spor Rehberi</button>
                         <button class="filter-btn link-btn" onclick="openWizard()"><i class="fas fa-robot"></i> İade Asistanı</button>
                         <button class="filter-btn link-btn" onclick="openSales()"><i class="fas fa-headset"></i> TeleSatış</button>
-                        <!-- YENİ EKLENEN BUTON: SATIŞ PERFORMANS -->
-                        <button class="filter-btn link-btn" onclick="openSalesPerformance()"><i class="fas fa-chart-line"></i> Performans</button>
-                        
                         <button class="filter-btn link-btn" onclick="openPenaltyGame()"><i class="fas fa-futbol"></i> Oyun</button>
                         <button class="filter-btn link-btn" onclick="openQualityArea()"><i class="fas fa-chart-pie"></i> Kalite</button>
                     </div>
@@ -124,7 +121,7 @@
     <div id="news-modal" class="modal-overlay">
         <div class="modal-content">
             <span class="close-modal" onclick="closeModal('news-modal')">&times;</span>
-            <h2 style="color:var(--primary);"> 📢 Duyurular</h2>
+            <h2 style="color:var(--primary);">📢 Duyurular</h2>
             <div id="news-container"></div>
         </div>
     </div>
@@ -141,7 +138,7 @@
     <div id="guide-modal" class="modal-overlay">
         <div class="modal-content">
             <span class="close-modal" onclick="closeModal('guide-modal')">&times;</span>
-            <h2 style="text-align:center; color:var(--primary);"> 📖 Spor Terimleri & İçerik Rehberi</h2>
+            <h2 style="text-align:center; color:var(--primary);">📖 Spor Terimleri & İçerik Rehberi</h2>
             <div class="guide-grid" id="guide-grid"></div>
         </div>
     </div>
@@ -150,22 +147,8 @@
     <div id="sales-modal" class="modal-overlay">
         <div class="modal-content">
             <span class="close-modal" onclick="closeModal('sales-modal')">&times;</span>
-            <h2 style="text-align:center; color:var(--sales);"> 📞 Satış Scriptleri</h2>
+            <h2 style="text-align:center; color:var(--sales);">📞 Satış Scriptleri</h2>
             <div class="sales-grid" id="sales-grid"></div>
-        </div>
-    </div>
-
-    <!-- YENİ EKLENEN MODAL: SATIŞ PERFORMANS TABLOSU -->
-    <div id="performance-modal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 1200px;">
-            <span class="close-modal" onclick="closeModal('performance-modal')">&times;</span>
-            <h2 style="text-align:center; color:var(--primary); margin-bottom:20px;"> 🚀 Satış Performans Tablosu</h2>
-            <div style="overflow-x:auto;">
-                <table id="sales-table" class="performance-table">
-                    <thead></thead>
-                    <tbody id="sales-table-body"></tbody>
-                </table>
-            </div>
         </div>
     </div>
 
@@ -173,9 +156,9 @@
     <div id="penalty-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 650px; background: #1a1a1a; border: 1px solid #333; min-height:600px; display:flex; flex-direction:column;">
             <span class="close-modal" onclick="closeModal('penalty-modal')">&times;</span>
-            <h2 style="text-align:center; color:#fabb00; margin-top:0;"> ⚽ S Sport Arena</h2>
+            <h2 style="text-align:center; color:#fabb00; margin-top:0;">⚽ S Sport Arena</h2>
             <div id="penalty-lobby" style="text-align:center; padding:20px; flex-grow:1; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-                <h3 style="color:white; margin-bottom:15px;"> 🏆 Liderlik Tablosu (Top 5)</h3>
+                <h3 style="color:white; margin-bottom:15px;">🏆 Liderlik Tablosu (Top 5)</h3>
                 <div id="leaderboard-loader" style="color:#aaa;">Yükleniyor...</div>
                 <table id="leaderboard-table" style="width:100%; color:#eee; border-collapse:collapse; margin-bottom:30px; display:none;">
                     <thead><tr style="border-bottom:1px solid #555; color:#fabb00;"><th style="padding:10px;">#</th><th style="padding:10px;">Temsilci</th><th style="padding:10px;">Maç</th><th style="padding:10px;">Ort.</th></tr></thead>
@@ -192,8 +175,8 @@
                 </div>
                 <div style="margin-top:15px; color:#ddd; min-height:50px; font-weight:500; text-align:center; padding:10px; background:rgba(255,255,255,0.05); border-radius:8px;" id="p-question-text">Soru yükleniyor...</div>
                 <div id="joker-container" style="display: flex; justify-content: space-around; margin: 15px 0;">
-                    <button id="joker-call" class="joker-btn" onclick="useJoker('call')" title="Telefon Jokeri"> 📞 Telefon</button>
-                    <button id="joker-half" class="joker-btn" onclick="useJoker('half')" title="Yarı Yarıya Joker"> ✂️ 50:50</button>
+                    <button id="joker-call" class="joker-btn" onclick="useJoker('call')" title="Telefon Jokeri">📞 Telefon</button>
+                    <button id="joker-half" class="joker-btn" onclick="useJoker('half')" title="Yarı Yarıya Joker">✂️ 50:50</button>
                     <button id="joker-double" class="joker-btn" onclick="useJoker('double')" title="Çift Cevap Hakkı">2️⃣ Çift Cevap</button>
                 </div>
                 <div class="penalty-options" id="p-options"></div>
@@ -202,18 +185,20 @@
         </div>
     </div>
 
-    <!-- MODAL: KALİTE YÖNETİM PANELİ -->
+    <!-- MODAL: KALİTE YÖNETİM PANELİ (GÜNCELLENMİŞ HALİ) -->
     <div id="quality-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 900px;">
             <span class="close-modal" onclick="closeModal('quality-modal')">&times;</span>
             <h2 style="text-align:center; color:var(--primary); margin-bottom: 20px;">Kalite</h2>
             
+            <!-- Admin Kontrolleri (GÜNCELLENDİ) -->
             <div id="admin-quality-controls" style="display:none; margin-bottom:15px;">
                 <div class="quality-controls-top">
                     <div style="display:flex; gap:10px;">
                         <button class="add-btn" style="background:var(--accent); border:none; color:white; padding:8px 15px; border-radius:4px; cursor:pointer;" onclick="logEvaluationPopup()"><i class="fas fa-plus"></i> Ekle</button>
                         <button class="admin-btn" style="background:var(--primary); color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;" onclick="exportEvaluations()"><i class="fas fa-file-csv"></i> Rapor</button>
                     </div>
+                    <!-- YENİ: Grup ve Temsilci Filtresi -->
                     <div style="font-weight:bold; display:flex; align-items:center; gap: 15px;">
                         <div style="display:flex; flex-direction:column;">
                             <label style="font-size:0.7rem; color:#999; margin-bottom:2px;">Ekip / Grup</label>
@@ -227,7 +212,10 @@
                 </div>
             </div>
 
+            <!-- GÜNCELLENMİŞ KALİTE İÇERİĞİ -->
             <div id="quality-content" style="padding: 10px; border-radius: 8px;">
+    
+                <!-- ÜST KISIM: BAŞLIK VE FİLTRE -->
                 <div class="q-dashboard-header" style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
                     <div>
                         <h3 style="font-size:1.2rem; color:var(--primary); margin:0; font-weight:700;">Kalite Yönetim Paneli</h3>
@@ -242,6 +230,7 @@
                     </div>
                 </div>
             
+                <!-- ORTA KISIM: 3'LÜ İSTATİSTİK KARTLARI -->
                 <div class="q-stats-grid">
                     <div class="q-stat-card card-blue">
                         <div class="q-card-title">ORTALAMA PUAN</div>
@@ -265,6 +254,7 @@
                     </div>
                 </div>
                 
+                <!-- ALT KISIM: LİSTE BAŞLIĞI VE LİSTE -->
                 <div class="list-section-title" style="font-size:0.85rem; font-weight:700; color:#333; margin:15px 0 10px 0; padding-left:5px; border-left:3px solid #ccc;">
                     Değerlendirme Geçmişi
                 </div>
@@ -273,6 +263,7 @@
             
                 <div id="evaluations-list" style="max-height: 380px; overflow-y: auto; padding-right:5px;"></div>
             </div>
+
         </div>
     </div>
 
@@ -305,4 +296,3 @@
     </script>
 </body>
 </html>
-
