@@ -967,11 +967,23 @@ selectEl.appendChild(option);
 }
 }
 function openQualityArea() {
+// HOŞ GELDİNİZ MESAJI EKLENİYOR
+Swal.fire({
+    title: '  👋   Kalite Alanına Hoş Geldiniz!',
+    text: 'Performans özetiniz ve eğitim kayıtlarınız yükleniyor.',
+    icon: 'info',
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 2000,
+});
+    
 document.getElementById('quality-modal').style.display = 'flex';
 document.getElementById('admin-quality-controls').style.display = isAdminMode ? 'block' : 'none';
 document.getElementById('quality-modal-title').innerText = `  📊   Kalite Yönetim Paneli: ${isAdminMode ? 'Yönetici' : currentUser}`;
-// Yeni sekme yapısını varsayarak: Performans Özeti sekmesini aktif et
-// switchQualityTab('overview'); // Bu fonksiyonu HTML içinde eklediğimiz script bloğuna taşıdık, burada sadece DOM'un açıldığından emin olmalıyız.
+
+// Sekmeleri Performans Özeti'ne ayarla
+switchQualityTab('overview');
 
 populateMonthFilter();
 
@@ -1074,7 +1086,7 @@ return;
 }
 
 // Modal Başlığını Güncelle
-const agentNameDisplay = (targetAgent === 'all' && targetGroup === 'all') ? 'Tüm Şirket' : (targetAgent === 'all' ? targetGroup + ' Ekibi' : targetAgent);
+const agentNameDisplay = (targetAgent === 'all' && targetGroup === 'all') ? 'Tüm Şirket' : (targetAgent === 'all' ? targetGroup + ' Ekibi' : agentSelect ? agentSelect.options[agentSelect.selectedIndex].text : targetAgent);
 document.getElementById('quality-modal-title').innerText = `  📊   Kalite Yönetim Paneli: ${agentNameDisplay}`;
 
 
@@ -1111,22 +1123,18 @@ const targetRate = monthlyCount > 0 ? Math.round((targetHitCount / monthlyCount)
 let totalNegativeNotes = 0;
 let revisionCount = 0;
 filteredEvals.forEach(evalItem => {
-try {
-const detailsObj = JSON.parse(evalItem.details);
-detailsObj.forEach(item => {
-// Kritere göre puan düşüşü varsa not say
-if (item.score < item.max) {
-// Not alanı doluysa (kritik kırılım)
-if (item.note && item.note.trim() !== '') {
-totalNegativeNotes++;
-}
-}
-});
-} catch (e) { /* JSON Parse Hatası: Manuel puanlama formu */ }
-// Revize edilmiş kayıtları say (callDate mevcut, ama logDate ile arasındaki fark 1 günden fazlaysa revize kabul edebiliriz
-// Basitçe: Eğer değerlendiren kişi, kullanıcının kendisi değilse ve feedback/detay değişimi varsa revizedir (Bunu backend'den kontrol etmek daha zor, şimdilik sabit sayım yapmayalım)
-// Şimdilik Revizyon Sayısı: Feedback varsa 1 sayalım (Basit simülasyon)
-if(evalItem.feedback && evalItem.feedback.trim() !== '') revisionCount++;
+    // Kritik Kırılım ve Revizyon Sayısı
+    if (evalItem.feedbackType && evalItem.feedbackType !== 'Yok') revisionCount++;
+
+    try {
+        const detailsObj = JSON.parse(evalItem.details);
+        detailsObj.forEach(item => {
+            // Not alanı doluysa (kritik kırılım)
+            if (item.note && item.note.trim() !== '') {
+                totalNegativeNotes++;
+            }
+        });
+    } catch (e) { /* JSON Parse Hatası: Manuel puanlama formu */ }
 });
 
 
@@ -1692,7 +1700,7 @@ const experts = ["Umut Bey", "Doğuş Bey", "Deniz Bey", "Esra Hanım"];
 const expert = experts[Math.floor(Math.random() * experts.length)];
 let guess = correctAns;
 if (Math.random() > 0.8 && currentQ.opts.length > 1) {
-let incorrectOpts = currentQ.opts.map((_, i) => i).filter(i => i !== correctAns);
+let incorrectOpts = currentQ.opts.map((_, i) => i).filter(i => i !== correctAns).sort(() => Math.random() - 0.5).slice(0, 2);
 guess = incorrectOpts[Math.floor(Math.random() * incorrectOpts.length)] || correctAns;
 }
 Swal.fire({ icon: 'info', title: '  📞   Telefon Jokeri', html: `${expert} soruyu cevaplıyor...<br><br>"Benim tahminim kesinlikle **${String.fromCharCode(65 + guess)}** şıkkı. Bundan ${Math.random() < 0.8 ? "çok eminim" : "emin değilim"}."`, confirmButtonText: 'Kapat' });
