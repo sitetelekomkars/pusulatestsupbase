@@ -19,6 +19,72 @@ let allEvaluationsData = [];
 let trainingRecordsData = []; // YENİ: Eğitim Kayıtları
 let wizardStepsData = {};
 const MONTH_NAMES = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+// --- FONKSİYON BAŞLANGICI ---
+function enterBas(e) { if (e.key === "Enter") girisYap(); }
+function girisYap() {
+    const uName = document.getElementById("usernameInput").value.trim();
+    const uPass = document.getElementById("passInput").value.trim();
+    const loadingMsg = document.getElementById("loading-msg");
+    const errorMsg = document.getElementById("error-msg");
+    if(!uName || !uPass) {
+        errorMsg.innerText = "Lütfen bilgileri giriniz.";
+        errorMsg.style.display = "block";
+        return;
+    }
+    loadingMsg.style.display = "block";
+    loadingMsg.innerText = "Doğrulanıyor...";
+    errorMsg.style.display = "none";
+    document.querySelector('.login-btn').disabled = true;
+    const hashedPass = CryptoJS.SHA256(uPass).toString();
+    fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "login", username: uName, password: hashedPass })
+    }).then(response => response.json())
+    .then(data => {
+        loadingMsg.style.display = "none";
+        document.querySelector('.login-btn').disabled = false;
+        
+        if (data.result === "success") {
+            currentUser = data.username;
+            localStorage.setItem("sSportUser", currentUser);
+            localStorage.setItem("sSportToken", data.token);
+            localStorage.setItem("sSportRole", data.role);
+            if (data.forceChange === true) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: '  ⚠️   Güvenlik Uyarısı',
+                    text: 'İlk girişiniz. Lütfen şifrenizi değiştirin.',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    confirmButtonText: 'Şifremi Değiştir'
+                }).then(() => { changePasswordPopup(true); });
+            } else {
+                document.getElementById("login-screen").style.display = "none";
+                document.getElementById("user-display").innerText = currentUser;
+                checkAdmin(data.role);
+                startSessionTimer();
+                if (BAKIM_MODU)
+                    document.getElementById("maintenance-screen").style.display = "flex";
+                else {
+                    document.getElementById("main-app").style.display = "block";
+                    loadContentData();
+                    loadWizardData();
+                    loadTechWizardData();
+                }
+            }
+        } else {
+            errorMsg.innerText = data.message || "Hatalı giriş!";
+            errorMsg.style.display = "block";
+        }
+    }).catch(error => {
+        console.error("Login Error:", error);
+        loadingMsg.style.display = "none";
+        document.querySelector('.login-btn').disabled = false;
+        errorMsg.innerText = "Sunucu hatası! Lütfen sayfayı yenileyin.";
+        errorMsg.style.display = "block";
+    });
+}
 // --- KALİTE PUANLAMA LOGİĞİ ---
 window.updateRowScore = function(index, max) {
 const slider = document.getElementById(`slider-${index}`);
@@ -158,71 +224,7 @@ loadTechWizardData(); // YENİ: Otomatik yükle
 }
 }
 }
-function enterBas(e) { if (e.key === "Enter") girisYap(); }
-function girisYap() {
-const uName = document.getElementById("usernameInput").value.trim();
-const uPass = document.getElementById("passInput").value.trim();
-const loadingMsg = document.getElementById("loading-msg");
-const errorMsg = document.getElementById("error-msg");
-if(!uName || !uPass) {
-errorMsg.innerText = "Lütfen bilgileri giriniz.";
-errorMsg.style.display = "block";
-return;
-}
-loadingMsg.style.display = "block";
-loadingMsg.innerText = "Doğrulanıyor...";
-errorMsg.style.display = "none";
-document.querySelector('.login-btn').disabled = true;
-const hashedPass = CryptoJS.SHA256(uPass).toString();
-fetch(SCRIPT_URL, {
-method: 'POST',
-headers: { "Content-Type": "text/plain;charset=utf-8" },
-body: JSON.stringify({ action: "login", username: uName, password: hashedPass })
-}).then(response => response.json())
-.then(data => {
-loadingMsg.style.display = "none";
-document.querySelector('.login-btn').disabled = false;
 
-if (data.result === "success") {
-currentUser = data.username;
-localStorage.setItem("sSportUser", currentUser);
-localStorage.setItem("sSportToken", data.token);
-localStorage.setItem("sSportRole", data.role);
-if (data.forceChange === true) {
-Swal.fire({
-icon: 'warning',
-title: '  ⚠️   Güvenlik Uyarısı',
-text: 'İlk girişiniz. Lütfen şifrenizi değiştirin.',
-allowOutsideClick: false,
-allowEscapeKey: false,
-confirmButtonText: 'Şifremi Değiştir'
-}).then(() => { changePasswordPopup(true); });
-} else {
-document.getElementById("login-screen").style.display = "none";
-document.getElementById("user-display").innerText = currentUser;
-checkAdmin(data.role);
-startSessionTimer();
-if (BAKIM_MODU)
-document.getElementById("maintenance-screen").style.display = "flex";
-else {
-document.getElementById("main-app").style.display = "block";
-loadContentData();
-loadWizardData();
-loadTechWizardData(); // YENİ: Yükle
-}
-}
-} else {
-errorMsg.innerText = data.message || "Hatalı giriş!";
-errorMsg.style.display = "block";
-}
-}).catch(error => {
-console.error("Login Error:", error);
-loadingMsg.style.display = "none";
-document.querySelector('.login-btn').disabled = false;
-errorMsg.innerText = "Sunucu hatası! Lütfen sayfayı yenileyin.";
-errorMsg.style.display = "block";
-});
-}
 function checkAdmin(role) {
 const addCardDropdown = document.getElementById('dropdownAddCard');
 const quickEditDropdown = document.getElementById('dropdownQuickEdit');
@@ -1011,10 +1013,12 @@ async function fetchTrainingRecords(targetAgent, targetGroup, selectedMonth) {
 
 function renderTrainingTab(targetAgent, targetGroup, selectedMonth) {
     const listEl = document.getElementById('training-records-list');
-    const tableEl = document.getElementById('training-performance-body'); // Yeni eklenecek tablo body ID'si
+    const tableElBody = document.getElementById('training-performance-body');
+    
+    if (!listEl || !tableElBody) return;
 
-    if (!listEl) return;
     listEl.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Eğitim verileri yükleniyor...</div>';
+    tableElBody.innerHTML = '';
     
     fetchTrainingRecords(targetAgent, targetGroup, selectedMonth).then(trainings => {
         let listHtml = '';
@@ -1055,14 +1059,9 @@ function renderTrainingTab(targetAgent, targetGroup, selectedMonth) {
             perfTableData.forEach(p => {
                 tableHtml += `<tr><td>${p.date}</td><td>${p.topic}</td><td>${p.score}</td><td>${p.evaluator}</td></tr>`;
             });
-            // Tablo body'sini bulup doldurun
-            if (document.getElementById('training-performance-body')) {
-                document.getElementById('training-performance-body').innerHTML = tableHtml;
-            }
+            tableElBody.innerHTML = tableHtml;
         } else {
-             if (document.getElementById('training-performance-body')) {
-                document.getElementById('training-performance-body').innerHTML = `<tr><td colspan="4" style="text-align:center;">Eğitim sonrası performans kaydı yok.</td></tr>`;
-            }
+            tableElBody.innerHTML = `<tr><td colspan="4" style="text-align:center;">Eğitim sonrası performans kaydı yok.</td></tr>`;
         }
 
     }).catch(err => {
@@ -1131,7 +1130,8 @@ updateAgentListBasedOnGroup();
 fetchEvaluationsForAgent(currentUser);
 }
 // Eğitim sekmesi için veriyi önceden yükleyelim (görünüm değişince render edeceğiz)
-renderTrainingTab(currentUser, 'all', document.getElementById('month-select-filter').value); 
+const currentMonth = document.getElementById('month-select-filter') ? document.getElementById('month-select-filter').value : 'N/A';
+renderTrainingTab(currentUser, 'all', currentMonth); 
 }
 // YENİ FONKSİYON: Gruba Göre Temsilci Listesini Güncelleme
 function updateAgentListBasedOnGroup() {
@@ -1255,9 +1255,9 @@ filteredEvals.forEach(evalItem => {
 });
 
 
-if(dashAvg) dashAvg.innerText = monthlyAvg % 1 === 0 ? monthlyAvg : monthlyAvg.toFixed(1); [cite: 1357]
-if(dashCount) dashCount.innerText = monthlyCount; [cite: 1358]
-if(dashTarget) dashTarget.innerText = `%${targetRate}`; [cite: 1359]
+if(dashAvg) dashAvg.innerText = monthlyAvg % 1 === 0 ? monthlyAvg : monthlyAvg.toFixed(1);
+if(dashCount) dashCount.innerText = monthlyCount;
+if(dashTarget) dashTarget.innerText = `%${targetRate}`;
 if(dashNegativeNotes) dashNegativeNotes.innerText = totalNegativeNotes;
 if(dashRevisionCount) dashRevisionCount.innerText = revisionCount;
 
