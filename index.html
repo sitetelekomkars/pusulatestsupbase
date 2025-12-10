@@ -4,443 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>S Sport Plus - Pusula</title>
-    
-    <!-- Gerekli kütüphaneler -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" type="image/png" href="favicon.png">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    
-    <!-- TEK DOSYALI CSS (style.css içeriği buraya taşındı) -->
-    <style>
-        :root { 
-            --primary: #0e1b42; 
-            --secondary: #fabb00; 
-            --bg: #f4f6f8; 
-            --card-bg: #ffffff; 
-            --accent: #d32f2f; /* Kırmızı (Kritik Kırılım) */
-            --success: #2e7d32; 
-            --info: #0288d1; 
-            --warning: #ed6c02; /* Turuncu (Geri Bildirim) */
-            --sales: #10b981; 
-            --quiz: #8e24aa; /* Mor (Eğitim) */
-            --text-dark: #2c3e50;
-            --text-light: #95a5a6;
-        }
-        body { 
-            margin: 0; padding: 0; 
-            font-family: 'Segoe UI', 'Roboto', Helvetica, Arial, sans-serif; 
-            background-color: var(--bg); 
-            color: var(--text-dark);
-            user-select: none; 
-            overflow-x: hidden;
-        }
-        /* --- LOGIN SCREEN --- */
-        #login-screen { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 5000; 
-            display: flex; justify-content: center; align-items: center;
-            background: #0e1b42; 
-        }
-        .login-card {
-            background: #1c2438; padding: 25px 40px; border-radius: 12px; text-align: center;
-            width: 300px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-            border: 1px solid rgba(255,255,255,0.05);
-        }
-        .login-logo-img {
-            width: 90px;
-            height: auto; 
-            margin-bottom: 0px; 
-            filter: drop-shadow(0 0 10px rgba(250, 187, 0, 0.3));
-        }
-        .login-card h2 {
-            margin-top: 5px !important; 
-            margin-bottom: 0px !important;
-        }
-        .login-card p {
-            margin-top: 5px !important; 
-            margin-bottom: 25px !important;
-        }
-        .login-input { 
-            width: 100%; padding: 12px; margin: 8px 0; background: #2c344a; color: #fff; 
-            border: 1px solid #3a4563; border-radius: 6px; text-align: center; box-sizing: border-box; 
-            font-size: 0.9rem; outline: none; transition: 0.3s;
-        }
-        .login-input:focus { border-color: var(--secondary); background: #323c54; }
-        .login-btn { 
-            width: 100%; padding: 12px; background: var(--secondary); border: none; 
-            border-radius: 6px; font-weight: 700; cursor: pointer; margin-top: 15px; 
-            color: #0e1b42; transition: 0.2s;
-        }
-        .login-btn:hover { background: #e0a800; }
-        .loading-text { font-size: 0.8rem; color: #666; margin-top: 10px; display: none; }
-        #maintenance-screen { display: none !important; }
-        #main-app { display: none; }
-        /* --- HEADER YAPISI --- */
-        .header { 
-            background: #0e1b42; 
-            color: white; 
-            padding: 0; 
-            position: sticky; top: 0; 
-            z-index: 1000; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-            display: flex;
-            flex-direction: column;
-        }
-        .header-content-limit {
-            width: 100%;
-            max-width: 1600px; 
-            /* Sol tarafa kaydırma için ayar */
-            margin-right: auto; 
-            margin-left: 0; 
-            padding: 5px 25px 0px 10px; 
-            box-sizing: border-box;
-        }
-        .header-top { 
-            display: flex; justify-content: space-between; align-items: center; 
-            /* Kırmızı boşlukları silmek için marjini sıfırladık */
-            margin-bottom: 0px; 
-        }
-        /* MARKA ALANI */
-        .brand-area { display: flex; align-items: center; gap: 10px; }
-        .brand-img { 
-            /* Logo boyutunu dikey alana yayılacak şekilde artırdık */
-            height: 65px; 
-            width: 65px; 
-            object-fit: contain;
-            filter: drop-shadow(0 0 5px rgba(250, 187, 0, 0.3));
-        }
-        .brand-text { display: flex; flex-direction: row; align-items: center; gap: 8px; }
-        .brand-text .main-text { font-size: 1.0rem; font-weight: 700; color: #fff; letter-spacing: 0.5px; white-space: nowrap; }
-        .brand-text .sub-text { font-size: 1.0rem; font-weight: 300; color: rgba(255,255,255,0.6); white-space: nowrap; border-left: 1px solid rgba(255,255,255,0.3); padding-left: 8px; }
-        .header-controls { display: flex; align-items: center; gap:10px; }
-        .action-btn { 
-            background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); 
-            color: #ccc; padding: 5px 10px; border-radius: 4px; cursor: pointer; 
-            font-weight: 500; font-size: 0.75rem; display: flex; align-items: center; 
-            gap: 6px; transition: all 0.2s; 
-        }
-        .action-btn:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
-        .action-btn.active { background: var(--secondary); border-color: var(--secondary); color: #0e1b42; }
-        /* KULLANICI MENÜSÜ & DROPDOWN */
-        .user-menu-wrapper { position: relative; }
-        .user-btn { background: transparent; border: none; color: #eee; padding: 6px 10px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; border-radius: 4px; border: 1px solid transparent; transition: all 0.2s; }
-        .user-btn:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); }
-        .user-avatar { width: 26px; height: 26px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--secondary); font-size: 0.8rem; }
-        .dropdown-menu { display: none; position: absolute; right: 0; top: 110%; background-color: #1c2438; min-width: 180px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); z-index: 2000; overflow: hidden; animation: fadeInDropdown 0.2s ease; }
-        .dropdown-menu.show { display: block; }
-        .dropdown-header { padding: 10px 15px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .dropdown-item { display: flex; align-items: center; gap: 10px; padding: 12px 15px; color: #ddd; text-decoration: none; font-size: 0.85rem; transition: 0.2s; }
-        .dropdown-item:hover { background-color: #2c344a; color: #fff; }
-        .dropdown-item i { width: 15px; text-align: center; color: var(--secondary); }
-        .dropdown-item.logout { color: #ff6b6b; }
-        .dropdown-item.logout:hover { background: rgba(255, 107, 107, 0.1); }
-        .dropdown-item.logout i { color: #ff6b6b; }
-        .dropdown-divider { height: 1px; background: rgba(255,255,255,0.05); margin: 0; }
-        @keyframes fadeInDropdown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        /* --- ORTA KONTROL ALANI --- */
-        .control-wrapper { 
-            display: flex; 
-            align-items: center; 
-            /* Sola hizalı */
-            justify-content: flex-start; 
-            gap: 15px; 
-            /* Kırmızı boşlukları silmek için padding'i sıfırladık */
-            padding-bottom: 0; 
-            position: relative;
-            flex-wrap: wrap; 
-        }
-        .search-container { position: relative; width: 300px; flex-shrink: 0; }
-        #searchInput { 
-            width: 100%; padding: 6px 15px 6px 35px;
-            background: rgba(255, 255, 255, 0.1); 
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 4px; 
-            color: white;
-            font-size: 0.85rem;
-            box-sizing: border-box; 
-            transition: all 0.3s ease;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
-        }
-        #searchInput::placeholder { color: rgba(255, 255, 255, 0.5); }
-        #searchInput:focus {
-            background: rgba(255, 255, 255, 0.15);
-            border-color: #fabb00; 
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(250, 187, 0, 0.15);
-        }
-        .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: rgba(255, 255, 255, 0.5); font-size: 0.85rem; }
-        /* Filtre Alanı */
-        .filter-container { 
-            display: flex; 
-            gap: 6px; 
-            align-items: center;
-            overflow-x: auto;
-            padding-bottom: 2px;
-            max-width: 100%;
-            position: relative;
-        }
-        .filter-container::-webkit-scrollbar { height: 0px; } 
-        /* GENEL FİLTRE BUTONU */
-        .filter-btn { 
-            background-color: rgba(255, 255, 255, 0.03); 
-            border: 1px solid rgba(255, 255, 255, 0.15); 
-            color: rgba(255, 255, 255, 0.75); 
-            padding: 5px 10px; 
-            border-radius: 4px; 
-            cursor: pointer; 
-            transition: all 0.2s ease; 
-            display: flex; align-items: center; gap: 6px; 
-            font-weight: 500; font-size: 0.75rem; 
-            white-space: nowrap; 
-            z-index: 1; 
-        }
-        .filter-btn:hover { 
-            background-color: rgba(255, 255, 255, 0.1); 
-            color: white;
-            border-color: rgba(255, 255, 255, 0.4); 
-            transform: translateY(-1px);
-        }
-        /* Aktif Buton */
-        .filter-btn.active { 
-            background-color: #fabb00 !important; 
-            color: #0e1b42 !important; 
-            border-color: #fabb00 !important; 
-            font-weight: 700;
-            box-shadow: 0 2px 8px rgba(250, 187, 0, 0.3);
-        }
-        .divider { width: 1px; height: 18px; background: rgba(255,255,255,0.15); margin: 0 4px; }
-        .link-btn { color: rgba(255, 255, 255, 0.7); }
-        .link-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
-        /* --- TICKER (Duyuru Barı İyileştirmesi) --- */
-        .news-ticker-box { 
-            width: 100%;
-            /* Rengi üst barın ana rengine yakın, hafif koyu yaptık */
-            background: #0a1532; 
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 0 25px; 
-            height: 25px; /* Duyuru barını daralttık */
-            display: flex; 
-            align-items: center; 
-            gap: 15px; 
-            cursor: pointer; 
-            transition: 0.2s;
-            margin-top: 0px; 
-            box-sizing: border-box;
-            overflow: hidden; 
-        }
-        .news-ticker-box:hover { background: #1c2438; } 
-        .ticker-label { 
-            font-size: 0.65rem; color: #fabb00; font-weight: 800; display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px; min-width: fit-content; z-index: 5; 
-            background: #0a1532; /* Arka planı kutu arka planıyla eşleştirdik */
-            padding-right: 15px; height: 100%; 
-            display: flex; align-items: center;
-        }
-        .pulse-dot { width: 5px; height: 5px; background: var(--secondary); border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
-        .ticker-scroll-wrapper {
-            flex-grow: 1;
-            overflow: hidden;
-            position: relative;
-            height: 100%;
-            display: flex;
-            align-items: center;
-        }
-        /* KAYAN YAZI ANİMASYONU */
-        .ticker-content { 
-            font-size: 0.7rem; /* Metin boyutunu küçülttük */
-            color: rgba(255, 255, 255, 0.9); 
-            white-space: nowrap; 
-            position: absolute; 
-            left: 100%; 
-            animation: ticker-scroll 30s linear infinite; 
-            font-weight: 400; font-family: 'Segoe UI', sans-serif; 
-        }
-        @keyframes ticker-scroll {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-100%) translateX(-200px); } 
-        }
-        /* --- CARDS & GRID --- */
-        .container { padding: 25px; max-width: 1600px; margin: 0 auto; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-        .card { background: var(--card-bg); border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #eaedf2; border-left: 4px solid var(--info); display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s; position: relative; }
-        .card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.06); border-color: #dfe3e8; }
-        .card.Teknik { border-left-color: var(--primary); }
-        .card.İkna { border-left-color: var(--accent); } 
-        .card.Kampanya { border-left-color: var(--success); } 
-        .card.Bilgi { border-left-color: var(--info); }
-        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; padding-right: 25px; }
-        .card-title { font-weight: 600; font-size: 1.05rem; margin: 0; color: #2c3e50; line-height: 1.3; }
-        .badge { font-size: 0.65rem; padding: 3px 6px; border-radius: 3px; background: #f7f9fc; text-transform: uppercase; font-weight: 600; color: #7f8c8d; border: 1px solid #edf2f7; }
-        .card-content { font-size: 0.9rem; color: #555; margin-bottom: 15px; line-height: 1.5; flex-grow: 1; cursor: pointer; }
-        .card-text-truncate { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-        .script-box { background: #fffdf5; border: 1px solid #f9f1d8; padding: 10px; border-radius: 4px; font-style: italic; color: #666; margin-top: auto; position: relative; font-size: 0.85rem; }
-        .card-actions { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
-        .btn { padding: 5px 10px; border-radius: 4px; cursor: pointer; border: none; font-weight: 600; font-size: 0.8rem; display: flex; align-items: center; gap: 5px; }
-        .btn-copy { background: #0e1b42; color: white; transition: background 0.2s; }
-        .btn-copy:hover { background: #2c3e50; }
-        .btn-link { background: transparent; border: 1px solid #ddd; color: var(--info); text-decoration: none; }
-        .btn-link:hover { background: #f0f8ff; border-color: var(--info); }
-        .new-badge { position: absolute; top: 12px; left: -4px; background: #2e7d32; color: white; font-size: 0.6rem; padding: 2px 5px; border-radius: 0 3px 3px 0; font-weight: bold; box-shadow: 1px 1px 2px rgba(0,0,0,0.2); z-index:15; }
-        .icon-wrapper { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 20; }
-        .edit-icon { color: var(--secondary); cursor: pointer; display: none; font-size: 0.9rem; padding: 5px; background: white; border-radius: 50%; border:1px solid #eee; }
-        body.editing .edit-icon { display: block !important; }
-        .fav-icon { color: #dce0e6; cursor: pointer; font-size: 1.1rem; padding: 5px; transition: 0.2s; }
-        .fav-icon:hover { color: #b0b8c1; }
-        .fav-icon.active { color: var(--secondary); }
-        /* --- MODAL / TAM SAYFA KALİTE ARAYÜZÜ --- */
-        #quality-modal { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0, 0, 0, 0.7); display: none; justify-content: center; align-items: center; 
-            z-index: 5000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
-        }
-        #quality-modal.show { opacity: 1; pointer-events: all; }
-        .quality-modal-content {
-            background: var(--card-bg); width: 90%; max-width: 1100px; max-height: 90vh;
-            border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); 
-            padding: 20px 25px; display: flex; flex-direction: column;
-            transform: translateY(-50px); opacity: 0; transition: all 0.3s ease;
-        }
-        #quality-modal.show .quality-modal-content { transform: translateY(0); opacity: 1; }
-
-        .quality-modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 15px;}
-        .quality-modal-header h3 { margin: 0; color: var(--primary); font-weight: 600;}
-        .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; transition: 0.2s; }
-        .quality-modal-body { flex-grow: 1; overflow-y: auto; }
-        /* --- SEKME YAPISI --- */
-        .q-tabs { display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 15px; }
-        .q-tab-btn {
-            background: none; border: none; padding: 10px 15px; cursor: pointer;
-            font-size: 0.9rem; font-weight: 600; color: #94a3b8;
-            border-bottom: 2px solid transparent; transition: all 0.3s ease;
-        }
-        .q-tab-btn:hover { color: var(--primary); }
-        .q-tab-btn.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
-        .q-tab-content.hidden { display: none; }
-        /* --- İSTATİSTİK GRIDİ VE KARTLAR --- */
-        .q-stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 20px; }
-        .q-stat-card {
-            background: var(--card-bg); padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            border-left: 4px solid var(--info); position: relative; overflow: hidden;
-        }
-        .q-stat-card:nth-child(2) { border-left-color: var(--primary); }
-        .q-stat-card:nth-child(3) { border-left-color: var(--success); }
-        .q-stat-card:nth-child(4) { border-left-color: var(--accent); }
-        .q-stat-card:nth-child(5) { border-left-color: var(--warning); }
-        .q-card-title { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 5px;}
-        .q-card-value { font-size: 1.6rem; font-weight: 800; line-height: 1; color: var(--primary); margin-bottom: 5px;}
-        .q-card-footer { font-size: 0.75rem; color: #94a3b8; display: flex; align-items: center; gap: 4px;}
-        .q-card-icon-bg { position: absolute; right: -5px; bottom: -5px; font-size: 3.5rem; opacity: 0.08; pointer-events: none;}
-        .q-card-icon-bg i.fa-star { color: var(--info); }
-        .q-card-icon-bg i.fa-headset { color: var(--primary); }
-        .q-card-icon-bg i.fa-bullseye { color: var(--success); }
-        .q-card-icon-bg i.fa-exclamation-triangle { color: var(--accent); }
-        .q-card-icon-bg i.fa-comments { color: var(--warning); }
-        /* --- DEĞERLENDİRME LİSTESİ --- */
-        .evaluation-summary { 
-            border: 1px solid #eaedf2; 
-            border-left: 4px solid #eee; /* JS tarafından güncellenecek */
-            padding: 15px; margin-bottom: 10px; border-radius: 8px; 
-            background: #fff; cursor: pointer; transition: all 0.2s ease; 
-        }
-        .evaluation-summary:hover { background: #fcfcfc; }
-        .evaluation-details-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-in-out; margin-top: 0; }
-        .evaluation-details-content table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .evaluation-details-content td { padding: 8px; border-radius: 4px; }
-
-        /* --- EĞİTİM & FEEDBACK GÖRÜNÜMÜ --- */
-        .q-section-card {
-            background: #f8fafc;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-        }
-        .training-item { 
-            display: flex; justify-content: space-between; align-items: center; padding: 8px 0; 
-            border-bottom: 1px dotted #e2e8f0; font-size: 0.9rem;
-        }
-        .training-status { 
-            padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; width: 100px; text-align: center;
-        }
-        .status-success { background: #dcfce7; color: var(--success); }
-        .status-warning { background: #fffbe6; color: var(--warning); }
-        .simple-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 10px; }
-        .simple-table th, .simple-table td { text-align: left; padding: 8px 10px; border: 1px solid #e2e8f0; }
-        .simple-table th { background-color: #f1f5f9; color: var(--primary); font-weight: 600; }
-        .simple-table tr:nth-child(even) { background-color: #fafafa; }
-        .filter-select { padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; }
-
-        /* --- PUANLAMA FORMU (GLOBAL) --- */
-        .eval-modal-wrapper { display: flex; flex-direction: column; gap: 15px; text-align: left; font-family: 'Segoe UI', sans-serif; }
-        .score-dashboard { background: #0e1b42; color: white; border-radius: 12px; padding: 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 5px 15px rgba(14, 27, 66, 0.3); margin-bottom: 10px; position: sticky; top: 0; z-index: 10; }
-        .score-circle-outer { width: 80px; height: 80px; border-radius: 50%; background: conic-gradient(var(--success) 0%, #444 0%); display: flex; align-items: center; justify-content: center; transition: background 0.5s ease; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
-        .score-circle-inner { width: 64px; height: 64px; background: #0e1b42; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.5rem; color: white; }
-        .criteria-container { max-height: 400px; overflow-y: auto; padding-right: 5px; }
-        .criteria-row { background: white; border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-bottom: 10px; transition: all 0.2s; display: flex; flex-direction: column; gap: 10px; }
-        .criteria-header { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 0.95rem; color: #333; }
-        .score-badge { background: #333; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold; min-width: 30px; text-align: center; }
-        .note-input { width: 100%; border: 1px solid #e0e0e0; border-radius: 4px; padding: 6px; font-size: 0.85rem; background: #fff; }
-
-        /* --- CHAT BUTON STİLLERİ --- */
-        .eval-button-group { display: flex; gap: 8px; justify-content: center; align-items: center; }
-        .eval-button { 
-            padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; 
-            font-weight: 600; font-size: 0.8rem; transition: all 0.1s; flex-grow: 1; 
-            text-align: center; color: #555; background: #fff;
-            white-space: nowrap; 
-        }
-        .eval-button:hover:not(.active) { border-color: var(--primary); background: #f0f4ff; }
-        .eval-good { border-color: #2e7d32; color: #1b5e20; background: #e8f5e9; }
-        .eval-good.active { 
-            background: #2e7d32; color: white; border-color: #1b5e20; 
-            box-shadow: 0 2px 4px rgba(46, 125, 50, 0.3);
-        }
-        .eval-medium { border-color: #ed6c02; color: #e65100; background: #fff3e0; }
-        .eval-medium.active { 
-            background: #ed6c02; color: white; border-color: #e65100;
-            box-shadow: 0 2px 4px rgba(237, 108, 2, 0.3);
-        }
-        .eval-bad { border-color: #d32f2f; color: #b71c1c; background: #ffebee; }
-        .eval-bad.active { 
-            background: #d32f2f; color: white; border-color: #b71c1c;
-            box-shadow: 0 2px 4px rgba(211, 47, 47, 0.3);
-        }
-
-        /* --- TELE SATIŞ SLIDER STİLİ (Eski Mantık) --- */
-        .criteria-controls {
-            /* TELE SATIŞ için flex */
-            display: flex; 
-            align-items: center; 
-            gap: 15px; 
-            background: #f9f9f9; 
-            padding: 8px; 
-            border-radius: 6px; 
-        }
-        /* Buton formatında da çalışabilmesi için geçersiz kılıyoruz */
-        .criteria-row:has(.eval-button-group) .criteria-controls {
-            display: block;
-            padding: 10px; /* Butonlu versiyon için biraz daha büyük padding */
-        }
-        
-        .criteria-controls input[type="range"] {
-            -webkit-appearance: none;
-            appearance: none;
-            height: 8px;
-            background: #ccc;
-            border-radius: 4px;
-        }
-        .criteria-controls input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: var(--primary);
-            cursor: pointer;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-        }
-        /* --- DİĞER STİLLER --- */
-        .swal2-container { z-index: 10000 !important; }
-        .mb-20 { margin-bottom: 20px; }
-        .flex-row { display: flex; align-items: center; gap: 10px; }
-    </style>
 </head>
 <body>
     <!-- LOGIN EKRANI -->
@@ -577,7 +145,7 @@
             <!-- Navigasyon Barı -->
             <div style="background-color: #eaeaea; padding: 10px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc;">
                 <button id="tw-btn-back" class="btn btn-copy" style="background:#6c757d; color:white; display:none;" onclick="twGoBack()"> ⬅  Önceki Adım</button>
-                <button class="btn btn-copy" style="background:#d32f2f; color:white;" onclick="twResetWizard()"> ↻  Başa Dön</button>
+                <button class="btn btn-copy" style="background:#d32f2f; color:white;" onclick="twResetWizard()"> ↻  Ba ş a D ö n</button>
             </div>
             <!-- İçerik Alanı -->
             <div id="tech-wizard-content" style="padding: 30px; overflow-y: auto; max-height: 60vh;">
@@ -626,150 +194,94 @@
                 <div id="joker-container" style="display: flex; justify-content: space-around; margin: 15px 0;">
                     <button id="joker-call" class="joker-btn" onclick="useJoker('call')" title="Telefon Jokeri">  📞   Telefon</button>
                     <button id="joker-half" class="joker-btn" onclick="useJoker('half')" title="Yarı Yarıya Joker">  ✂️   50:50</button>
-                    <button id="joker-double" class="joker-btn" onclick="useJoker('double')" title="Çift Cevap Hakkı">2️  ⃣    Çift Cevap</button>
+                    <button id="joker-double" class="joker-btn" onclick="useJoker('double')" title="Çift Cevap Hakkı">2️  ⃣    Ç ift Cevap</button>
                 </div>
                 <div class="penalty-options" id="p-options"></div>
                 <button id="p-restart-btn" class="restart-btn" style="display:none; width:100%; background:#fabb00; color:black; font-weight:bold;" onclick="showLobby()">LOBİYE DÖN   🏠  </button>
             </div>
         </div>
     </div>
-    <!-- MODAL: KALİTE YÖNETİM PANELİ (TAM SAYFA GÖRÜNÜMÜ) -->
+    <!-- MODAL: KALİTE YÖNETİM PANELİ (GÜNCELLENMİŞ HALİ) -->
     <div id="quality-modal" class="modal-overlay">
-        <div class="quality-modal-content">
-            <div class="quality-modal-header">
-                <h3 id="quality-modal-title">Temsilci Kalite Performans Paneli</h3>
-                <button class="close-modal" onclick="closeQualityModal()"><i class="fas fa-times"></i></button>
-            </div>
+        <div class="modal-content" style="max-width: 900px;">
+            <span class="close-modal" onclick="closeModal('quality-modal')">&times;</span>
+            <h2 style="text-align:center; color:var(--primary); margin-bottom: 20px;">Kalite</h2>
             
+            <!-- Admin Kontrolleri (GÜNCELLENDİ) -->
             <div id="admin-quality-controls" style="display:none; margin-bottom:15px;">
                 <div class="quality-controls-top">
                     <div style="display:flex; gap:10px;">
-                        <button class="add-btn" style="background:var(--accent); border:none; color:white; padding:8px 15px; border-radius:4px; cursor:pointer;" onclick="logEvaluationPopup()"><i class="fas fa-plus"></i> Değerlendirme Ekle</button>
-                        <button class="admin-btn" style="background:var(--primary); color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;" onclick="exportEvaluations()"><i class="fas fa-file-csv"></i> Rapor İndir</button>
+                        <button class="add-btn" style="background:var(--accent); border:none; color:white; padding:8px 15px; border-radius:4px; cursor:pointer;" onclick="logEvaluationPopup()"><i class="fas fa-plus"></i> Ekle</button>
+                        <button class="admin-btn" style="background:var(--primary); color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;" onclick="exportEvaluations()"><i class="fas fa-file-csv"></i> Rapor</button>
                     </div>
-                    <!-- Admin Temsilci Seçimi Alanı -->
-                    <div class="quality-filter-group" style="margin-top: 10px; justify-content: flex-start;">
-                        <div style="display:flex; flex-direction:column; gap: 5px;">
-                            <label style="font-size:0.7rem; color:#0e1b42;">Ekip / Grup</label>
-                            <select id="group-select-admin" class="filter-select" onchange="updateAgentListBasedOnGroup()" style="width: 150px;"></select>
+                    <!-- YENİ: Grup ve Temsilci Filtresi -->
+                    <div style="font-weight:bold; display:flex; align-items:center; gap: 15px;">
+                        <div style="display:flex; flex-direction:column;">
+                            <label style="font-size:0.7rem; color:#999; margin-bottom:2px;">Ekip / Grup</label>
+                            <select id="group-select-admin" class="swal2-input" onchange="updateAgentListBasedOnGroup()" style="width: 150px; padding:5px; height:35px; margin:0; border-color:#ccc; font-size:0.85rem;"></select>
                         </div>
-                        <div style="display:flex; flex-direction:column; gap: 5px;">
-                            <label style="font-size:0.7rem; color:#0e1b42;">Temsilci</label>
-                            <select id="agent-select-admin" class="filter-select" onchange="fetchEvaluationsForAgent()" style="width: 180px;"></select>
+                        <div style="display:flex; flex-direction:column;">
+                            <label style="font-size:0.7rem; color:#999; margin-bottom:2px;">Temsilci</label>
+                            <select id="agent-select-admin" class="swal2-input" onchange="fetchEvaluationsForAgent()" style="width: 180px; padding:5px; height:35px; margin:0; border-color:#ccc; font-size:0.85rem;"></select>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <div class="quality-modal-body">
-                <div class="q-tabs">
-                    <button class="q-tab-btn active" onclick="switchQualityTab('overview')"><i class="fas fa-chart-line"></i> Performans Özeti</button>
-                    <button class="q-tab-btn" onclick="switchQualityTab('training')"><i class="fas fa-graduation-cap"></i> Eğitim ve Gelişim</button>
-                    <button class="q-tab-btn" onclick="switchQualityTab('feedback')"><i class="fas fa-comment-dots"></i> Geri Bildirim</button>
-                </div>
-
-                <div id="quality-tab-overview" class="q-tab-content">
+            <!-- GÜNCELLENMİŞ KALİTE İÇERİĞİ -->
+            <div id="quality-content" style="padding: 10px; border-radius: 8px;">
+    
+                <!-- ÜST KISIM: BAŞLIK VE FİLTRE -->
+                <div class="q-dashboard-header" style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+                    <div>
+                        <h3 style="font-size:1.2rem; color:var(--primary); margin:0; font-weight:700;">Kalite Yönetim Paneli</h3>
+                        <p style="font-size:0.8rem; color:#888; margin:2px 0 0 0;">Genel performans özeti</p>
+                    </div>
                     
-                    <div class="flex-row mb-20" style="justify-content: flex-end;">
-                        <label for="month-select-filter" style="font-weight: 600;">Dönem:</label>
-                        <select id="month-select-filter" class="filter-select" onchange="fetchEvaluationsForAgent()">
-                            <!-- JS tarafından doldurulur -->
+                    <div style="text-align:right;">
+                        <label style="font-size:0.75rem; color:#999; display:block; margin-bottom:2px;">Dönem Seçimi:</label>
+                        <select id="month-select-filter" class="minimal-select" style="font-size:0.9rem; font-weight:bold; color:var(--primary); border:none; border-bottom:1px dashed #ccc; outline:none; background:transparent; cursor:pointer;" onchange="fetchEvaluationsForAgent()">
+                            <!-- JS burayı dolduracak -->
                         </select>
                     </div>
-
-                    <div class="q-stats-grid">
-                        <div class="q-stat-card" style="border-left: 4px solid var(--info);">
-                            <div class="q-card-title">ORTALAMA PUAN</div>
-                            <div class="q-card-value" id="dash-avg-score">-</div>
-                            <div class="q-card-footer">Ay Bazında Ortalama</div>
-                            <div class="q-card-icon-bg" style="color:var(--info);"><i class="fas fa-star"></i></div>
-                        </div>
-
-                        <div class="q-stat-card" style="border-left: 4px solid var(--primary);">
-                            <div class="q-card-title">ÇAĞRI ADEDİ</div>
-                            <div class="q-card-value" id="dash-eval-count">-</div>
-                            <div class="q-card-footer">Dinlenen Çağrı Sayısı</div>
-                            <div class="q-card-icon-bg" style="color:var(--primary);"><i class="fas fa-headset"></i></div>
-                        </div>
-                        
-                        <div class="q-stat-card" style="border-left: 4px solid var(--success);">
-                            <div class="q-card-title">HEDEF TUTMA</div>
-                            <div class="q-card-value" id="dash-target-rate">-%</div>
-                            <div class="q-card-footer">Hedef: 90+ Puan Üzeri</div>
-                            <div class="q-card-icon-bg" style="color:var(--success);"><i class="fas fa-bullseye"></i></div>
-                        </div>
-
-                        <div class="q-stat-card" style="border-left: 4px solid var(--accent);">
-                            <div class="q-card-title">KRİTİK KIRILIM</div>
-                            <div class="q-card-value" id="dash-negative-notes">0</div>
-                            <div class="q-card-footer">Not girilen adet</div>
-                            <div class="q-card-icon-bg" style="color:var(--accent);"><i class="fas fa-exclamation-triangle"></i></div>
-                        </div>
-
-                        <div class="q-stat-card" style="border-left: 4px solid var(--warning);">
-                            <div class="q-card-title">YENİ BİLDİRİM</div>
-                            <div class="q-card-value" id="dash-feedback-count">0</div>
-                            <div class="q-card-footer">Okunmamış Geri Bildirim</div>
-                            <div class="q-card-icon-bg" style="color:var(--warning);"><i class="fas fa-comments"></i></div>
-                        </div>
+                </div>
+            
+                <!-- ORTA KISIM: 3'LÜ İSTATİSTİK KARTLARI -->
+                <div class="q-stats-grid">
+                    <div class="q-stat-card card-blue">
+                        <div class="q-card-title">ORTALAMA PUAN</div>
+                        <div class="q-card-value" id="dash-avg-score">-</div>
+                        <div class="q-card-footer">Seçili dönem</div>
+                        <div class="q-card-icon-bg"><i class="fas fa-chart-pie"></i></div>
                     </div>
-
-                    <h4><i class="fas fa-list-alt"></i> Değerlendirme Geçmişi</h4>
-                    <div id="quality-loader" style="text-align:center; color:#999; font-style:italic; display:none; margin:20px 0;">Yükleniyor...</div>
-                    <div id="evaluations-list" style="max-height: 380px; overflow-y: auto; padding-right:5px;">
-                        <!-- JS tarafından doldurulur (fetchEvaluationsForAgent) -->
+            
+                    <div class="q-stat-card card-green">
+                        <div class="q-card-title">ÇAĞRI ADEDİ</div>
+                        <div class="q-card-value" id="dash-eval-count">-</div>
+                        <div class="q-card-footer">Değerlendirilen</div>
+                        <div class="q-card-icon-bg"><i class="fas fa-check"></i></div>
+                    </div>
+            
+                    <div class="q-stat-card card-orange">
+                        <div class="q-card-title">HEDEF TUTMA</div>
+                        <div class="q-card-value" id="dash-target-rate">-%</div>
+                        <div class="q-card-footer">Hedef: 90+</div>
+                        <div class="q-card-icon-bg"><i class="fas fa-trophy"></i></div>
                     </div>
                 </div>
-
-                <!-- EĞİTİM VE GELİŞİM SEKMESİ -->
-                <div id="quality-tab-training" class="q-tab-content hidden">
-                    <h3><i class="fas fa-graduation-cap"></i> Eğitim ve Gelişim Atamaları</h3>
-
-                    <div class="q-section-card mb-20">
-                        <h4>Bekleyen/Tamamlanan Eğitimler</h4>
-                        <div id="training-records-list" style="max-height: 350px; overflow-y: auto; padding-right:5px;">
-                            <!-- JS tarafından SIMULATION_TRAININGS ile doldurulur -->
-                        </div>
-                    </div>
-                    
-                    <div class="q-section-card">
-                        <h4><i class="fas fa-chart-line"></i> Eğitim Sonrası Performans Takibi</h4>
-                        <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 15px;">Eğitim sonrası yapılan kalite değerlendirmelerinde elde edilen puanlar.</p>
-                        
-                        <table class="simple-table">
-                            <thead>
-                                <tr><th>Tarih</th><th>Eğitim Konusu</th><th>Puan</th><th>Değerlendiren</th></tr>
-                            </thead>
-                            <tbody>
-                                <!-- Simülasyon Verisi -->
-                                <tr><td>05.12.2025</td><td>Yeni Kural İhlali (Görüşme Sonrası)</td><td>80 / 100</td><td>Ayşe T.</td></tr>
-                                <tr><td>25.11.2025</td><td>Yeni Kampanya İkna (Eğitim Sonrası)</td><td>95 / 100</td><td>Mehmet K.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+                
+                <!-- ALT KISIM: LİSTE BAŞLIĞI VE LİSTE -->
+                <div class="list-section-title" style="font-size:0.85rem; font-weight:700; color:#333; margin:15px 0 10px 0; padding-left:5px; border-left:3px solid #ccc;">
+                    Değerlendirme Geçmişi
                 </div>
-
-                <!-- GERİ BİLDİRİM SEKMESİ -->
-                <div id="quality-tab-feedback" class="q-tab-content hidden">
-                    <h3><i class="fas fa-comment-dots"></i> Size Özel Geri Bildirimler</h3>
-                    <p style="font-size: 0.85rem; color: var(--accent); margin-bottom: 15px;">Yeni geri bildirimlerinizi inceledikten sonra okundu olarak işaretlemeyi unutmayın.</p>
-
-                    <div class="q-section-card mb-20">
-                        <h4>Çağrı Geri Bildirim Geçmişi</h4>
-                        <div id="feedback-records-list" style="max-height: 450px; overflow-y: auto; padding-right:5px;">
-                            <!-- JS tarafından SIMULATION_FEEDBACKS ile doldurulur -->
-                        </div>
-                    </div>
-                </div>
-
+                
+                <div id="quality-loader" style="text-align:center; color:#999; font-style:italic; display:none; margin:20px 0;">Yükleniyor...</div>
+            
+                <div id="evaluations-list" style="max-height: 380px; overflow-y: auto; padding-right:5px;"></div>
             </div>
         </div>
     </div>
     <div class="crafted-by-badge">Crafted by Doğuş Yalçınkaya</div>
-    
-    <!-- APP.JS İÇERİĞİ BURAYA GELECEK -->
-    <script src="app.js"></script> 
-    
+    <script src="js/app.js"></script>
     <script>
         function toggleUserDropdown() {
             const dropdown = document.getElementById('userDropdown');
