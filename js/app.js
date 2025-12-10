@@ -18,8 +18,9 @@ let adminUserList = [];
 let allEvaluationsData = [];
 let wizardStepsData = {};
 const MONTH_NAMES = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+
 // --- SİMÜLASYON VERİLERİ (GERÇEKTE BACKEND'DEN GELİR) ---
-// Note: isNew alanı kaldırıldı, isRead ve status kullanılacak
+// Temsilciye özel okunmamış feedback ve bekleyen eğitimleri simüle eder
 const SIMULATION_FEEDBACKS = [
     { id: 1, date: '10.12.2025', title: 'İkna Süreci Gelişim Notu', content: 'Müşteriye teklif sunarken "fırsatı kaçırmayın" yerine "sadece size özel avantaj" vurgusunu kullanmanız daha etkili olacaktır. Kayıt dinlemesi yapıldı.', isRead: false, callId: 'C4567' },
     { id: 2, date: '08.12.2025', title: 'Yeni Teknik Arıza Prosedürü', content: 'Yeni arıza kodları 303 ve 304 için sıfırlama adımlarını eksiksiz uyguladınız, bravo!', isRead: true, callId: 'C4555' },
@@ -731,7 +732,7 @@ async function addNewCardPopup() {
         title: 'Yeni İçerik Ekle',
         html: `
         <div style="margin-bottom:15px; text-align:left;">
-            <label style="font-weight:bold; font-size:0.9rem;">Ne Ekleyeceksin?</label>
+            <label style="font-weight:bold;">Ne Ekleyeceksin?</label>
             <select id="swal-type-select" class="swal2-input" style="width:100%; margin-top:5px; height:35px; font-size:0.9rem;" onchange="toggleAddFields()">
                 <option value="card">  📌   Bilgi Kartı</option>
                 <option value="news">  📢   Duyuru</option>
@@ -2339,4 +2340,122 @@ function openWizard(){
             if (wizardStepsData && wizardStepsData['start']) {
                 renderStep('start');
             } else {
-                document.getElementById('wizard-body').innerHTML = '<h2 style="color:red;">Asistan verisi eksik veya hatalı. Lütfen yöneticinizle iletişime geçin.
+                document.getElementById('wizard-body').innerHTML = '<h2 style="color:red;">Asistan verisi eksik veya hatalı. Lütfen yöneticinizle iletişime geçin.</h2>';
+            }
+        }).catch(() => {
+            Swal.close();
+            document.getElementById('wizard-body').innerHTML = '<h2 style="color:red;">Sunucudan veri çekme hatası oluştu.</h2>';
+        });
+    } else {
+        renderStep('start');
+    }
+}
+function renderStep(k){
+    const s = wizardStepsData[k];
+    if (!s) {
+        document.getElementById('wizard-body').innerHTML = `<h2 style="color:red;">HATA: Adım ID'si (${k}) bulunamadı. Lütfen yöneticinizle iletişime geçin.</h2>`;
+        return;
+    }
+    const b = document.getElementById('wizard-body');
+    let h = `<h2 style="color:var(--primary);">${s.title || ''}</h2>`;
+    
+    if(s.result) {
+        let i = s.result === 'red' ? '  🛑  ' : (s.result === 'green' ? '  ✅  ' : '  ⚠️  ');
+        let c = s.result === 'red' ? 'res-red' : (s.result === 'green' ? 'res-green' : 'res-yellow');
+        h += `<div class="result-box ${c}"><div style="font-size:3rem;margin-bottom:10px;">${i}</div><h3>${s.title}</h3><p>${s.text}</p>${s.script ? `<div class="script-box">${s.script}</div>` : ''}</div><button class="restart-btn" onclick="renderStep('start')"><i class="fas fa-redo"></i> Başa Dön</button>`;
+    } else {
+        h += `<p>${s.text}</p><div class="wizard-options">`;
+        s.options.forEach(o => {
+            h += `<button class="option-btn" onclick="renderStep('${o.next}')"><i class="fas fa-chevron-right"></i> ${o.text}</button>`;
+        });
+        h += `</div>`;
+        if(k !== 'start')
+            h += `<button class="restart-btn" onclick="renderStep('start')" style="background:#eee;color:#333;margin-top:15px;">Başa Dön</button>`;
+    }
+    b.innerHTML = h;
+}
+// --- TEKNİK SİHİRBAZ MODÜLÜ (DİNAMİK VERİ İLE) ---
+// State Yönetimi
+const twState = {
+    currentStep: 'start',
+    history: []
+};
+// Modal Açma Fonksiyonu
+function openTechWizard() {
+    document.getElementById('tech-wizard-modal').style.display = 'flex';
+    // Eğer veri henüz yüklenmediyse tekrar dene
+    if (Object.keys(techWizardData).length === 0) {
+        Swal.fire({ title: 'Veriler Yükleniyor...', didOpen: () => Swal.showLoading() });
+        loadTechWizardData().then(() => {
+            Swal.close();
+            twResetWizard();
+        });
+    } else {
+        twRenderStep();
+    }
+}
+// Navigasyon ve Render Mantığı
+function twRenderStep() {
+    const contentDiv = document.getElementById('tech-wizard-content');
+    const backBtn = document.getElementById('tw-btn-back');
+    const stepData = techWizardData[twState.currentStep];
+    // Geri butonu kontrolü
+    if (twState.history.length > 0) backBtn.style.display = 'block';
+    else backBtn.style.display = 'none';
+    if (!stepData) {
+        contentDiv.innerHTML = `<div class="alert" style="color:red;">Hata: Adım bulunamadı (${twState.currentStep}). Lütfen tabloyu kontrol edin.</div>`;
+        return;
+    }
+    let html = `<div class="tech-step-title">${stepData.title || ''}</div>`;
+    // Metin (Varsa)
+    if (stepData.text) {
+        html += `<p style="font-size:1rem; margin-bottom:15px;">${stepData.text}</p>`;
+    }
+    // Script Kutusu (Varsa) - GÜVENLİ KOPYALAMA BUTONU EKLENDİ
+    if (stepData.script) {
+        // Encode URI Component ile metni güvenli hale getiriyoruz (Tırnak ve satır hatalarını önler)
+        const safeScript = encodeURIComponent(stepData.script);
+        html += `
+        <div class="tech-script-box">
+            <span class="tech-script-label">Müşteriye iletilecek:</span>
+            "${stepData.script}"
+            <div style="margin-top:10px; text-align:right;">
+                <button class="btn btn-copy" style="font-size:0.8rem; padding:5px 10px;" onclick="copyScriptContent('${safeScript}')">
+                    <i class="fas fa-copy"></i> Kopyala
+                </button>
+            </div>
+        </div>`;
+    }
+    // Uyarı/Alert (Varsa)
+    if (stepData.alert) {
+        html += `<div class="tech-alert">${stepData.alert}</div>`;
+    }
+    // Butonlar
+    if (stepData.buttons && stepData.buttons.length > 0) {
+        html += `<div class="tech-buttons-area">`;
+        stepData.buttons.forEach(btn => {
+            let btnClass = btn.style === 'option' ? 'tech-btn-option' : 'tech-btn-primary';
+            html += `<button class="tech-btn ${btnClass}" onclick="twChangeStep('${btn.next}')">${btn.text}</button>`;
+        });
+        html += `</div>`;
+    }
+    contentDiv.innerHTML = html;
+}
+// Navigasyon Fonksiyonları
+function twChangeStep(newStep) {
+    // Özel komutlar (Eski hardcoded mantıktan kalanlar varsa buraya eklenebilir ama şu an hepsi tabloda)
+    twState.history.push(twState.currentStep);
+    twState.currentStep = newStep;
+    twRenderStep();
+}
+function twGoBack() {
+    if (twState.history.length > 0) {
+        twState.currentStep = twState.history.pop();
+        twRenderStep();
+    }
+}
+function twResetWizard() {
+    twState.currentStep = 'start';
+    twState.history = [];
+    twRenderStep();
+}
