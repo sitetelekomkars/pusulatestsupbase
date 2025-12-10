@@ -77,7 +77,6 @@ body {
     /* Sol tarafa kaydırma için ayar */
     margin-right: auto; 
     margin-left: 0; 
-  
     padding: 5px 25px 0px 10px; 
     box-sizing: border-box;
 }
@@ -380,10 +379,47 @@ body.editing .edit-icon { display: block !important; }
 .criteria-row { background: white; border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-bottom: 10px; transition: all 0.2s; display: flex; flex-direction: column; gap: 10px; }
 .criteria-row:hover { border-color: #bbb; box-shadow: 0 3px 6px rgba(0,0,0,0.05); }
 .criteria-header { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 0.95rem; color: #333; }
-.criteria-controls { display: flex; align-items: center; gap: 15px; background: #f9f9f9; padding: 8px; border-radius: 6px; }
+/* ESKİ SLIDER STİLLERİ YERİNE YENİ BUTON KONTROLLERİ */
+.criteria-controls {
+    display: block; /* Eski flex yerine blok yaptık */
+    background: #f9f9f9;
+    padding: 10px;
+    border-radius: 6px;
+}
 .score-badge { background: #333; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold; min-width: 30px; text-align: center; }
 .note-input { width: 100%; border: 1px solid #e0e0e0; border-radius: 4px; padding: 6px; font-size: 0.85rem; background: #fff; }
 .note-input:focus { border-color: var(--secondary); outline: none; }
+/* YENİ BUTON SINIFLARI */
+.eval-button-group { display: flex; gap: 8px; justify-content: center; align-items: center; }
+.eval-button {
+    padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;
+    font-weight: 600; font-size: 0.8rem; transition: all 0.1s; flex-grow: 1;
+    text-align: center; color: #555; background: #fff;
+    white-space: nowrap; /* Metnin sığmasını sağla */
+}
+.eval-button:hover:not(.active) { border-color: var(--primary); background: #f0f4ff; }
+
+/* İyi Puan: Yeşil */
+.eval-good { border-color: #2e7d32; color: #1b5e20; background: #e8f5e9; }
+.eval-good.active {
+    background: #2e7d32; color: white; border-color: #1b5e20;
+    box-shadow: 0 2px 4px rgba(46, 125, 50, 0.3);
+}
+
+/* Orta Puan: Turuncu */
+.eval-medium { border-color: #ed6c02; color: #e65100; background: #fff3e0; }
+.eval-medium.active {
+    background: #ed6c02; color: white; border-color: #e65100;
+    box-shadow: 0 2px 4px rgba(237, 108, 2, 0.3);
+}
+
+/* Kötü Puan: Kırmızı */
+.eval-bad { border-color: #d32f2f; color: #b71c1c; background: #ffebee; }
+.eval-bad.active {
+    background: #d32f2f; color: white; border-color: #b71c1c;
+    box-shadow: 0 2px 4px rgba(211, 47, 47, 0.3);
+}
+/* YENİ BUTON SINIFLARI BİTİŞ */
 .quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 .quiz-btn-opt { padding: 15px; border: 2px solid #eee; background: white; border-radius: 8px; cursor: pointer; }
 .quiz-btn-opt.correct { background: #c8e6c9; border-color: #2e7d32; color: #1b5e20; }
@@ -527,7 +563,6 @@ body.editing .edit-icon { display: block !important; }
     border-left: 6px solid var(--secondary); /* Mevcut sarı renk */
     padding-left: 20px;
 }
-
 /* Mevcut .script-box ile çakışmaması için özelleştirildi */
 .tech-script-box {
     background-color: #e3f2fd;
@@ -538,7 +573,6 @@ body.editing .edit-icon { display: block !important; }
     font-size: 1.05rem;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
-
 .tech-script-label {
     font-weight: 900;
     font-size: 0.8rem;
@@ -548,19 +582,16 @@ body.editing .edit-icon { display: block !important; }
     text-transform: uppercase;
     letter-spacing: 1px;
 }
-
 .tech-steps-list {
     list-style-type: none;
     padding: 0;
     counter-reset: step-counter;
 }
-
 .tech-steps-list li {
     position: relative;
     padding-left: 45px;
     margin-bottom: 15px;
 }
-
 .tech-steps-list li::before {
     content: counter(step-counter);
     counter-increment: step-counter;
@@ -577,7 +608,6 @@ body.editing .edit-icon { display: block !important; }
     font-weight: bold;
     font-size: 0.9rem;
 }
-
 .tech-code-block {
     background-color: #2d2d2d;
     color: #76ff03;
@@ -589,7 +619,6 @@ body.editing .edit-icon { display: block !important; }
     margin: 10px 0;
     border: 1px solid #444;
 }
-
 .tech-buttons-area {
     display: flex;
     gap: 15px;
@@ -598,7 +627,6 @@ body.editing .edit-icon { display: block !important; }
     padding-top: 20px;
     border-top: 1px solid #eee;
 }
-
 .tech-btn {
     padding: 14px 28px;
     border: none;
@@ -608,20 +636,17 @@ body.editing .edit-icon { display: block !important; }
     font-weight: 600;
     transition: 0.2s;
 }
-
 .tech-btn-primary {
     background-color: var(--primary);
     color: #fff;
 }
 .tech-btn-primary:hover { background-color: #2c3e50; }
-
 .tech-btn-option {
     background-color: #fff;
     color: #333;
     border: 2px solid #ddd;
 }
 .tech-btn-option:hover { background-color: #f1f1f1; }
-
 .tech-alert {
     padding: 15px;
     background-color: #fff3cd;
