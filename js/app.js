@@ -18,11 +18,9 @@ let adminUserList = [];
 let allEvaluationsData = [];
 let wizardStepsData = {};
 const MONTH_NAMES = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
-
 // ==========================================================
 // --- KALİTE PUANLAMA LOGİĞİ: CHAT (BUTON TABANLI) ---
 // ==========================================================
-
 /**
  * Puanlama butonuna basıldığında ilgili satırın skorunu ve görünümünü günceller.
  * @param {number} index - Kriterin dizin numarası.
@@ -34,17 +32,13 @@ window.setButtonScore = function(index, score, max) {
     const badge = document.getElementById(`badge-${index}`);
     const noteInput = document.getElementById(`note-${index}`);
     const buttons = row.querySelectorAll('.eval-button');
-
     // Butonları resetle
     buttons.forEach(b => b.classList.remove('active'));
-
     // Aktif butonu ayarla
     const activeBtn = row.querySelector(`.eval-button[data-score="${score}"]`);
     if (activeBtn) activeBtn.classList.add('active');
-
     // Puanı göster
     badge.innerText = score;
-
     // Not Alanını Güncelle (Max puandan düşükse göster)
     if (score < max) {
         noteInput.style.display = 'block';
@@ -58,10 +52,8 @@ window.setButtonScore = function(index, score, max) {
         row.style.borderColor = '#eee';
         row.style.background = '#fff';
     }
-
     window.recalcTotalScore();
 };
-
 /**
  * Toplam skoru hesaplar ve göstergeyi günceller (Buton Versiyonu).
  */
@@ -84,9 +76,7 @@ window.recalcTotalScore = function() {
     
     const liveScoreEl = document.getElementById('live-score');
     const ringEl = document.getElementById('score-ring');
-
     if(liveScoreEl) liveScoreEl.innerText = currentTotal;
-
     if(ringEl) {
         let color = '#2e7d32';
         let ratio = maxTotal > 0 ? (currentTotal / maxTotal) * 100 : 0;
@@ -96,11 +86,9 @@ window.recalcTotalScore = function() {
         ringEl.style.background = `conic-gradient(${color} ${ratio}%, #444 ${ratio}%)`;
     }
 };
-
 // ==========================================================
 // --- KALİTE PUANLAMA LOGİĞİ: TELE SATIŞ (SLIDER TABANLI) ---
 // ==========================================================
-
 /**
  * Puanlama slider'ı hareket ettiğinde ilgili satırın skorunu ve görünümünü günceller.
  * Bu fonksiyon Telesatış için eski slider mantığını geri getirir.
@@ -112,7 +100,6 @@ window.updateRowSliderScore = function(index, max) {
     const badge = document.getElementById(`badge-${index}`);
     const noteInput = document.getElementById(`note-${index}`);
     const row = document.getElementById(`row-${index}`);
-
     if(!slider) return;
     const val = parseInt(slider.value);
     badge.innerText = val;
@@ -132,7 +119,6 @@ window.updateRowSliderScore = function(index, max) {
     }
     window.recalcTotalSliderScore();
 };
-
 /**
  * Toplam skoru hesaplar ve göstergeyi günceller (Slider Versiyonu).
  */
@@ -146,12 +132,10 @@ window.recalcTotalSliderScore = function() {
         currentTotal += parseInt(s.value) || 0;
         maxTotal += parseInt(s.getAttribute('max')) || 0;
     });
-
     const liveScoreEl = document.getElementById('live-score');
     const ringEl = document.getElementById('score-ring');
     
     if(liveScoreEl) liveScoreEl.innerText = currentTotal;
-
     if(ringEl) {
         let color = '#2e7d32';
         let ratio = maxTotal > 0 ? (currentTotal / maxTotal) * 100 : 0;
@@ -161,7 +145,6 @@ window.recalcTotalSliderScore = function() {
         ringEl.style.background = `conic-gradient(${color} ${ratio}%, #444 ${ratio}%)`;
     }
 };
-
 // --- YARDIMCI FONKSİYONLAR ---
 function getToken() { return localStorage.getItem("sSportToken"); }
 function getFavs() { return JSON.parse(localStorage.getItem('sSportFavs') || '[]'); }
@@ -262,11 +245,9 @@ function checkSession() {
                  // Ana içeriği (kartlar) gizle
                 const grid = document.getElementById('cardGrid');
                 if (grid) grid.style.display = 'none';
-
                 // Filtre ve arama alanını gizle
                 const controls = document.querySelector('.control-wrapper');
                 if (controls) controls.style.display = 'none';
-
                 // Ticker'ı gizle
                 const ticker = document.querySelector('.news-ticker-box');
                 if (ticker) ticker.style.display = 'none';
@@ -313,7 +294,7 @@ function girisYap() {
             if (data.forceChange === true) {
                 Swal.fire({
                     icon: 'warning',
-                    title: '  ⚠️   Güvenlik Uyarısı',
+                    title: '   ⚠️    Güvenlik Uyarısı',
                     text: 'İlk girişiniz. Lütfen şifrenizi değiştirin.',
                     allowOutsideClick: false,
                     allowEscapeKey: false,
@@ -337,15 +318,12 @@ function girisYap() {
                         // Ana içeriği (kartlar) gizle
                         const grid = document.getElementById('cardGrid');
                         if (grid) grid.style.display = 'none';
-
                         // Filtre ve arama alanını gizle
                         const controls = document.querySelector('.control-wrapper');
                         if (controls) controls.style.display = 'none';
-
                         // Ticker'ı gizle
                         const ticker = document.querySelector('.news-ticker-box');
                         if (ticker) ticker.style.display = 'none';
-
                         openQualityArea();
                     }
                 }
@@ -394,7 +372,6 @@ function checkAdmin(role) {
             searchInput.placeholder = "Arama devre dışı (Kalite Modu)";
             searchInput.style.opacity = '0.6';
         }
-
     } else {
         // Tüm menü butonlarını aktif et
         filterButtons.forEach(btn => {
@@ -451,8 +428,8 @@ function openUserMenu() {
         title: `Merhaba, ${currentUser}`,
         showCancelButton: true,
         showDenyButton: true,
-        confirmButtonText: '  🔑   Şifre Değiştir',
-        denyButtonText: '  🚪   Çıkış Yap',
+        confirmButtonText: '   🔑    Şifre Değiştir',
+        denyButtonText: '   🚪    Çıkış Yap',
         cancelButtonText: 'İptal'
     };
     Swal.fire(options).then((result) => {
@@ -750,11 +727,11 @@ async function addNewCardPopup() {
         <div style="margin-bottom:15px; text-align:left;">
             <label style="font-weight:bold; font-size:0.9rem;">Ne Ekleyeceksin?</label>
             <select id="swal-type-select" class="swal2-input" style="width:100%; margin-top:5px; height:35px; font-size:0.9rem;" onchange="toggleAddFields()">
-                <option value="card">  📌   Bilgi Kartı</option>
-                <option value="news">  📢   Duyuru</option>
-                <option value="sales">  📞   Telesatış Scripti</option>
-                <option value="sport">  🏆   Spor İçeriği</option>
-                <option value="quiz">  ❓   Quiz Sorusu</option>
+                <option value="card">   📌    Bilgi Kartı</option>
+                <option value="news">   📢    Duyuru</option>
+                <option value="sales">   📞    Telesatış Scripti</option>
+                <option value="sport">   🏆    Spor İçeriği</option>
+                <option value="quiz">   ❓    Quiz Sorusu</option>
             </select>
         </div>
         <div id="preview-card" class="card Bilgi" style="text-align:left; box-shadow:none; border:1px solid #e0e0e0; margin-top:10px;">
@@ -1079,7 +1056,7 @@ function openGuide() {
     grid.innerHTML = '';
     
     sportsData.forEach((s, index) => {
-        let pronHtml = s.pronunciation ? `<div class="pronunciation-badge">  🗣️   ${s.pronunciation}</div>` : '';
+        let pronHtml = s.pronunciation ? `<div class="pronunciation-badge">   🗣️    ${s.pronunciation}</div>` : '';
         let editBtn = (isAdminMode && isEditingActive) 
             ? `<i class="fas fa-pencil-alt edit-icon" style="top:5px; right:5px; z-index:50;" onclick="event.stopPropagation(); editSport('${escapeForJsString(s.title)}')"></i>` 
             : '';
@@ -1090,7 +1067,7 @@ function openGuide() {
 function showSportDetail(index) {
     const sport = sportsData[index];
     const detailText = sport.detail ? sport.detail.replace(/\n/g,'<br>') : "Bu içerik için henüz detay eklenmemiş.";
-    const pronDetail = sport.pronunciation ? `<div style="color:#e65100; font-weight:bold; margin-bottom:15px;">  🗣️   Okunuşu: ${sport.pronunciation}</div>` : '';
+    const pronDetail = sport.pronunciation ? `<div style="color:#e65100; font-weight:bold; margin-bottom:15px;">   🗣️    Okunuşu: ${sport.pronunciation}</div>` : '';
     
     Swal.fire({
         title: `<i class="fas ${sport.icon}" style="color:#0e1b42;"></i> ${sport.title}`,
@@ -1469,7 +1446,6 @@ function toggleEvaluationDetail(index) {
         detailEl.style.marginTop = '10px';
     }
 }
-
 // --- GÜNCELLENMİŞ logEvaluationPopup FONKSİYONU ---
 async function logEvaluationPopup() {
     const agentSelect = document.getElementById('agent-select-admin');
@@ -1518,7 +1494,6 @@ async function logEvaluationPopup() {
             let initialScore = pts; 
             
             if (pts === 0) return; // Pasif kriterleri atla
-
             if (isChat) {
                 // CHAT: Butonlu Puanlama
                 let mPts = parseInt(c.mediumScore) || 0;
@@ -1614,7 +1589,7 @@ async function logEvaluationPopup() {
         width: '600px',
         padding: '0 0 20px 0',
         showCancelButton: true,
-        confirmButtonText: '  💾   Kaydet',
+        confirmButtonText: '   💾    Kaydet',
         cancelButtonText: 'İptal',
         focusConfirm: false,
         didOpen: () => {
@@ -1654,29 +1629,29 @@ async function logEvaluationPopup() {
                          // CHAT: Butonlardan Oku
                         val = parseInt(document.getElementById(`badge-${i}`).innerText) || 0;
                         note = document.getElementById(`note-${i}`).value;
-
-                        // Kırılım Notu Zorunluluğu Kontrolü (Sadece Chat'te Orta/Kötü'ye basınca not beklenir)
+                        // Kırılım Notu Zorunluluğu KALDIRILDI
+                        /*
                         if (val < parseInt(c.points) && !note) {
                             Swal.showValidationMessage(`'${c.text}' için kırılım nedeni zorunludur.`);
                             return false;
                         }
-
+                        */
                     } else if (isTelesatis) {
                          // TELESATIŞ: Slider'dan Oku
                         val = parseInt(document.getElementById(`slider-${i}`).value) || 0;
                         note = document.getElementById(`note-${i}`).value;
                         
-                        // Telesatışta da düşük puanda not zorunlu olabilir
+                        // Kırılım Notu Zorunluluğu KALDIRILDI
+                        /*
                         if (val < parseInt(c.points) && !note) {
                             Swal.showValidationMessage(`'${c.text}' için kırılım nedeni zorunludur.`);
                             return false;
                         }
+                        */
                     }
-
                     total += val;
                     detailsArr.push({ q: c.text, max: parseInt(c.points), score: val, note: note });
                 }
-
                 return { agentName, agentGroup, callId, callDate: formattedCallDate, score: total, details: JSON.stringify(detailsArr), feedback, feedbackType: feedbackType }; 
             } else {
                 const score = document.getElementById('eval-manual-score').value;
@@ -1710,7 +1685,6 @@ async function logEvaluationPopup() {
         }).catch(err => { Swal.fire('Hata', 'Sunucu hatası.', 'error'); });
     }
 }
-
 // --- GÜNCELLENMİŞ editEvaluation FONKSİYONU ---
 async function editEvaluation(targetCallId) {
     // 1. ID Kontrolü (Güçlendirilmiş - String Eşleşmesi)
@@ -1766,14 +1740,12 @@ async function editEvaluation(targetCallId) {
     </div>
     </div>
     `;
-
     if (isCriteriaBased) {
         contentHtml += `<div class="criteria-container">`;
         criteriaList.forEach((c, i) => {
             let pts = parseInt(c.points) || 0;
             let mPts = parseInt(c.mediumScore) || 0;
             let bPts = parseInt(c.badScore) || 0;
-
             if (pts === 0) return;
             
             // Eski Puan/Notu Bul
@@ -1782,7 +1754,6 @@ async function editEvaluation(targetCallId) {
             if (!oldItem) { oldItem = { score: pts, note: '' }; }
             let currentVal = parseInt(oldItem.score);
             let currentNote = oldItem.note || '';
-
             if (isChat) {
                 // CHAT: Butonlu Düzenleme
                 let goodActive = currentVal === pts ? 'active' : '';
@@ -1795,7 +1766,6 @@ async function editEvaluation(targetCallId) {
                 } else if (currentVal === 0 && bPts > 0) {
                     goodActive = mediumActive = badActive = '';
                 }
-
                 contentHtml += `
                 <div class="criteria-row" id="row-${i}" data-max-score="${pts}">
                     <div class="criteria-header"><span>${i+1}. ${c.text}</span><span style="font-size:0.8rem; color:#999;">Max: ${pts}</span></div>
@@ -1809,7 +1779,6 @@ async function editEvaluation(targetCallId) {
                     </div>
                     <input type="text" id="note-${i}" class="note-input" placeholder="Kırılım nedeni..." value="${currentNote}" style="display:${currentVal < pts ? 'block' : 'none'};">
                 </div>`;
-
             } else if (isTelesatis) {
                 // TELESATIŞ: Slider Düzenleme
                  contentHtml += `
@@ -1847,7 +1816,7 @@ async function editEvaluation(targetCallId) {
         html: contentHtml,
         width: '600px',
         showCancelButton: true,
-        confirmButtonText: '  💾   Güncelle',
+        confirmButtonText: '   💾    Güncelle',
         cancelButtonText: 'İptal',
         focusConfirm: false,
         didOpen: () => {
@@ -1866,7 +1835,6 @@ async function editEvaluation(targetCallId) {
         preConfirm: () => {
             const callId = document.getElementById('eval-callid').value;
             const feedback = document.getElementById('eval-feedback').value;
-
             if (isCriteriaBased) {
                 let total = 0;
                 let detailsArr = [];
@@ -1877,29 +1845,32 @@ async function editEvaluation(targetCallId) {
                     let val;
                     let maxPoints = parseInt(c.points) || 0;
                     let note = document.getElementById(`note-${i}`).value;
-
                     if (isChat) {
                          // CHAT: Butonlardan Oku
                         val = parseInt(document.getElementById(`badge-${i}`).innerText) || 0;
                         
+                        // Kırılım Notu Zorunluluğu KALDIRILDI
+                        /*
                         if (val < maxPoints && !note) {
                             Swal.showValidationMessage(`'${c.text}' için kırılım nedeni zorunludur.`);
                             return false;
                         }
-
+                        */
                     } else if (isTelesatis) {
                          // TELESATIŞ: Slider'dan Oku
                         const slider = document.getElementById(`slider-${i}`);
                         val = parseInt(slider.value) || 0;
                         
+                        // Kırılım Notu Zorunluluğu KALDIRILDI
+                        /*
                         if (val < maxPoints && !note) {
                             Swal.showValidationMessage(`'${c.text}' için kırılım nedeni zorunludur.`);
                             return false;
                         }
+                        */
                     } else {
                         val = maxPoints; // Varsayılan
                     }
-
                     total += val;
                     detailsArr.push({ q: c.text, max: maxPoints, score: val, note: note });
                 }
@@ -1956,7 +1927,7 @@ function useJoker(type) {
             let incorrectOpts = currentQ.opts.map((_, i) => i).filter(i => i !== correctAns);
             guess = incorrectOpts[Math.floor(Math.random() * incorrectOpts.length)] || correctAns;
         }
-        Swal.fire({ icon: 'info', title: '  📞   Telefon Jokeri', html: `${expert} soruyu cevaplıyor...<br><br>"Benim tahminim kesinlikle **${String.fromCharCode(65 + guess)}** şıkkı. Bundan ${Math.random() < 0.8 ? "çok eminim" : "emin değilim"}."`, confirmButtonText: 'Kapat' });
+        Swal.fire({ icon: 'info', title: '   📞    Telefon Jokeri', html: `${expert} soruyu cevaplıyor...<br><br>"Benim tahminim kesinlikle **${String.fromCharCode(65 + guess)}** şıkkı. Bundan ${Math.random() < 0.8 ? "çok eminim" : "emin değilim"}."`, confirmButtonText: 'Kapat' });
     } else if (type === 'half') {
         let incorrectOpts = currentQ.opts.map((_, i) => i).filter(i => i !== correctAns).sort(() => Math.random() - 0.5).slice(0, 2);
         incorrectOpts.forEach(idx => {
@@ -1964,7 +1935,7 @@ function useJoker(type) {
             btns[idx].style.textDecoration = 'line-through';
             btns[idx].style.opacity = '0.4';
         });
-        Swal.fire({ icon: 'success', title: '  ✂️   Yarı Yarıya Kullanıldı', text: 'İki yanlış şık elendi!', toast: true, position: 'top', showConfirmButton: false, timer: 1500 });
+        Swal.fire({ icon: 'success', title: '   ✂️    Yarı Yarıya Kullanıldı', text: 'İki yanlış şık elendi!', toast: true, position: 'top', showConfirmButton: false, timer: 1500 });
     } else if (type === 'double') {
         doubleChanceUsed = true;
         Swal.fire({ icon: 'warning', title: '2️  Çift Cevap', text: 'Bu soruda bir kez yanlış cevap verme hakkınız var. İlk cevabınız yanlışsa, ikinci kez deneyebilirsiniz.', toast: true, position: 'top', showConfirmButton: false, timer: 2500 });
@@ -2006,7 +1977,7 @@ function fetchLeaderboard() {
                 html = '<tr><td colspan="4" style="text-align:center; color:#666;">Henüz maç yapılmadı.</td></tr>';
             } else {
                 data.leaderboard.forEach((u, i) => {
-                    let medal = i===0 ? '  🥇  ' : (i===1 ? '  🥈  ' : (i===2 ? '  🥉  ' : `<span class="rank-badge">${i+1}</span>`));
+                    let medal = i===0 ? '   🥇   ' : (i===1 ? '   🥈   ' : (i===2 ? '   🥉   ' : `<span class="rank-badge">${i+1}</span>`));
                     let bgStyle = (u.username === currentUser) ? 'background:rgba(250, 187, 0, 0.1);' : '';
                     html += `<tr style="${bgStyle}"><td>${medal}</td><td style="text-align:left;">${u.username}</td><td>${u.games}</td><td>${u.average}</td></tr>`;
                 });
@@ -2153,7 +2124,7 @@ function resetField() {
     });
 }
 function finishPenaltyGame() {
-    let title = pScore >= 8 ? "EFSANE!  🏆 " : (pScore >= 5 ? "İyi Maçtı!  👏 " : "Antrenman Lazım  🤕 ");
+    let title = pScore >= 8 ? "EFSANE!   🏆  " : (pScore >= 5 ? "İyi Maçtı!   👏  " : "Antrenman Lazım   🤕  ");
     document.getElementById('p-question-text').innerHTML = `<span style="font-size:1.5rem; color:#fabb00;">MAÇ BİTTİ!</span><br>${title}<br>Toplam Skor: ${pScore}/10`;
     document.getElementById('p-options').style.display = 'none';
     document.getElementById('p-restart-btn').style.display = 'block';
@@ -2194,7 +2165,7 @@ function renderStep(k){
     let h = `<h2 style="color:var(--primary);">${s.title || ''}</h2>`;
     
     if(s.result) {
-        let i = s.result === 'red' ? '  🛑  ' : (s.result === 'green' ? '  ✅  ' : '  ⚠️  ');
+        let i = s.result === 'red' ? '   🛑   ' : (s.result === 'green' ? '   ✅   ' : '   ⚠️   ');
         let c = s.result === 'red' ? 'res-red' : (s.result === 'green' ? 'res-green' : 'res-yellow');
         h += `<div class="result-box ${c}"><div style="font-size:3rem;margin-bottom:10px;">${i}</div><h3>${s.title}</h3><p>${s.text}</p>${s.script ? `<div class="script-box">${s.script}</div>` : ''}</div><button class="restart-btn" onclick="renderStep('start')"><i class="fas fa-redo"></i> Başa Dön</button>`;
     } else {
