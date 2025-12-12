@@ -22,12 +22,11 @@ let adminUserList = [];
 let allEvaluationsData = [];
 let wizardStepsData = {};
 
-// Yeni Kalite Modülü Değişkenleri
 let currentQualityView = 'dashboard';
 const MONTH_NAMES = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 
 // ==========================================================
-// --- 1. YARDIMCI FONKSİYONLAR ---
+// --- YARDIMCI FONKSİYONLAR ---
 // ==========================================================
 function getToken() { return localStorage.getItem("sSportToken"); }
 function getFavs() { return JSON.parse(localStorage.getItem('sSportFavs') || '[]'); }
@@ -44,7 +43,7 @@ function toggleFavorite(title) {
     if (currentCategory === 'fav') {
         filterCategory(document.querySelector('.btn-fav'), 'fav');
     } else {
-        renderCards(activeCards); // İkonu güncellemek için
+        renderCards(activeCards);
     }
 }
 
@@ -85,7 +84,7 @@ function getCategorySelectHtml(currentCategory, id) {
     if (currentCategory && !VALID_CATEGORIES.includes(currentCategory)) {
         options = `<option value="${currentCategory}" selected>${currentCategory} (Hata)</option>` + options;
     }
-    return `<select id="${id}" class="swal2-input" style="width:100%; margin-top:5px;">${options}</select>`;
+    return `<select id="${id}" class="swal2-input custom-swal-select">${options}</select>`;
 }
 
 function escapeForJsString(text) {
@@ -123,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================================
-// --- 2. OTURUM VE GİRİŞ İŞLEMLERİ ---
+// --- SESSION & LOGIN ---
 // ==========================================================
 function checkSession() {
     const savedUser = localStorage.getItem("sSportUser");
@@ -240,56 +239,20 @@ function girisYap() {
 }
 
 function checkAdmin(role) {
-    const addCardDropdown = document.getElementById('dropdownAddCard');
-    const quickEditDropdown = document.getElementById('dropdownQuickEdit');
-    
     isAdminMode = (role === "admin");
-    isEditingActive = false;
-    document.body.classList.remove('editing');
+    const addBtn = document.getElementById('dropdownAddCard');
+    const editBtn = document.getElementById('dropdownQuickEdit');
     
-    const isQualityUser = (role === 'qusers');
-    const filterButtons = document.querySelectorAll('.filter-btn:not(.btn-fav)'); 
-    
-    if (isQualityUser) {
-        filterButtons.forEach(btn => {
-            if (btn.innerText.indexOf('Kalite') === -1) {
-                btn.style.opacity = '0.5';
-                btn.style.pointerEvents = 'none';
-                btn.style.filter = 'grayscale(100%)';
-            } else {
-                btn.style.filter = 'none';
-            }
-        });
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.disabled = true;
-            searchInput.placeholder = "Arama devre dışı (Kalite Modu)";
-            searchInput.style.opacity = '0.6';
+    if(isAdminMode){
+        if(addBtn) addBtn.style.display='flex';
+        if(editBtn) {
+            editBtn.style.display='flex';
+            editBtn.innerHTML='<i class="fas fa-pen" style="color:var(--secondary);"></i> Düzenlemeyi Aç';
+            editBtn.classList.remove('active');
         }
     } else {
-        filterButtons.forEach(btn => {
-            btn.style.opacity = '1';
-            btn.style.pointerEvents = 'auto';
-            btn.style.filter = 'none';
-        });
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.disabled = false;
-            searchInput.placeholder = "İçeriklerde hızlı ara...";
-            searchInput.style.opacity = '1';
-        }
-    }
-    
-    if(isAdminMode) {
-        if(addCardDropdown) addCardDropdown.style.display = 'flex';
-        if(quickEditDropdown) {
-            quickEditDropdown.style.display = 'flex';
-            quickEditDropdown.innerHTML = '<i class="fas fa-pen" style="color:var(--secondary);"></i> Düzenlemeyi Aç';
-            quickEditDropdown.classList.remove('active');
-        }
-    } else {
-        if(addCardDropdown) addCardDropdown.style.display = 'none';
-        if(quickEditDropdown) quickEditDropdown.style.display = 'none';
+        if(addBtn) addBtn.style.display='none';
+        if(editBtn) editBtn.style.display='none';
     }
 }
 
@@ -627,6 +590,104 @@ function sendUpdate(o, c, v, t='card') {
             Swal.fire('Hata', 'Kaydedilemedi: ' + (data.message || 'Bilinmeyen Hata'), 'error');
         }
     }).catch(err => Swal.fire('Hata', 'Sunucu hatası.', 'error'));
+}
+
+// ==========================================================
+// --- GÜNCELLENMİŞ EDİT (DÜZENLEME) PENCERESİ ---
+// ==========================================================
+async function editContent(index) {
+    const item = activeCards[index];
+    const catSelectHTML = getCategorySelectHtml(item.category, 'swal-cat');
+    
+    // Görseldeki gibi temiz, alt alta sıralanmış input yapısı
+    const htmlContent = `
+    <div style="display:flex; flex-direction:column; gap:15px; text-align:left;">
+        <input id="swal-title" class="swal2-input custom-swal-input" value="${item.title}" placeholder="Başlık">
+        ${catSelectHTML}
+        <textarea id="swal-text" class="swal2-textarea custom-swal-textarea" placeholder="İçerik Metni">${(item.text||'').replace(/<br>/g,'\n')}</textarea>
+        <textarea id="swal-script" class="swal2-textarea custom-swal-textarea" placeholder="Script Metni">${(item.script||'').replace(/<br>/g,'\n')}</textarea>
+        <input id="swal-code" class="swal2-input custom-swal-input" value="${item.code||''}" placeholder="Kod (Opsiyonel)">
+        <input id="swal-link" class="swal2-input custom-swal-input" value="${item.link||''}" placeholder="Link (Opsiyonel)">
+    </div>
+    `;
+
+    const { value: formValues } = await Swal.fire({
+        title: 'Düzenle',
+        html: htmlContent,
+        width: '600px',
+        showCancelButton: true,
+        confirmButtonText: 'Kaydet',
+        cancelButtonText: 'İptal',
+        customClass: {
+            popup: 'custom-swal-popup'
+        },
+        preConfirm: () => {
+            return {
+                cat: document.getElementById('swal-cat').value,
+                title: document.getElementById('swal-title').value,
+                text: document.getElementById('swal-text').value,
+                script: document.getElementById('swal-script').value,
+                code: document.getElementById('swal-code').value,
+                link: document.getElementById('swal-link').value
+            }
+        }
+    });
+
+    if (formValues) {
+        if(formValues.cat !== item.category) sendUpdate(item.title, "Category", formValues.cat, 'card');
+        if(formValues.text !== (item.text || '').replace(/<br>/g,'\n')) setTimeout(() => sendUpdate(item.title, "Text", formValues.text, 'card'), 500);
+        if(formValues.script !== (item.script || '').replace(/<br>/g,'\n')) setTimeout(() => sendUpdate(item.title, "Script", formValues.script, 'card'), 1000);
+        if(formValues.code !== (item.code || '')) setTimeout(() => sendUpdate(item.title, "Code", formValues.code, 'card'), 1500);
+        if(formValues.link !== (item.link || '')) setTimeout(() => sendUpdate(item.title, "Link", formValues.link, 'card'), 2000);
+        if(formValues.title !== item.title) setTimeout(() => sendUpdate(item.title, "Title", formValues.title, 'card'), 2500);
+    }
+}
+
+// ==========================================================
+// --- GÜNCELLENMİŞ SPOR REHBERİ (GÖRSELDEKİ GİBİ) ---
+// ==========================================================
+function openGuide() {
+    document.getElementById('guide-modal').style.display = 'flex';
+    const grid = document.getElementById('guide-grid');
+    grid.innerHTML = '';
+    
+    sportsData.forEach((s, index) => {
+        let editBtn = (isAdminMode && isEditingActive) 
+            ? `<div class="guide-edit-btn" onclick="event.stopPropagation(); editSport('${escapeForJsString(s.title)}')"><i class="fas fa-pencil-alt"></i></div>` 
+            : '';
+        
+        let pronHtml = s.pronunciation ? `<div class="guide-pronunciation">🗣️ ${s.pronunciation}</div>` : '';
+        let tipHtml = s.tip ? `<div class="guide-tip-box"><i class="fas fa-lightbulb"></i> ${s.tip}</div>` : '';
+        
+        // Görseldeki kart yapısına birebir uygun HTML
+        grid.innerHTML += `
+        <div class="guide-card-new" onclick="showSportDetail(${index})">
+            ${editBtn}
+            <div class="guide-icon-area">
+                <i class="fas ${s.icon} guide-icon-large"></i>
+            </div>
+            <div class="guide-content-area">
+                <div class="guide-card-title">${s.title}</div>
+                ${pronHtml}
+                <div class="guide-card-desc">${s.desc || ''}</div>
+                ${tipHtml}
+            </div>
+            <div class="guide-footer">(Detay için tıkla)</div>
+        </div>`;
+    });
+}
+
+function showSportDetail(x) { 
+    const s=sportsData[x]; 
+    const detailText = s.detail ? s.detail.replace(/\n/g,'<br>') : "Detay bilgisi yok.";
+    const pronDetail = s.pronunciation ? `<div style="color:#e65100; font-weight:bold; margin-bottom:15px; font-style:italic;">🗣️ Okunuşu: ${s.pronunciation}</div>` : '';
+    
+    Swal.fire({ 
+        title: `<i class="fas ${s.icon}" style="color:#0e1b42;"></i> ${s.title}`,
+        html: `${pronDetail}<div style="text-align:left; font-size:1rem; line-height:1.6;">${detailText}</div>`, 
+        width:'600px',
+        background: '#f8f9fa' 
+    }); 
 }
 
 // ==========================================================
@@ -1587,18 +1648,48 @@ async function addNewCardPopup() {
 async function editContent(index) {
     const item = activeCards[index];
     const catSelectHTML = getCategorySelectHtml(item.category, 'swal-cat');
-    const { value: f } = await Swal.fire({
-        title: 'Düzenle', html: `<input id="swal-title" class="swal2-input" value="${item.title}">${catSelectHTML}<textarea id="swal-text" class="swal2-textarea">${(item.text||'').replace(/<br>/g,'\n')}</textarea><textarea id="swal-script" class="swal2-textarea">${(item.script||'').replace(/<br>/g,'\n')}</textarea><input id="swal-code" class="swal2-input" value="${item.code||''}"><input id="swal-link" class="swal2-input" value="${item.link||''}">`,
-        showCancelButton: true, confirmButtonText: 'Kaydet',
-        preConfirm: () => ({ cat: document.getElementById('swal-cat').value, title: document.getElementById('swal-title').value, text: document.getElementById('swal-text').value, script: document.getElementById('swal-script').value, code: document.getElementById('swal-code').value, link: document.getElementById('swal-link').value })
+    
+    // Görseldeki gibi temiz, alt alta sıralanmış input yapısı
+    const htmlContent = `
+    <div style="display:flex; flex-direction:column; gap:15px; text-align:left;">
+        <input id="swal-title" class="swal2-input custom-swal-input" value="${item.title}" placeholder="Başlık">
+        ${catSelectHTML}
+        <textarea id="swal-text" class="swal2-textarea custom-swal-textarea" placeholder="İçerik Metni">${(item.text||'').replace(/<br>/g,'\n')}</textarea>
+        <textarea id="swal-script" class="swal2-textarea custom-swal-textarea" placeholder="Script Metni">${(item.script||'').replace(/<br>/g,'\n')}</textarea>
+        <input id="swal-code" class="swal2-input custom-swal-input" value="${item.code||''}" placeholder="Kod (Opsiyonel)">
+        <input id="swal-link" class="swal2-input custom-swal-input" value="${item.link||''}" placeholder="Link (Opsiyonel)">
+    </div>
+    `;
+
+    const { value: formValues } = await Swal.fire({
+        title: 'Düzenle',
+        html: htmlContent,
+        width: '600px',
+        showCancelButton: true,
+        confirmButtonText: 'Kaydet',
+        cancelButtonText: 'İptal',
+        customClass: {
+            popup: 'custom-swal-popup'
+        },
+        preConfirm: () => {
+            return {
+                cat: document.getElementById('swal-cat').value,
+                title: document.getElementById('swal-title').value,
+                text: document.getElementById('swal-text').value,
+                script: document.getElementById('swal-script').value,
+                code: document.getElementById('swal-code').value,
+                link: document.getElementById('swal-link').value
+            }
+        }
     });
-    if (f) {
-        if(f.cat !== item.category) sendUpdate(item.title, "Category", f.cat, 'card');
-        if(f.text !== (item.text||'').replace(/<br>/g,'\n')) setTimeout(()=>sendUpdate(item.title, "Text", f.text, 'card'), 500);
-        if(f.script !== (item.script||'').replace(/<br>/g,'\n')) setTimeout(()=>sendUpdate(item.title, "Script", f.script, 'card'), 1000);
-        if(f.code !== (item.code||'')) setTimeout(()=>sendUpdate(item.title, "Code", f.code, 'card'), 1500);
-        if(f.link !== (item.link||'')) setTimeout(()=>sendUpdate(item.title, "Link", f.link, 'card'), 2000);
-        if(f.title !== item.title) setTimeout(()=>sendUpdate(item.title, "Title", f.title, 'card'), 2500);
+
+    if (formValues) {
+        if(formValues.cat !== item.category) sendUpdate(item.title, "Category", formValues.cat, 'card');
+        if(formValues.text !== (item.text || '').replace(/<br>/g,'\n')) setTimeout(() => sendUpdate(item.title, "Text", formValues.text, 'card'), 500);
+        if(formValues.script !== (item.script || '').replace(/<br>/g,'\n')) setTimeout(() => sendUpdate(item.title, "Script", formValues.script, 'card'), 1000);
+        if(formValues.code !== (item.code || '')) setTimeout(() => sendUpdate(item.title, "Code", formValues.code, 'card'), 1500);
+        if(formValues.link !== (item.link || '')) setTimeout(() => sendUpdate(item.title, "Link", formValues.link, 'card'), 2000);
+        if(formValues.title !== item.title) setTimeout(() => sendUpdate(item.title, "Title", formValues.title, 'card'), 2500);
     }
 }
 
@@ -1714,25 +1805,44 @@ function openGuide() {
     const g = document.getElementById('guide-grid');
     g.innerHTML = '';
     sportsData.forEach((s, x) => {
-        let eb = (isAdminMode && isEditingActive) ? `<i class="fas fa-pencil-alt edit-icon" style="position:absolute; top:5px; right:5px;" onclick="event.stopPropagation(); editSport('${escapeForJsString(s.title)}')"></i>` : '';
+        let editBtn = (isAdminMode && isEditingActive) 
+            ? `<div class="guide-edit-btn" onclick="event.stopPropagation(); editSport('${escapeForJsString(s.title)}')"><i class="fas fa-pencil-alt"></i></div>` 
+            : '';
         
-        let pronHtml = s.pronunciation ? `<div class="pronunciation-badge">🗣️ ${s.pronunciation}</div>` : '';
-        let descHtml = s.desc ? `<div class="guide-desc">${s.desc}</div>` : '';
-        let tipHtml = s.tip ? `<div class="guide-tip">💡 ${s.tip}</div>` : '';
-
+        let pronHtml = s.pronunciation ? `<div class="guide-pronunciation">🗣️ ${s.pronunciation}</div>` : '';
+        let tipHtml = s.tip ? `<div class="guide-tip-box"><i class="fas fa-lightbulb"></i> ${s.tip}</div>` : '';
+        
+        // Görseldeki kart yapısına birebir uygun HTML
         g.innerHTML += `
-        <div class="guide-item" onclick="showSportDetail(${x})">
-            ${eb}
-            <i class="fas ${s.icon} guide-icon"></i>
-            <span class="guide-title">${s.title}</span>
-            ${pronHtml}
-            ${descHtml}
-            ${tipHtml}
-            <div style="font-size:0.75rem; color:#999; margin-top:8px;">(Detay için tıkla)</div>
+        <div class="guide-card-new" onclick="showSportDetail(${x})">
+            ${editBtn}
+            <div class="guide-icon-area">
+                <i class="fas ${s.icon} guide-icon-large"></i>
+            </div>
+            <div class="guide-content-area">
+                <div class="guide-card-title">${s.title}</div>
+                ${pronHtml}
+                <div class="guide-card-desc">${s.desc || ''}</div>
+                ${tipHtml}
+            </div>
+            <div class="guide-footer">(Detay için tıkla)</div>
         </div>`;
     });
 }
-function showSportDetail(x) { const s=sportsData[x]; Swal.fire({ title: s.title, html: s.detail, width:'600px' }); }
+
+function showSportDetail(x) { 
+    const s=sportsData[x]; 
+    const detailText = s.detail ? s.detail.replace(/\n/g,'<br>') : "Detay bilgisi yok.";
+    const pronDetail = s.pronunciation ? `<div style="color:#e65100; font-weight:bold; margin-bottom:15px; font-style:italic;">🗣️ Okunuşu: ${s.pronunciation}</div>` : '';
+    
+    Swal.fire({ 
+        title: `<i class="fas ${s.icon}" style="color:#0e1b42;"></i> ${s.title}`,
+        html: `${pronDetail}<div style="text-align:left; font-size:1rem; line-height:1.6;">${detailText}</div>`, 
+        width:'600px',
+        background: '#f8f9fa' 
+    }); 
+}
+
 function openSales() { document.getElementById('sales-modal').style.display='flex'; const c=document.getElementById('sales-grid'); c.innerHTML=''; salesScripts.forEach((s,x)=>{ let eb=(isAdminMode&&isEditingActive)?`<i class="fas fa-pencil-alt edit-icon" onclick="editSales('${escapeForJsString(s.title)}')"></i>`:''; c.innerHTML+=`<div class="sales-item" id="sales-${x}" onclick="toggleSales('${x}')">${eb}<div class="sales-header"><span class="sales-title">${s.title}</span></div><div class="sales-text">${s.text}</div></div>`; }); }
 function toggleSales(x) { document.getElementById(`sales-${x}`).classList.toggle('active'); }
 function closeModal(id) { document.getElementById(id).style.display='none'; }
