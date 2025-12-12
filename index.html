@@ -24,16 +24,14 @@
             <p id="error-msg" style="color:#ef5350; display:none; margin-top:10px; font-size:0.9rem;">Hatalı Kullanıcı Adı veya Şifre!</p>
         </div>
     </div>
-
     <!-- BAKIM EKRANI -->
     <div id="maintenance-screen">
         <div class="maintenance-content" style="text-align:center; color:white;">
-            <span style="font-size: 4rem;">   👨‍🏫   </span>
+            <span style="font-size: 4rem;">   👨   ‍   🏫   </span>
             <h1>Sistem Mola Verdi!</h1>
             <p>Bakım çalışması sürüyor...    🚀   </p>
         </div>
     </div>
-
     <!-- ANA UYGULAMA -->
     <div id="main-app">
         <div class="header">
@@ -91,7 +89,10 @@
                         <a href="https://www.ssportplus.com/yayin-akisi/" target="_blank" class="filter-btn link-btn"><i class="fas fa-calendar-alt"></i> Yayın Akışı</a>
                         <button class="filter-btn link-btn" onclick="openGuide()"><i class="fas fa-book"></i> Spor Rehberi</button>
                         <button class="filter-btn link-btn" onclick="openWizard()"><i class="fas fa-robot"></i> İade Asistanı</button>
+                        
+                        <!-- YENİ EKLENEN BUTON: TEKNİK SİHİRBAZ -->
                         <button class="filter-btn link-btn" onclick="openTechWizard()"><i class="fas fa-magic"></i> Teknik Sihirbaz</button>
+                        
                         <button class="filter-btn link-btn" onclick="openSales()"><i class="fas fa-headset"></i> TeleSatış</button>
                         <button class="filter-btn link-btn" onclick="openPenaltyGame()"><i class="fas fa-futbol"></i> Oyun</button>
                         <button class="filter-btn link-btn" onclick="openQualityArea()"><i class="fas fa-chart-pie"></i> Kalite</button>
@@ -116,7 +117,6 @@
             <div class="grid" id="cardGrid"></div>
         </div>
     </div>
-
     <!-- MODAL: DUYURULAR -->
     <div id="news-modal" class="modal-overlay">
         <div class="modal-content">
@@ -125,7 +125,6 @@
             <div id="news-container"></div>
         </div>
     </div>
-
     <!-- MODAL: İADE ASİSTANI -->
     <div id="wizard-modal" class="modal-overlay">
         <div class="modal-content">
@@ -134,21 +133,26 @@
         </div>
     </div>
     
-    <!-- MODAL: TEKNİK SİHİRBAZ -->
+    <!-- YENİ MODAL: TEKNİK SİHİRBAZ -->
     <div id="tech-wizard-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 900px; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+            
+            <!-- Header Kısmı -->
             <div style="background-color: #0e1b42; color: #fabb00; padding: 20px; text-align: center; font-size: 1.4rem; font-weight: 800; border-bottom: 5px solid #fabb00; position: relative;">
                   📺   S Sport Plus - Teknik Çözüm Sihirbazı
                 <span class="close-modal" onclick="closeModal('tech-wizard-modal')" style="color: white; top: 15px; right: 20px;">&times;</span>
             </div>
+            <!-- Navigasyon Barı -->
             <div style="background-color: #eaeaea; padding: 10px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc;">
                 <button id="tw-btn-back" class="btn btn-copy" style="background:#6c757d; color:white; display:none;" onclick="twGoBack()">  ⬅   Önceki Adım</button>
-                <button class="btn btn-copy" style="background:#d32f2f; color:white;" onclick="twResetWizard()">  ↻   Başa Dön</button>
+                <button class="btn btn-copy" style="background:#d32f2f; color:white;" onclick="twResetWizard()">  ↻   Ba  ş  a D  ö  n</button>
             </div>
-            <div id="tech-wizard-content" style="padding: 30px; overflow-y: auto; max-height: 60vh;"></div>
+            <!-- İçerik Alanı -->
+            <div id="tech-wizard-content" style="padding: 30px; overflow-y: auto; max-height: 60vh;">
+                <!-- JS burayı dolduracak -->
+            </div>
         </div>
     </div>
-
     <!-- MODAL: SPOR REHBERİ -->
     <div id="guide-modal" class="modal-overlay">
         <div class="modal-content">
@@ -157,7 +161,6 @@
             <div class="guide-grid" id="guide-grid"></div>
         </div>
     </div>
-
     <!-- MODAL: SATIŞ SCRIPTLERI -->
     <div id="sales-modal" class="modal-overlay">
         <div class="modal-content">
@@ -166,7 +169,6 @@
             <div class="sales-grid" id="sales-grid"></div>
         </div>
     </div>
-
     <!-- MODAL: PENALTI OYUNU -->
     <div id="penalty-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 650px; background: #1a1a1a; border: 1px solid #333; min-height:600px; display:flex; flex-direction:column;">
@@ -179,7 +181,7 @@
                     <thead><tr style="border-bottom:1px solid #555; color:#fabb00;"><th style="padding:10px;">#</th><th style="padding:10px;">Temsilci</th><th style="padding:10px;">Maç</th><th style="padding:10px;">Ort.</th></tr></thead>
                     <tbody id="leaderboard-body"></tbody>
                 </table>
-                <button class="penalty-btn" style="width:200px; background:#2e7d32; color:white; border-color:#1b5e20;" onclick="startGameFromLobby()">MAÇA BAŞLA    🏃‍♂️⚽   </button>
+                <button class="penalty-btn" style="width:200px; background:#2e7d32; color:white; border-color:#1b5e20;" onclick="startGameFromLobby()">MAÇA BAŞLA    🏃   ‍   ♂️⚽   </button>
             </div>
             <div id="penalty-game-area" style="display:none;">
                 <div class="penalty-stats"><span>SKOR: <span id="p-score">0</span></span><span>TOP: <span id="p-balls">10</span></span></div>
@@ -192,113 +194,92 @@
                 <div id="joker-container" style="display: flex; justify-content: space-around; margin: 15px 0;">
                     <button id="joker-call" class="joker-btn" onclick="useJoker('call')" title="Telefon Jokeri">   📞    Telefon</button>
                     <button id="joker-half" class="joker-btn" onclick="useJoker('half')" title="Yarı Yarıya Joker">   ✂️    50:50</button>
-                    <button id="joker-double" class="joker-btn" onclick="useJoker('double')" title="Çift Cevap Hakkı">2️⃣ Çift Cevap</button>
+                    <button id="joker-double" class="joker-btn" onclick="useJoker('double')" title="Çift Cevap Hakkı">2️   ⃣      Ç  ift Cevap</button>
                 </div>
                 <div class="penalty-options" id="p-options"></div>
                 <button id="p-restart-btn" class="restart-btn" style="display:none; width:100%; background:#fabb00; color:black; font-weight:bold;" onclick="showLobby()">LOBİYE DÖN    🏠   </button>
             </div>
         </div>
     </div>
-
-    <!-- YENİ MODAL: KALİTE & GELİŞİM (SIDEBAR'LI) -->
+    <!-- MODAL: KALİTE YÖNETİM PANELİ (GÜNCELLENMİŞ HALİ) -->
     <div id="quality-modal" class="modal-overlay">
-        <div class="modal-content quality-modal-layout" style="padding:0; max-width: 1100px; height: 80vh; display: flex; overflow: hidden;">
+        <div class="modal-content" style="max-width: 900px;">
+            <span class="close-modal" onclick="closeModal('quality-modal')">&times;</span>
+            <h2 style="text-align:center; color:var(--primary); margin-bottom: 20px;">Kalite</h2>
             
-            <!-- SOL SIDEBAR MENÜ -->
-            <div class="quality-sidebar">
-                <div class="q-sidebar-header">
-                    <i class="fas fa-chart-pie"></i> Kalite & Gelişim
-                </div>
-                <ul class="q-menu">
-                    <li onclick="switchQualityTab('dashboard')" id="tab-dashboard" class="active">
-                        <i class="fas fa-tachometer-alt"></i> Özet (Dashboard)
-                    </li>
-                    <li onclick="switchQualityTab('evaluations')" id="tab-evaluations">
-                        <i class="fas fa-headset"></i> Çağrı Değerlendirme
-                    </li>
-                    <li onclick="switchQualityTab('feedback')" id="tab-feedback">
-                        <i class="fas fa-comments"></i> Hızlı Feedback
-                    </li>
-                    <li onclick="switchQualityTab('training')" id="tab-training">
-                        <i class="fas fa-graduation-cap"></i> Eğitimlerim
-                    </li>
-                </ul>
-                <div class="q-sidebar-footer">
-                     <button onclick="closeModal('quality-modal')" class="q-close-btn"><i class="fas fa-times"></i> Kapat</button>
+            <!-- Admin Kontrolleri -->
+            <div id="admin-quality-controls" style="display:none; margin-bottom:15px;">
+                <div class="quality-controls-top">
+                    <div style="display:flex; gap:10px;">
+                        <button class="add-btn" style="background:var(--accent); border:none; color:white; padding:8px 15px; border-radius:4px; cursor:pointer;" onclick="logEvaluationPopup()"><i class="fas fa-plus"></i> Ekle</button>
+                        <button class="admin-btn" style="background:var(--primary); color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;" onclick="exportEvaluations()"><i class="fas fa-file-csv"></i> Rapor</button>
+                    </div>
+                    <!-- Grup ve Temsilci Filtresi -->
+                    <div style="font-weight:bold; display:flex; align-items:center; gap: 15px;">
+                        <div style="display:flex; flex-direction:column;">
+                            <label style="font-size:0.7rem; color:#999; margin-bottom:2px;">Ekip / Grup</label>
+                            <select id="group-select-admin" class="swal2-input" onchange="updateAgentListBasedOnGroup()" style="width: 150px; padding:5px; height:35px; margin:0; border-color:#ccc; font-size:0.85rem;"></select>
+                        </div>
+                        <div style="display:flex; flex-direction:column;">
+                            <label style="font-size:0.7rem; color:#999; margin-bottom:2px;">Temsilci</label>
+                            <select id="agent-select-admin" class="swal2-input" onchange="fetchEvaluationsForAgent()" style="width: 180px; padding:5px; height:35px; margin:0; border-color:#ccc; font-size:0.85rem;"></select>
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <!-- SAĞ İÇERİK ALANI -->
-            <div class="quality-main-content">
+            <!-- KALİTE İÇERİĞİ -->
+            <div id="quality-content" style="padding: 10px; border-radius: 8px;">
+    
+                <!-- ÜST KISIM: BAŞLIK VE FİLTRE -->
+                <div class="q-dashboard-header" style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+                    <div>
+                        <h3 style="font-size:1.2rem; color:var(--primary); margin:0; font-weight:700;">Kalite Yönetim Paneli</h3>
+                        <p style="font-size:0.8rem; color:#888; margin:2px 0 0 0;">Genel performans özeti</p>
+                    </div>
+                    
+                    <div style="text-align:right;">
+                        <label style="font-size:0.75rem; color:#999; display:block; margin-bottom:2px;">Dönem Seçimi:</label>
+                        <select id="month-select-filter" class="minimal-select" style="font-size:0.9rem; font-weight:bold; color:var(--primary); border:none; border-bottom:1px dashed #ccc; outline:none; background:transparent; cursor:pointer;" onchange="fetchEvaluationsForAgent()">
+                            <!-- JS burayı dolduracak -->
+                        </select>
+                    </div>
+                </div>
+            
+                <!-- ORTA KISIM: 3'LÜ İSTATİSTİK KARTLARI -->
+                <div class="q-stats-grid">
+                    <div class="q-stat-card card-blue">
+                        <div class="q-card-title">ORTALAMA PUAN</div>
+                        <div class="q-card-value" id="dash-avg-score">-</div>
+                        <div class="q-card-footer">Seçili dönem</div>
+                        <div class="q-card-icon-bg"><i class="fas fa-chart-pie"></i></div>
+                    </div>
+            
+                    <div class="q-stat-card card-green">
+                        <div class="q-card-title">ÇAĞRI ADEDİ</div>
+                        <div class="q-card-value" id="dash-eval-count">-</div>
+                        <div class="q-card-footer">Değerlendirilen</div>
+                        <div class="q-card-icon-bg"><i class="fas fa-check"></i></div>
+                    </div>
+            
+                    <div class="q-stat-card card-orange">
+                        <div class="q-card-title">HEDEF TUTMA</div>
+                        <div class="q-card-value" id="dash-target-rate">-%</div>
+                        <div class="q-card-footer">Hedef: 90+</div>
+                        <div class="q-card-icon-bg"><i class="fas fa-trophy"></i></div>
+                    </div>
+                </div>
                 
-                <!-- ÜST BAR: FİLTRELER -->
-                <div class="q-top-bar">
-                    <h3 id="page-title">Dashboard</h3>
-                    <div class="q-filters">
-                        <!-- Admin ise Personel Seçimi Görünür -->
-                        <div id="admin-filters" style="display:none; gap:10px;">
-                             <select id="group-select-admin" class="q-select" onchange="updateAgentListBasedOnGroup()"></select>
-                             <select id="agent-select-admin" class="q-select" onchange="refreshQualityData()"></select>
-                        </div>
-                        <!-- Tarih Filtresi -->
-                        <select id="month-select-filter" class="q-select" onchange="refreshQualityData()"></select>
-                    </div>
+                <!-- ALT KISIM: LİSTE BAŞLIĞI VE LİSTE -->
+                <div class="list-section-title" style="font-size:0.85rem; font-weight:700; color:#333; margin:15px 0 10px 0; padding-left:5px; border-left:3px solid #ccc;">
+                    Değerlendirme Geçmişi
                 </div>
-
-                <!-- İÇERİK 1: DASHBOARD -->
-                <div id="view-dashboard" class="q-view active">
-                    <div class="q-stats-grid">
-                        <div class="q-stat-card card-blue">
-                            <div class="q-card-title">ORTALAMA PUAN</div>
-                            <div class="q-card-value" id="dash-avg-score">-</div>
-                            <div class="q-card-icon-bg"><i class="fas fa-chart-bar"></i></div>
-                        </div>
-                        <div class="q-stat-card card-green">
-                            <div class="q-card-title">TOPLAM İŞLEM</div>
-                            <div class="q-card-value" id="dash-eval-count">-</div>
-                            <div class="q-card-icon-bg"><i class="fas fa-check-circle"></i></div>
-                        </div>
-                        <div class="q-stat-card card-orange">
-                            <div class="q-card-title">HEDEF TUTMA</div>
-                            <div class="q-card-value" id="dash-target-rate">-%</div>
-                            <div class="q-card-icon-bg"><i class="fas fa-bullseye"></i></div>
-                        </div>
-                    </div>
-                    <div style="margin-top:20px; padding:40px; background:#f8f9fa; border-radius:8px; text-align:center; color:#777;">
-                        <i class="fas fa-chart-line fa-3x" style="opacity:0.2;"></i>
-                        <p style="margin-top:15px;">Detaylı grafikler ve analizler yakında eklenecek.</p>
-                    </div>
-                </div>
-
-                <!-- İÇERİK 2: ÇAĞRI DEĞERLENDİRME -->
-                <div id="view-evaluations" class="q-view">
-                    <div class="view-actions" id="eval-admin-actions" style="display:none; margin-bottom:15px; text-align:right;">
-                        <button class="btn btn-copy" onclick="logEvaluationPopup()"><i class="fas fa-plus"></i> Yeni Değerlendirme</button>
-                        <button class="btn btn-copy" style="background:var(--primary);" onclick="exportEvaluations()"><i class="fas fa-file-csv"></i> Rapor İndir</button>
-                    </div>
-                    <div id="evaluations-list" class="scrollable-list"></div>
-                </div>
-
-                <!-- İÇERİK 3: FEEDBACK -->
-                <div id="view-feedback" class="q-view">
-                     <div class="view-actions" id="fb-admin-actions" style="display:none; margin-bottom:15px; text-align:right;">
-                        <button class="btn btn-copy" style="background:var(--warning); color:#333;" onclick="openManualFeedbackPopup()"><i class="fas fa-comment-medical"></i> Feedback Ekle</button>
-                    </div>
-                    <div id="feedback-list" class="scrollable-list"></div>
-                </div>
-
-                <!-- İÇERİK 4: EĞİTİMLER -->
-                <div id="view-training" class="q-view">
-                     <div class="view-actions" id="train-admin-actions" style="display:none; margin-bottom:15px; text-align:right;">
-                        <button class="btn btn-copy" style="background:var(--info);" onclick="openAssignTrainingPopup()"><i class="fas fa-plus-circle"></i> Eğitim Ata</button>
-                    </div>
-                    <div id="training-list" class="scrollable-list"></div>
-                </div>
-
+                
+                <div id="quality-loader" style="text-align:center; color:#999; font-style:italic; display:none; margin:20px 0;">Yükleniyor...</div>
+            
+                <div id="evaluations-list" style="max-height: 380px; overflow-y: auto; padding-right:5px;"></div>
             </div>
         </div>
     </div>
-
     <div class="crafted-by-badge">Crafted by Doğuş Yalçınkaya</div>
     <script src="js/app.js"></script>
     <script>
