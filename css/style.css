@@ -326,7 +326,7 @@ body.editing .edit-icon { display: block !important; }
 .torso::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(to right, rgba(0,0,0,0.05), transparent 20%, transparent 80%, rgba(0,0,0,0.05)), linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.1)); z-index: 1; }
 .torso::after { content: 'SSP'; position: absolute; top: 18px; left: 50%; transform: translateX(-50%); color: #0e1b42; font-size: 12px; font-weight: 800; opacity: 0.8; z-index: 2; }
 .arms { position: absolute; top: 35px; width: 100%; height: 15px; z-index: 2; }
-.arm { width: 16px; height: 45px; background: linear-gradient(to right, #ffeb3b, #fbc02d); border-radius: 10px; position: absolute; top: 0; box-shadow: inset 0 0 6px rgba(0,0,0,0.3); transform-origin: top center; }
+.arm { width: 16px; height: 45px; background: linear-gradient(135deg, #ffeb3b 0%, #fbc02d); border-radius: 10px; position: absolute; top: 0; box-shadow: inset 0 0 6px rgba(0,0,0,0.3); transform-origin: top center; }
 .arm.left { left: -8px; transform: rotate(25deg) translateZ(2px); } .arm.right { right: -8px; transform: rotate(-25deg) translateZ(2px); }
 .gloves { width: 20px; height: 20px; background: #fff; border-radius: 50%; position: absolute; bottom: -8px; left: -2px; border:3px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transform: translateZ(6px); }
 .gloves::after { content: ''; position: absolute; width: 6px; height: 6px; background: #f00; border-radius: 50%; top: 5px; left: 5px; }
@@ -558,7 +558,6 @@ body.editing .edit-icon { display: block !important; }
 .t-btn-start { background: #fabb00; color: #0e1b42; }
 .t-btn-start:hover { background: #ffc107; }
 .t-btn-done { background: #2e7d32; color: white; cursor: default; }
-
 .t-doc-link {
     display: inline-flex;
     align-items: center;
@@ -575,7 +574,6 @@ body.editing .edit-icon { display: block !important; }
 .t-doc-link:hover {
     background: #bbdefb;
 }
-
 /* --- GERİ BİLDİRİM KARTLARI --- */
 .feedback-card {
     background: white;
@@ -624,7 +622,6 @@ body.editing .edit-icon { display: block !important; }
     min-width: 60px;
     text-align: center;
 }
-
 /* --- Değerlendirme Geçmişi Tarih İkonları (Evaluation List) --- */
 .eval-date-info {
     font-size: 0.75rem;
@@ -637,7 +634,6 @@ body.editing .edit-icon { display: block !important; }
     color: var(--primary);
     width: 14px;
 }
-
 /* --- Manuel Geri Bildirim Butonu --- */
 .add-manual-feedback-btn {
     background: var(--secondary);
@@ -654,4 +650,77 @@ body.editing .edit-icon { display: block !important; }
 }
 .add-manual-feedback-btn:hover {
     background: #e0a800;
+}
+/* --- Pop-up Tasarım İyileştirmeleri (v13.1) --- */
+.swal2-popup {
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
+    border-radius: 15px !important;
+    font-family: 'Segoe UI', sans-serif !important;
+}
+
+/* Eğitim Atama Modal Grid Yapısı */
+.t-modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+.t-modal-grid .swal2-input {
+    margin: 0 !important;
+    height: 40px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border: 1px solid #ddd;
+    font-size: 0.9rem;
+}
+.t-modal-grid .swal2-textarea {
+    margin: 0 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border: 1px solid #ddd;
+    font-size: 0.9rem;
+}
+.t-modal-grid input[type="date"] {
+    padding: 0 10px;
+    color: #555;
+}
+.t-modal-grid input[placeholder="Süre (Örn: 20dk)"] {
+    text-align: center;
+}
+
+/* Manuel Geri Bildirim Modal (swal2-input) Stilini iyileştirme */
+#manual-q-agent, #manual-q-topic, #manual-q-callid, #manual-q-date, #manual-q-type {
+    border-radius: 6px !important;
+    padding: 10px 15px !important;
+    border: 1px solid #ddd !important;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+}
+#manual-q-feedback {
+    border-radius: 6px !important;
+    padding: 10px 15px !important;
+    border: 1px solid #ddd !important;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* Swal butonlarını görseldeki gibi yapalım */
+.swal2-actions button {
+    border-radius: 6px !important;
+    font-weight: 700 !important;
+    padding: 10px 20px !important;
+    transition: all 0.2s;
+}
+
+/* Ata / Kaydet butonu */
+.swal2-confirm {
+    background: var(--primary) !important;
+    color: var(--secondary) !important;
+}
+.swal2-confirm:hover {
+    background: #1c2438 !important;
+}
+
+/* Cancel butonu */
+.swal2-cancel {
+    background: #ccc !important;
+    color: #333 !important;
+}
+.swal2-cancel:hover {
+    background: #bbb !important;
 }
