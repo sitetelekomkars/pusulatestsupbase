@@ -824,3 +824,6 @@ body.editing .edit-icon { display: block !important; }
     border-radius: 6px;
     margin-bottom: 20px;
 }
+
+/* Penalty Game - Double indicator */
+.double-indicator{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:8px 12px;border-radius:999px;background:rgba(255,193,7,0.18);border:1px solid rgba(255,193,7,0.45);color:#ffc107;font-weight:800;letter-spacing:0.5px;margin:10px auto 0;max-width:max-content;}
