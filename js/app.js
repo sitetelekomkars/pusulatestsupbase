@@ -1546,6 +1546,31 @@ async function fetchFeedbackLogs() {
     }
 }
 
+// YARDIMCI FONKSİYON: Dönem bilgisini MM.YYYY formatında döndürür
+function formatPeriod(periodString) {
+    if (!periodString || periodString === 'N/A') return 'N/A';
+    
+    // Zaten MM.YYYY formatındaysa direkt döndür
+    if (periodString.match(/^\d{2}\.\d{4}$/)) {
+        return periodString;
+    }
+    
+    // Eğer uzun bir Date string'i ise (ör: Wed Oct 01 2025...) tarih nesnesine çevir
+    try {
+        const date = new Date(periodString);
+        if (!isNaN(date.getTime())) {
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${month}.${year}`;
+        }
+    } catch (e) {
+        // Hata oluşursa olduğu gibi bırak veya N/A döndür
+        console.error("Dönem formatlama hatası:", e);
+    }
+    
+    return periodString; // Başka formatta gelirse yine de olduğu gibi döndür
+}
+
 function loadFeedbackList() {
     const listEl = document.getElementById('feedback-list');
     listEl.innerHTML = '';
@@ -1592,9 +1617,8 @@ function loadFeedbackList() {
             // CallId'deki MANUEL- ön ekini atarak Feedback_Logs'taki Call_ID ile eşleştirme
             const logRow = feedbackLogsData.find(x => String(x.callId) === String(cleanCallId));
             if (logRow) {
-                // Not: logRow.period ve logRow.channel zaten Apps Script'te string olarak temizleniyor (row[X] || 'N/A')
-                // Değer 'N/A' değilse veya boş değilse kullan
-                period = logRow.period && logRow.period !== 'N/A' ? logRow.period : period;
+                // Apps Script'ten gelen period değerini formatla (Tarih Nesnesi/String olma ihtimaline karşı)
+                period = formatPeriod(logRow.period) || period;
                 channel = logRow.channel && logRow.channel !== 'N/A' ? logRow.channel : 'Yok';
             }
         }
@@ -2078,7 +2102,7 @@ async function logEvaluationPopup() {
         })
         .then(r => r.json()).then(d => {
             if (d.result === "success") { 
-                Swal.fire({ icon: 'success', title: 'Kaydedildi', timer: 1500, showConfirmButton: false }); 
+                Swal.fire({ icon: 'success', title: 'Kaydedildi', timer: 1500, showConfirmButton: false });
                 // DÜZELTME: Hem evaluations hem de feedback logs güncellenmeli
                 fetchEvaluationsForAgent(formValues.agentName);
                 fetchFeedbackLogs().then(() => {
