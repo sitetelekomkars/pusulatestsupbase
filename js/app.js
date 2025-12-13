@@ -1534,7 +1534,7 @@ function loadFeedbackList() {
         return isMailFeedback || isManualFeedback;
     });
     if(feedbackItems.length === 0) {
-        listEl.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Görüntülenecek filtrelenmiş geri bildirim yok (Sadece Mail veya Manuel).</div>';
+        listEl.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">geri bildirim yok .</div>';
         return;
     }
     
