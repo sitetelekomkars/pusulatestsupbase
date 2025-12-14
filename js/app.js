@@ -2440,7 +2440,8 @@ function loadFeedbackList() {
                         <span><i class="fas fa-comment-alt"></i> Kanal: ${channel}</span>
                         <span><i class="fas fa-tag"></i> Tip: ${infoType}</span>
                      </div>
-                     
+                     <span class="feedback-tag" style="background:${feedbackClass}; color:white;">${isManual ? 'MANUEL' : 'OTOMATİK'}</span>
+                </div>
             </div>`;
     });
 }
