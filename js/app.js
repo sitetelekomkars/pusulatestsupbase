@@ -870,7 +870,7 @@ async function openBroadcastFlow() {
         // Tarihe göre grupla
         const byDate = {};
         items.forEach(it => {
-            const k = it.date || "Tarih Yok";
+            const k = String(it.dateISO || it.date || "Tarih Yok");
             if (!byDate[k]) byDate[k] = [];
             byDate[k].push(it);
         });
@@ -878,7 +878,7 @@ async function openBroadcastFlow() {
         let html = `<div style="text-align:left; max-height:60vh; overflow:auto; padding-right:6px;">`;
 
         Object.keys(byDate).forEach(day => {
-            html += `<div style="margin:12px 0 8px; font-weight:800; color:#0e1b42;">${escapeHtml(day)}</div>`;
+            html += `<div style="margin:12px 0 8px; font-weight:800; color:#0e1b42;">${escapeHtml(_formatBroadcastDateTr({dateISO: day}))}</div>`;
             html += `<div style="display:grid; gap:8px;">`;
 
             byDate[day].forEach(it => {
@@ -910,6 +910,32 @@ async function openBroadcastFlow() {
 }
 
 // XSS koruması
+
+function _formatBroadcastDateTr(it) {
+    // Backend yeni alanları gönderiyorsa kullan
+    if (it && it.dateLabelTr) return String(it.dateLabelTr);
+
+    // Fallback: it.dateISO (yyyy-mm-dd) veya it.date
+    const s = String(it?.dateISO || it?.date || "").trim();
+    if (!s) return "Tarih Yok";
+
+    // ISO yyyy-mm-dd
+    const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) {
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "long", year: "numeric", weekday: "long" }).format(d);
+    }
+
+    // dd.mm.yyyy / dd/mm/yyyy
+    const m2 = s.match(/^(\d{1,2})[\./-](\d{1,2})[\./-](\d{4})/);
+    if (m2) {
+        const d = new Date(Number(m2[3]), Number(m2[2]) - 1, Number(m2[1]));
+        return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "long", year: "numeric", weekday: "long" }).format(d);
+    }
+
+    return s; // en kötü haliyle göster
+}
+
 function escapeHtml(str) {
     return String(str ?? "")
         .replaceAll("&", "&amp;")
