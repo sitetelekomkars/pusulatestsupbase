@@ -79,7 +79,7 @@
                     <div class="search-container">
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" id="searchInput" placeholder="İçeriklerde hızlı ara..." onkeyup="filterContent()">
-                    </div>
+                      <div id="searchResultCount" class="search-result-count"></div></div>
                     <div class="filter-container">
                         <button class="filter-btn btn-fav" onclick="filterCategory(this, 'fav')"><i class="fas fa-star"></i></button>
                         <button class="filter-btn btn-all active" onclick="filterCategory(this, 'all')"><i class="fas fa-layer-group"></i> Tümü</button>
@@ -96,7 +96,7 @@
                         <button class="filter-btn link-btn" onclick="openTechWizard()"><i class="fas fa-magic"></i> Teknik Sihirbaz</button>
                         
                         <button class="filter-btn link-btn" onclick="openSales()"><i class="fas fa-headset"></i> TeleSatış</button>
-                        <button class="filter-btn link-btn" onclick="openPenaltyGame()"><i class="fas fa-futbol"></i> Oyun</button>
+                        <button class="filter-btn link-btn" onclick="openGameHub()"><i class="fas fa-futbol"></i> Oyun</button>
                         <button class="filter-btn link-btn" onclick="openQualityArea()"><i class="fas fa-chart-pie"></i> Kalite</button>
                     </div>
                 </div>
@@ -112,6 +112,7 @@
             </div>
         </div>
         <div class="container">
+            <div id="featured-bar" class="featured-bar" style="display:none;"></div>
             <div id="loading" style="text-align:center; padding:40px; color:#999;">
                 <i class="fas fa-circle-notch fa-spin fa-2x"></i><br>
                 <span style="font-size:0.9rem; margin-top:10px; display:block;">Veriler güncelleniyor...</span>
@@ -368,5 +369,58 @@
             toggleUserDropdown();
         };
     </script>
+
+    <!-- MODAL: OYUN MERKEZİ -->
+    <div id="game-hub-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 760px;">
+            <span class="close-modal" onclick="closeModal('game-hub-modal')">&times;</span>
+            <h2 style="text-align:center; color:var(--primary); margin-top:0;">🎮 Oyun Merkezi</h2>
+            <p style="text-align:center; color:#666; margin-top:-10px;">İstersen hızlı eğitim oyunu, istersen arena!</p>
+            <div class="game-hub-grid">
+                <div class="game-hub-card" onclick="openQuickDecisionGame()">
+                    <div class="gh-icon">🧠</div>
+                    <div class="gh-title">Hızlı Karar</div>
+                    <div class="gh-desc">30 sn / 5 senaryo • İkna + Teknik refleksi</div>
+                    <div class="gh-cta">Başlat</div>
+                </div>
+                <div class="game-hub-card" onclick="openPenaltyGame()">
+                    <div class="gh-icon">⚽</div>
+                    <div class="gh-title">S Sport Arena</div>
+                    <div class="gh-desc">Liderlik tablosu • 10 top • Jokerli</div>
+                    <div class="gh-cta">Arenaya Gir</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: HIZLI KARAR OYUNU -->
+    <div id="quick-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 760px;">
+            <span class="close-modal" onclick="closeModal('quick-modal')">&times;</span>
+            <h2 style="text-align:center; color:var(--secondary); margin-top:0;">🧠 Hızlı Karar</h2>
+            <div class="quick-topbar">
+                <div class="quick-chip">Süre: <span id="qd-time">30</span> sn</div>
+                <div class="quick-chip">Soru: <span id="qd-step">0</span>/5</div>
+                <div class="quick-chip">Puan: <span id="qd-score">0</span></div>
+            </div>
+
+            <div id="qd-lobby" class="quick-lobby">
+                <p style="margin:0; color:#555; line-height:1.6;">
+                    30 saniyede 5 senaryo. En doğru yaklaşımı seç, puanı kap! 🎯
+                </p>
+                <button class="btn btn-copy" style="margin-top:15px; justify-content:center;" onclick="startQuickDecision()">Başlat</button>
+            </div>
+
+            <div id="qd-game" style="display:none;">
+                <div class="quick-question" id="qd-question">Soru yükleniyor...</div>
+                <div class="quick-options" id="qd-options"></div>
+                <div class="quick-footer">
+                    <button class="btn btn-link" onclick="resetQuickDecision()">Yeniden Başla</button>
+                    <button class="btn btn-copy" onclick="closeModal('quick-modal')">Kapat</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
