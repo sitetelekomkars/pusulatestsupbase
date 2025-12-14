@@ -53,6 +53,7 @@ window.setButtonScore = function(index, score, max) {
         row.style.background = '#fff';
     }
     window.recalcTotalScore();
+    try { window.updateCoachTip(index, score, max); } catch(e) {}
 };
 window.recalcTotalScore = function() {
     let currentTotal = 0;
@@ -102,6 +103,7 @@ window.updateRowSliderScore = function(index, max) {
         row.style.background = '#fff';
     }
     window.recalcTotalSliderScore();
+    try { window.updateCoachTip(index, val, max); } catch(e) {}
 };
 window.recalcTotalSliderScore = function() {
     let currentTotal = 0;
@@ -223,6 +225,141 @@ function copyText(t) {
     }
     document.body.removeChild(textarea);
 }
+
+// ==========================================================
+// --- KALİTE: KOÇ MESAJLARI + İÇERİK ÖNERİSİ (v6) ---
+// ==========================================================
+function normalizeTextForMatch(t){
+    return (t||"").toString().toLocaleLowerCase('tr-TR')
+        .replace(/ç/g,'c').replace(/ğ/g,'g').replace(/ı/g,'i').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ü/g,'u');
+}
+function findRelatedContentsByCriterion(critText, limit=2){
+    // Basit eşleştirme: kriter metninden anahtar kelimeler çıkar ve kartlarda ara
+    const stop = ['ve','ile','ama','fakat','ancak','için','olarak','kadar','gibi','mi','mı','mu','mü','de','da','ki','çok','az','en','bir','bu','şu','o','iletişim','müşteri'];
+    const n = normalizeTextForMatch(critText);
+    const words = n.split(/[^a-z0-9]+/).filter(w => w && w.length >= 4 && !stop.includes(w));
+    const uniq = [...new Set(words)].slice(0, 6);
+
+    // Skorla: başlık + içerik + script içinde geçen kelime sayısı
+    const scored = (database||[]).map(item => {
+        const hay = normalizeTextForMatch((item.title||"")+" "+(item.text||"")+" "+(item.script||"")+" "+(item.code||""));
+        let s = 0;
+        uniq.forEach(w => { if(hay.includes(w)) s += 1; });
+        return { item, s };
+    }).filter(x => x.s > 0);
+
+    scored.sort((a,b)=> b.s - a.s);
+    return scored.slice(0, limit).map(x => x.item);
+}
+window.openContentByTitle = function(title){
+    const t = (title||"").toString();
+    const found = (database||[]).find(i => (i.title||"") === t);
+    if(found){
+        showCardDetail(found.title, escapeForJsString(found.text||""));
+    } else {
+        Swal.fire({icon:'info', title:'Bulunamadı', text:'İlgili içerik şu an listede yok.'});
+    }
+};
+window.updateCoachTip = function(index, score, max){
+    const row = document.getElementById(`row-${index}`);
+    const tipEl = document.getElementById(`coach-${index}`);
+    if(!row || !tipEl) return;
+
+    const critText = row.getAttribute('data-crit-text') || '';
+    if(score >= max){
+        tipEl.style.display = 'none';
+        tipEl.innerHTML = '';
+        return;
+    }
+
+    const ratio = max > 0 ? (score / max) : 0;
+    let msgTitle = 'Gelişim Alanı';
+    let msg = 'Bu maddede küçük bir iyileştirme ile toplam puan ciddi artar.';
+    if(ratio < 0.5){
+        msgTitle = 'Kritik Nokta';
+        msg = 'Bu madde düşük kaldı. Bir sonraki çağrıda özellikle buraya odaklan.';
+    } else if(ratio < 0.85){
+        msgTitle = 'İyileştirme Fırsatı';
+        msg = 'Yakınsın. Küçük bir dokunuşla tam puana çıkabilir.';
+    }
+
+    const related = findRelatedContentsByCriterion(critText, 2);
+    const relHtml = related.length ? `
+        <div class="coach-links">
+            <div class="coach-links-title">İlgili içerikler:</div>
+            ${related.map(r => `<button class="coach-mini-btn" onclick="openContentByTitle('${escapeForJsString(r.title)}')">${escapeHtml(r.title)}</button>`).join('')}
+        </div>` : '';
+
+    tipEl.innerHTML = `
+        <div class="coach-title">💡 ${msgTitle}</div>
+        <div class="coach-msg">${escapeHtml(msg)}</div>
+        ${relHtml}
+    `;
+    tipEl.style.display = 'block';
+};
+async function showQualitySummaryPopup(payload){
+    try{
+        const detailsArr = payload.detailsArr || [];
+        const totalScore = payload.score || 0;
+        const maxTotal = detailsArr.reduce((a,x)=> a + (parseInt(x.max)||0), 0) || 0;
+
+        // Güçlü / zayıf alanlar
+        const strengths = detailsArr.filter(x => (parseInt(x.score)||0) >= (parseInt(x.max)||0)).slice(0,3);
+        const weaknesses = detailsArr
+            .map(x => ({...x, ratio: (parseInt(x.max)||0) ? ((parseInt(x.score)||0)/(parseInt(x.max)||0)) : 1 }))
+            .sort((a,b)=> a.ratio - b.ratio)
+            .slice(0,3);
+
+        // Zayıflara göre öneri kartlar
+        let recs = [];
+        weaknesses.forEach(w => { recs = recs.concat(findRelatedContentsByCriterion(w.q, 2)); });
+        // Unique by title
+        const seen = new Set();
+        recs = recs.filter(r => { if(seen.has(r.title)) return false; seen.add(r.title); return true; }).slice(0,4);
+
+        const scorePct = maxTotal ? Math.round((totalScore/maxTotal)*100) : 0;
+        const scoreColor = scorePct < 50 ? '#d32f2f' : (scorePct < 85 ? '#ed6c02' : (scorePct < 95 ? '#fabb00' : '#2e7d32'));
+
+        const html = `
+            <div class="q-summary-wrap">
+                <div class="q-summary-top">
+                    <div>
+                        <div style="font-size:0.85rem; color:#666;">Kaydedildi</div>
+                        <div style="font-weight:800; font-size:1.1rem; color:#0e1b42;">${escapeHtml(payload.agentName||'')}</div>
+                        <div style="font-size:0.8rem; color:#888;">Call ID: <b>${escapeHtml(payload.callId||'')}</b> • ${escapeHtml(payload.callDate||'')}</div>
+                    </div>
+                    <div class="q-summary-ring" style="border-color:${scoreColor};">
+                        <div class="q-summary-ring-in">${totalScore}</div>
+                        <div class="q-summary-ring-sub">${maxTotal ? `${scorePct}%` : ''}</div>
+                    </div>
+                </div>
+
+                <div class="q-summary-cols">
+                    <div class="q-sum-col">
+                        <div class="q-sum-h">🟢 Güçlü Alanlar</div>
+                        ${strengths.length ? `<ul class="q-sum-list">${strengths.map(s=>`<li>${escapeHtml(s.q)}</li>`).join('')}</ul>` : `<div class="q-sum-empty">Tam puan gelen madde yok (bu da fırsat 😉)</div>`}
+                    </div>
+                    <div class="q-sum-col">
+                        <div class="q-sum-h">🔴 Gelişim Alanları</div>
+                        ${weaknesses.length ? `<ul class="q-sum-list">${weaknesses.map(w=>`<li>${escapeHtml(w.q)} <span class="q-sum-mini">(${w.score}/${w.max})</span></li>`).join('')}</ul>` : `<div class="q-sum-empty">Gelişim alanı çıkmadı.</div>`}
+                    </div>
+                </div>
+
+                ${recs.length ? `
+                <div class="q-sum-rec">
+                    <div class="q-sum-h">📚 Hızlı Öneriler</div>
+                    <div class="q-sum-rec-grid">
+                        ${recs.map(r=>`<button class="coach-mini-btn" onclick="openContentByTitle('${escapeForJsString(r.title)}')">${escapeHtml(r.title)}</button>`).join('')}
+                    </div>
+                </div>` : ``}
+            </div>
+        `;
+        await Swal.fire({ icon: 'success', title: 'Değerlendirme Özeti', html, width: 720, confirmButtonText: 'Tamam' });
+    } catch(e){
+        // sessiz geç
+    }
+}
+
 document.addEventListener('contextmenu', event => event.preventDefault());
 document.onkeydown = function(e) { if(e.keyCode == 123) return false; }
 document.addEventListener('DOMContentLoaded', () => { checkSession(); });
@@ -392,6 +529,7 @@ function startSessionTimer() {
 }
 function openUserMenu() { toggleUserDropdown(); }
 async function changePasswordPopup(isMandatory = false) {
+    window.__consistencyConfirmed = false;
     const { value: formValues } = await Swal.fire({
         title: isMandatory ? 'Yeni Şifre Belirleyin' : 'Şifre Değiştir',
         html: `${isMandatory ? '<p style="font-size:0.9rem; color:#d32f2f;">İlk giriş şifrenizi değiştirmeden devam edemezsiniz.</p>' : ''}<input id="swal-old-pass" type="password" class="swal2-input" placeholder="Eski Şifre (Mevcut)"><input id="swal-new-pass" type="password" class="swal2-input" placeholder="Yeni Şifre">`,
@@ -2881,12 +3019,15 @@ async function addManualFeedbackPopup() {
         })
         .then(r => r.json()).then(d => {
             if (d.result === "success") { 
-                Swal.fire({ icon: 'success', title: 'Kaydedildi', timer: 1500, showConfirmButton: false });
+                // Özet popup (Koç ekranı)
+                try {
+                    const detailsArr = [];
+                    try { detailsArr.push(...JSON.parse(formValues.details || "[]")); } catch(e) {}
+                    showQualitySummaryPopup({ agentName: formValues.agentName, callId: formValues.callId, callDate: formValues.callDate, score: formValues.score, detailsArr });
+                } catch(e) {}
                 // DÜZELTME: Hem evaluations hem de feedback logs güncellenmeli
                 fetchEvaluationsForAgent(formValues.agentName);
-                fetchFeedbackLogs().then(() => {
-                    loadFeedbackList();
-                });
+                fetchFeedbackLogs().then(() => { loadFeedbackList(); });
             } else { 
                 Swal.fire('Hata', d.message, 'error'); 
             }
@@ -3087,9 +3228,9 @@ async function logEvaluationPopup() {
             const fullText = escapeForJsString(c.text); 
             if (isChat) {
                 let mPts = parseInt(c.mediumScore) || 0; let bPts = parseInt(c.badScore) || 0;
-                criteriaFieldsHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span style="font-size:0.8rem;">Max: ${pts}</span></div><div class="criteria-controls"><div class="eval-button-group"><button class="eval-button eval-good active" data-score="${pts}" onclick="setButtonScore(${i}, ${pts}, ${pts})">İyi (${pts})</button>${mPts > 0 ? `<button class="eval-button eval-medium" data-score="${mPts}" onclick="setButtonScore(${i}, ${mPts}, ${pts})">Orta (${mPts})</button>` : ''}${bPts > 0 ? `<button class="eval-button eval-bad" data-score="${bPts}" onclick="setButtonScore(${i}, ${bPts}, ${pts})">Kötü (${bPts})</button>` : ''}</div><span class="score-badge" id="badge-${i}" style="margin-top:8px; display:block; background:#2e7d32;">${pts}</span></div><input type="text" id="note-${i}" class="note-input" placeholder="Not..." style="display:none;"></div>`;
+                criteriaFieldsHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}" data-crit-text="${fullText}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span style="font-size:0.8rem;">Max: ${pts}</span></div><div class="criteria-controls"><div class="eval-button-group"><button class="eval-button eval-good active" data-score="${pts}" onclick="setButtonScore(${i}, ${pts}, ${pts})">İyi (${pts})</button>${mPts > 0 ? `<button class="eval-button eval-medium" data-score="${mPts}" onclick="setButtonScore(${i}, ${mPts}, ${pts})">Orta (${mPts})</button>` : ''}${bPts > 0 ? `<button class="eval-button eval-bad" data-score="${bPts}" onclick="setButtonScore(${i}, ${bPts}, ${pts})">Kötü (${bPts})</button>` : ''}</div><span class="score-badge" id="badge-${i}" style="margin-top:8px; display:block; background:#2e7d32;">${pts}</span></div><input type="text" id="note-${i}" class="note-input" placeholder="Not (zorunlu)..." style="display:none;"><div class="coach-tip" id="coach-${i}" style="display:none;"></div></div>`;
             } else if (isTelesatis) {
-                 criteriaFieldsHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span>Max: ${pts}</span></div><div class="criteria-controls" style="display:flex; align-items:center; gap:15px; background:#f9f9f9;"><input type="range" class="custom-range slider-input" id="slider-${i}" min="0" max="${pts}" value="${pts}" data-index="${i}" oninput="updateRowSliderScore(${i}, ${pts})" style="flex-grow:1;"><span class="score-badge" id="badge-${i}" style="background:#2e7d32;">${pts}</span></div><input type="text" id="note-${i}" class="note-input" placeholder="Not..." style="display:none;"></div>`;
+                 criteriaFieldsHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}" data-crit-text="${fullText}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span>Max: ${pts}</span></div><div class="criteria-controls" style="display:flex; align-items:center; gap:15px; background:#f9f9f9;"><input type="range" class="custom-range slider-input" id="slider-${i}" min="0" max="${pts}" value="${pts}" data-index="${i}" oninput="updateRowSliderScore(${i}, ${pts})" style="flex-grow:1;"><span class="score-badge" id="badge-${i}" style="background:#2e7d32;">${pts}</span></div><input type="text" id="note-${i}" class="note-input" placeholder="Not (zorunlu)..." style="display:none;"><div class="coach-tip" id="coach-${i}" style="display:none;"></div></div>`;
             }
         });
         criteriaFieldsHtml += `</div>`;
@@ -3107,9 +3248,24 @@ async function logEvaluationPopup() {
     
     const { value: formValues } = await Swal.fire({
         html: contentHtml, width: '600px', showCancelButton: true, confirmButtonText: ' 💾  Kaydet',
-        didOpen: () => { 
-            if (isTelesatis) window.recalcTotalSliderScore(); 
-            else if (isChat) window.recalcTotalScore(); 
+        didOpen: () => {
+            if (isTelesatis) window.recalcTotalSliderScore();
+            else if (isChat) window.recalcTotalScore();
+            // İlk açılışta koç mesajlarını güncelle
+            try {
+                criteriaList.forEach((c,i)=>{
+                    const pts = parseInt(c.points)||0; if(pts===0) return;
+                    let val = pts;
+                    if (isChat) {
+                        const b = document.getElementById(`badge-${i}`);
+                        val = b ? (parseInt(b.innerText)||0) : pts;
+                    } else if (isTelesatis) {
+                        const s = document.getElementById(`slider-${i}`);
+                        val = s ? (parseInt(s.value)||0) : pts;
+                    }
+                    window.updateCoachTip(i, val, pts);
+                });
+            } catch(e) {}
         },
         preConfirm: () => {
             const callId = document.getElementById('eval-callid').value.trim();
@@ -3129,9 +3285,50 @@ async function logEvaluationPopup() {
                     let val = 0; let note = document.getElementById(`note-${i}`).value;
                     if (isChat) val = parseInt(document.getElementById(`badge-${i}`).innerText) || 0;
                     else if (isTelesatis) val = parseInt(document.getElementById(`slider-${i}`).value) || 0;
+                    // Not zorunluluğu: max altı puanda not boş olamaz
+                    if (val < parseInt(c.points) && (!note || !note.trim())) {
+                        Swal.showValidationMessage(`Not zorunlu: ${i+1}. madde için kısa bir not girin.`);
+                        return false;
+                    }
+                    // Not zorunluluğu: max altı puanda not boş olamaz
+                    if (val < parseInt(c.points) && (!note || !note.trim())) {
+                        Swal.showValidationMessage(`Not zorunlu: ${i+1}. madde için kısa bir not girin.`);
+                        return false;
+                    }
                     total += val; detailsArr.push({ q: c.text, max: parseInt(c.points), score: val, note: note });
                 }
+                
+                // Tutarlılık uyarısı: önceki ortalamaya göre çok sapma varsa onay iste
+                try {
+                    if(!window.__consistencyConfirmed){
+                        const prev = (allEvaluationsData || []).filter(e => (e.agent||'') === agentName && (e.group||'') === agentGroup);
+                        const last = prev.slice(0, 10);
+                        const avg = last.length ? (last.reduce((a,x)=> a + (parseFloat(x.score)||0), 0)/last.length) : null;
+                        if(avg !== null){
+                            const diff = Math.abs(total - avg);
+                            if(diff >= 25){
+                                // SweetAlert içinde async confirm
+                                return (async () => {
+                                    const res = await Swal.fire({
+                                        icon:'warning',
+                                        title:'Tutarlılık Kontrolü',
+                                        html:`Bu puan, önceki ortalamadan <b>${diff.toFixed(0)}</b> puan farklı görünüyor.<br>Devam edelim mi?`,
+                                        showCancelButton:true,
+                                        confirmButtonText:'Evet, Kaydet',
+                                        cancelButtonText:'Vazgeç'
+                                    });
+                                    if(res.isConfirmed){
+                                        window.__consistencyConfirmed = true;
+                                        return { agentName, agentGroup, callId, callDate: formattedCallDate, score: total, details: JSON.stringify(detailsArr), feedback: document.getElementById('eval-feedback').value, feedbackType: document.getElementById('feedback-type').value };
+                                    }
+                                    return false;
+                                })();
+                            }
+                        }
+                    }
+                } catch(e) {}
                 return { agentName, agentGroup, callId, callDate: formattedCallDate, score: total, details: JSON.stringify(detailsArr), feedback: document.getElementById('eval-feedback').value, feedbackType: document.getElementById('feedback-type').value };
+
             } else {
                 return { agentName, agentGroup, callId, callDate: formattedCallDate, score: parseInt(document.getElementById('eval-manual-score').value), details: document.getElementById('eval-details').value, feedback: document.getElementById('feedback-type').value };
             }
@@ -3192,9 +3389,9 @@ async function editEvaluation(targetCallId) {
             if (isChat) {
                 let gAct = cVal === pts ? 'active' : ''; let mAct = (cVal===mPts && mPts!==0) ? 'active' : ''; let bAct = (cVal===bPts && bPts!==0) ? 'active' : '';
                 if(cVal===0 && bPts===0) bAct = 'active'; else if (cVal===0 && bPts>0) { gAct=''; mAct=''; bAct=''; }
-                contentHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span>Max: ${pts}</span></div><div class="criteria-controls"><div class="eval-button-group"><button class="eval-button eval-good ${gAct}" data-score="${pts}" onclick="setButtonScore(${i}, ${pts}, ${pts})">İyi</button>${mPts>0?`<button class="eval-button eval-medium ${mAct}" data-score="${mPts}" onclick="setButtonScore(${i}, ${mPts}, ${pts})">Orta</button>`:''}${bPts>0?`<button class="eval-button eval-bad ${bAct}" data-score="${bPts}" onclick="setButtonScore(${i}, ${bPts}, ${pts})">Kötü</button>`:''}</div><span class="score-badge" id="badge-${i}">${cVal}</span></div><input type="text" id="note-${i}" class="note-input" value="${cNote}" style="display:${cVal<pts?'block':'none'}"></div>`;
+                contentHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}" data-crit-text="${fullText}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span>Max: ${pts}</span></div><div class="criteria-controls"><div class="eval-button-group"><button class="eval-button eval-good ${gAct}" data-score="${pts}" onclick="setButtonScore(${i}, ${pts}, ${pts})">İyi</button>${mPts>0?`<button class="eval-button eval-medium ${mAct}" data-score="${mPts}" onclick="setButtonScore(${i}, ${mPts}, ${pts})">Orta</button>`:''}${bPts>0?`<button class="eval-button eval-bad ${bAct}" data-score="${bPts}" onclick="setButtonScore(${i}, ${bPts}, ${pts})">Kötü</button>`:''}</div><span class="score-badge" id="badge-${i}">${cVal}</span></div><input type="text" id="note-${i}" class="note-input" value="${cNote}" placeholder="Not (zorunlu)..." style="display:${cVal<pts?'block':'none'}"><div class="coach-tip" id="coach-${i}" style="display:none;"></div></div>`;
             } else if (isTelesatis) {
-                contentHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span>Max: ${pts}</span></div><div class="criteria-controls" style="display:flex; background:#f9f9f9;"><input type="range" class="custom-range slider-input" id="slider-${i}" min="0" max="${pts}" value="${cVal}" data-index="${i}" oninput="updateRowSliderScore(${i}, ${pts})" style="flex-grow:1;"><span class="score-badge" id="badge-${i}">${cVal}</span></div><input type="text" id="note-${i}" class="note-input" value="${cNote}" style="display:${cVal<pts?'block':'none'}"></div>`;
+                contentHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}" data-crit-text="${fullText}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span>Max: ${pts}</span></div><div class="criteria-controls" style="display:flex; background:#f9f9f9;"><input type="range" class="custom-range slider-input" id="slider-${i}" min="0" max="${pts}" value="${cVal}" data-index="${i}" oninput="updateRowSliderScore(${i}, ${pts})" style="flex-grow:1;"><span class="score-badge" id="badge-${i}">${cVal}</span></div><input type="text" id="note-${i}" class="note-input" value="${cNote}" placeholder="Not (zorunlu)..." style="display:${cVal<pts?'block':'none'}"><div class="coach-tip" id="coach-${i}" style="display:none;"></div></div>`;
             }
         });
         contentHtml += `</div>`;
@@ -3205,7 +3402,25 @@ async function editEvaluation(targetCallId) {
     
     const { value: formValues } = await Swal.fire({
         html: contentHtml, width: '600px', showCancelButton: true, confirmButtonText: ' 💾  Güncelle',
-        didOpen: () => { if (isTelesatis) window.recalcTotalSliderScore(); else if (isChat) window.recalcTotalScore(); },
+        didOpen: () => {
+            if (isTelesatis) window.recalcTotalSliderScore();
+            else if (isChat) window.recalcTotalScore();
+            // Mevcut değerlere göre koç mesajlarını güncelle
+            try {
+                criteriaList.forEach((c,i)=>{
+                    const pts = parseInt(c.points)||0; if(pts===0) return;
+                    let val = pts;
+                    if (isChat) {
+                        const b = document.getElementById(`badge-${i}`);
+                        val = b ? (parseInt(b.innerText)||0) : pts;
+                    } else if (isTelesatis) {
+                        const s = document.getElementById(`slider-${i}`);
+                        val = s ? (parseInt(s.value)||0) : pts;
+                    }
+                    window.updateCoachTip(i, val, pts);
+                });
+            } catch(e) {}
+        },
         preConfirm: () => {
             const callId = document.getElementById('eval-callid').value;
             const feedback = document.getElementById('eval-feedback').value;
