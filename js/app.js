@@ -1582,6 +1582,7 @@ function updateDashAgentList() {
         agentSelect.appendChild(opt);
     });
     
+    updateDashRingTitle();
     refreshQualityData();
 }
 function refreshQualityData() {
@@ -1676,6 +1677,7 @@ function loadQualityDashboard() {
         const ratio = (avg / 100) * 100;
         if(ring) ring.style.background = `conic-gradient(${color} ${ratio}%, #eee ${ratio}%)`;
         if(document.getElementById('q-dash-ring-text')) document.getElementById('q-dash-ring-text').innerText = Math.round(avg);
+        updateDashRingTitle();
         // Grafik Çizdir
         renderDashboardChart(filtered);
     });
