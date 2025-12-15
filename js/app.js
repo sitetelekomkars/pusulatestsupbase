@@ -22,6 +22,8 @@ let wizardStepsData = {};
 let trainingData = [];
 // YENİ: Chart instance'ı tutmak için
 let dashboardChart = null;
+// DUELLO
+let currentDuelId = null;
 // YENİ: Feedback Log Verisi (Manuel kayıt detayları için)
 let feedbackLogsData = [];
 // ==========================================================
@@ -225,7 +227,25 @@ function copyText(t) {
 }
 document.addEventListener('contextmenu', event => event.preventDefault());
 document.onkeydown = function(e) { if(e.keyCode == 123) return false; }
-document.addEventListener('DOMContentLoaded', () => { checkSession(); });
+document.addEventListener('DOMContentLoaded', () => { checkSession();
+    // Kısayollar: Ctrl/Cmd+K (arama), ESC (temizle)
+    document.addEventListener('keydown', (e) => {
+        const isMac = navigator.platform.toUpperCase().includes('MAC');
+        const mod = isMac ? e.metaKey : e.ctrlKey;
+        if(mod && (e.key === 'k' || e.key === 'K')) {
+            e.preventDefault();
+            const s = document.getElementById('searchInput');
+            if(s) { s.focus(); s.select(); }
+        }
+        if(e.key === 'Escape') {
+            const s = document.getElementById('searchInput');
+            if(s && document.activeElement === s && s.value) {
+                s.value = '';
+                filterContent();
+            }
+        }
+    });
+});
 // --- SESSION & LOGIN ---
 function checkSession() {
     const savedUser = localStorage.getItem("sSportUser");
@@ -499,34 +519,48 @@ function loadTechWizardData() {
 function renderCards(data) {
     activeCards = data;
     const container = document.getElementById('cardGrid');
+    if(!container) return;
     container.innerHTML = '';
-    
-    if (data.length === 0) { container.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#777;">Kayıt bulunamadı.</div>'; return; }
+
+    if (!Array.isArray(data) || data.length === 0) {
+        container.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#777;">Kayıt bulunamadı.</div>';
+        return;
+    }
+
+    let html = '';
     data.forEach((item, index) => {
         const safeTitle = escapeForJsString(item.title);
         const isFavorite = isFav(item.title);
         const favClass = isFavorite ? 'fas fa-star active' : 'far fa-star';
         const newBadge = isNew(item.date) ? '<span class="new-badge">YENİ</span>' : '';
         const editIconHtml = (isAdminMode && isEditingActive) ? `<i class="fas fa-pencil-alt edit-icon" onclick="editContent(${index})" style="display:block;"></i>` : '';
-        let formattedText = (item.text || "").replace(/\n/g, '<br>').replace(/\*(.*?)\*/g, '<b>$1</b>');
-        
-        container.innerHTML += `<div class="card ${item.category}">${newBadge}
+
+        const rawText = (item.text || "");
+        const safeText = escapeHtml(rawText).replace(/\n/g, '<br>').replace(/\*(.*?)\*/g, '<b>$1</b>');
+
+        const rawScript = (item.script || "");
+        const safeScript = escapeHtml(rawScript);
+
+        html += `<div class="card ${item.category}">${newBadge}
             <div class="icon-wrapper">${editIconHtml}<i class="${favClass} fav-icon" onclick="toggleFavorite('${safeTitle}')"></i></div>
-            <div class="card-header"><h3 class="card-title">${highlightText(item.title)}</h3><span class="badge">${item.category}</span></div>
-            <div class="card-content" onclick="showCardDetail('${safeTitle}', '${escapeForJsString(item.text)}')">
-                <div class="card-text-truncate">${highlightText(formattedText)}</div>
+            <div class="card-header"><h3 class="card-title">${highlightText(escapeHtml(item.title))}</h3><span class="badge">${escapeHtml(item.category)}</span></div>
+            <div class="card-content" onclick="showCardDetail('${safeTitle}', '${escapeForJsString(rawText)}')">
+                <div class="card-text-truncate">${highlightText(safeText)}</div>
                 <div style="font-size:0.8rem; color:#999; margin-top:5px; text-align:right;">(Tamamını oku)</div>
             </div>
-            <div class="script-box">${highlightText(item.script)}</div>
+            <div class="script-box">${highlightText(safeScript)}</div>
             <div class="card-actions">
-                <button class="btn btn-copy" onclick="copyText('${escapeForJsString(item.script)}')"><i class="fas fa-copy"></i> Kopyala</button>
+                <button class="btn btn-copy" onclick="copyText('${escapeForJsString(rawScript)}')"><i class="fas fa-copy"></i> Kopyala</button>
                 ${item.code ? `<button class="btn btn-copy" style="background:var(--secondary); color:#333;" onclick="copyText('${escapeForJsString(item.code)}')">Kod</button>` : ''}
-                ${item.link ? `<a href="${item.link}" target="_blank" class="btn btn-link"><i class="fas fa-external-link-alt"></i> Link</a>` : ''}
+                ${item.link ? `<a href="${escapeHtml(item.link)}" target="_blank" class="btn btn-link"><i class="fas fa-external-link-alt"></i> Link</a>` : ''}
             </div>
         </div>`;
     });
+
+    container.innerHTML = html;
 }
-function highlightText(htmlContent) {
+
+function highlightTextfunction highlightText(htmlContent) {
     if (!htmlContent) return "";
     const searchTerm = document.getElementById('searchInput').value.toLocaleLowerCase('tr-TR').trim();
     if (!searchTerm) return htmlContent;
@@ -572,8 +606,15 @@ function filterContent() {
     renderCards(filtered);
 }
 function showCardDetail(title, text) {
+    const safeTitle = escapeHtml(title || '');
+    const safeText = escapeHtml(text || '').replace(/\n/g,'<br>');
     Swal.fire({
-        title: title, html: `<div style="text-align:left; font-size:1rem; line-height:1.6;">${text.replace(/\\n/g,'<br>')}</div>`,
+        title: safeTitle,
+        html: `<div style="text-align:left; font-size:1rem; line-height:1.6;">${safeText}</div>`,
+        showCloseButton: true, showConfirmButton: false, width: '650px', background: '#f8f9fa'
+    });
+}
+</div>`,
         showCloseButton: true, showConfirmButton: false, width: '600px', background: '#f8f9fa'
     });
 }
@@ -1455,6 +1496,104 @@ function finishQuickDecision(timeout) {
     const st = document.getElementById('qd-step'); if (st) st.innerText = '0';
 }
 
+
+function openDuelArena() {
+    if(!currentUser || !getToken()) { Swal.fire('Uyarı','Duello için giriş yapmalısın.','warning'); return; }
+    const m = document.getElementById('duel-modal');
+    if(m) m.style.display = 'flex';
+    loadDuelArena();
+}
+function duelPost(payload){
+    return fetch(SCRIPT_URL, {
+        method:'POST',
+        headers:{ "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+    }).then(r=>r.json());
+}
+async function loadDuelArena(){
+    // kullanıcı listesi
+    try{
+        const usersRes = await duelPost({ action:'getUserList', username: currentUser, token: getToken(), mode:'public' });
+        const sel = document.getElementById('duel-opponent');
+        if(sel){
+            const me = currentUser;
+            const users = (usersRes.users || usersRes.userList || []).filter(u => u && u !== me);
+            sel.innerHTML = '<option value="">Rakip seç...</option>' + users.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+        }
+    }catch(e){}
+    // dueller
+    try{
+        const res = await duelPost({ action:'listDuels', username: currentUser, token: getToken() });
+        renderDuelLists(res);
+    }catch(e){
+        const incEl = document.getElementById('duel-incoming');
+        const actEl = document.getElementById('duel-active');
+        const finEl = document.getElementById('duel-finished');
+        if(incEl) incEl.innerText='Yüklenemedi.';
+        if(actEl) actEl.innerText='Yüklenemedi.';
+        if(finEl) finEl.innerText='Yüklenemedi.';
+    }
+}
+function renderDuelLists(res){
+    const incoming = res.incoming || [];
+    const active = res.active || [];
+    const finished = res.finished || [];
+    const incEl = document.getElementById('duel-incoming');
+    const actEl = document.getElementById('duel-active');
+    const finEl = document.getElementById('duel-finished');
+
+    const itemHtml = (d, state) => {
+        const pill = state==='pending' ? 'pending' : (state==='active' ? 'active' : 'done');
+        const title = `${escapeHtml(d.challenger)} vs ${escapeHtml(d.opponent)}`;
+        const meta = d.createdAt ? `${escapeHtml(d.createdAt)}` : '';
+        const score = (d.challengerScore!=null || d.opponentScore!=null) ? ` • Skor: ${d.challengerScore ?? '-'} - ${d.opponentScore ?? '-'}` : '';
+        const winner = d.winner ? ` • Kazanan: <b>${escapeHtml(d.winner)}</b>` : '';
+        let actions = '';
+
+        if(d.status === 'PENDING' && d.opponent === currentUser){
+            actions = `<div class="actions"><button class="btn btn-copy" onclick="acceptDuel('${escapeHtml(d.id)}')">Kabul Et</button></div>`;
+        } else if(d.status === 'ACTIVE'){
+            actions = `<div class="actions"><button class="btn btn-copy" onclick="playDuel('${escapeHtml(d.id)}')">Oyna</button></div>`;
+        } else {
+            actions = `<div class="actions"></div>`;
+        }
+
+        return `<div class="duel-item">
+            <div>
+                <div><b>${title}</b> <span class="duel-pill ${pill}">${escapeHtml(d.status||'')}</span></div>
+                <div class="meta">${meta}${score} ${winner}</div>
+            </div>
+            ${actions}
+        </div>`;
+    };
+
+    if(incEl) incEl.innerHTML = incoming.length ? incoming.map(d=>itemHtml(d,'pending')).join('') : '<div style="color:#777;">Gelen yok.</div>';
+    if(actEl) actEl.innerHTML = active.length ? active.map(d=>itemHtml(d,'active')).join('') : '<div style="color:#777;">Aktif yok.</div>';
+    if(finEl) finEl.innerHTML = finished.length ? finished.map(d=>itemHtml(d,'done')).join('') : '<div style="color:#777;">Kayıt yok.</div>';
+}
+async function createDuel(){
+    const opp = document.getElementById('duel-opponent')?.value;
+    if(!opp){ Swal.fire('Uyarı','Lütfen rakip seç.','warning'); return; }
+    const res = await duelPost({ action:'createDuel', username: currentUser, token: getToken(), opponent: opp, game:'penalty' });
+    if(res.result==='success'){
+        Swal.fire({icon:'success', title:'Meydan okuma gönderildi', timer:1200, showConfirmButton:false});
+        loadDuelArena();
+    } else Swal.fire('Hata', res.message || 'İşlem başarısız', 'error');
+}
+async function acceptDuel(id){
+    const res = await duelPost({ action:'acceptDuel', username: currentUser, token: getToken(), duelId: id });
+    if(res.result==='success'){
+        Swal.fire({icon:'success', title:'Duello aktif!', timer:1200, showConfirmButton:false});
+        loadDuelArena();
+    } else Swal.fire('Hata', res.message || 'Kabul edilemedi', 'error');
+}
+async function playDuel(id){
+    currentDuelId = id;
+    closeModal('duel-modal');
+    openPenaltyGame();
+    try{ startGameFromLobby(); }catch(e){}
+}
+
 function openPenaltyGame() {
     try { closeModal('game-hub-modal'); } catch(e) {}
     document.getElementById('penalty-modal').style.display = 'flex';
@@ -1769,65 +1908,20 @@ function openWizard(){
 }
 function renderStep(k){
     const s = wizardStepsData[k];
-    if (!s) {
-        document.getElementById('wizard-body').innerHTML = `<h2 style="color:red;">HATA: Adım ID (${k}) yok.</h2>`;
-        return;
-    }
+    if (!s) { document.getElementById('wizard-body').innerHTML = `<h2 style="color:red;">HATA: Adım ID (${k}) yok.</h2>`; return; }
     const b = document.getElementById('wizard-body');
-
-    // Sheet metinlerinde satır sonlarını göstermek için (HTML metinler desteklenir)
-    const fmt = (v) => {
-        if (v === null || v === undefined) return '';
-        return v.toString().replace(/\n/g, '
-').replace(/
-/g, '<br>');
-    };
-
-    const scriptBox = (script) => {
-        if (!script) return '';
-        const safeScript = encodeURIComponent(script);
-        return `
-            <div class="script-box" style="margin-top:12px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
-                    <span style="font-weight:700; color:#555;">Müşteriye iletilecek:</span>
-                    <button class="btn btn-copy" style="font-size:0.75rem; padding:4px 8px;" onclick="copyScriptContent('${safeScript}')">
-                        <i class="fas fa-copy"></i> Kopyala
-                    </button>
-                </div>
-                <div>${fmt(script)}</div>
-            </div>
-        `;
-    };
-
     let h = `<h2 style="color:var(--primary);">${s.title || ''}</h2>`;
-
-    if (s.result) {
+    if(s.result) {
         let i = s.result === 'red' ? ' 🛑 ' : (s.result === 'green' ? ' ✅ ' : ' ⚠️ ');
         let c = s.result === 'red' ? 'res-red' : (s.result === 'green' ? 'res-green' : 'res-yellow');
-        h += `
-            <div class="result-box ${c}">
-                <div style="font-size:3rem;margin-bottom:10px;">${i}</div>
-                <h3>${s.title || ''}</h3>
-                <p>${fmt(s.text || '')}</p>
-                ${scriptBox(s.script)}
-            </div>
-            <button class="restart-btn" onclick="renderStep('start')"><i class="fas fa-redo"></i> Başa Dön</button>
-        `;
+        h += `<div class="result-box ${c}"><div style="font-size:3rem;margin-bottom:10px;">${i}</div><h3>${s.title}</h3><p>${s.text}</p>${s.script ? `<div class="script-box">${s.script}</div>` : ''}</div><button class="restart-btn" onclick="renderStep('start')"><i class="fas fa-redo"></i> Başa Dön</button>`;
     } else {
-        h += `<p>${fmt(s.text || '')}</p>`;
-        if (s.script) h += scriptBox(s.script);
-
-        h += `<div class="wizard-options">`;
-        (s.options || []).forEach(o => {
-            h += `<button class="option-btn" onclick="renderStep('${o.next}')"><i class="fas fa-chevron-right"></i> ${o.text}</button>`;
-        });
-        h += `</div>`;
-        if (k !== 'start') h += `<button class="restart-btn" onclick="renderStep('start')" style="background:#eee;color:#333;margin-top:15px;">Başa Dön</button>`;
+        h += `<p>${s.text}</p><div class="wizard-options">`;
+        s.options.forEach(o => { h += `<button class="option-btn" onclick="renderStep('${o.next}')"><i class="fas fa-chevron-right"></i> ${o.text}</button>`; });
+        h += `</div>`; if(k !== 'start') h += `<button class="restart-btn" onclick="renderStep('start')" style="background:#eee;color:#333;margin-top:15px;">Başa Dön</button>`;
     }
-
     b.innerHTML = h;
 }
-
 // --- TECH WIZARD ---
 const twState = { currentStep: 'start', history: [] };
 function openTechWizard() {
@@ -3128,6 +3222,15 @@ function fetchUserListForAdmin() {
             method: 'POST', headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({ action: "getUserList", username: currentUser, token: getToken() })
         }).then(response => response.json()).then(data => {
+        // DUELLO submit: bu maç bir düelloya bağlıysa skoru da gönder
+        if (currentDuelId) {
+            try {
+                duelPost({ action:'submitDuelScore', username: currentUser, token: getToken(), duelId: currentDuelId, score: pScore, accuracy: acc })
+                    .then(() => { currentDuelId = null; })
+                    .catch(() => {});
+            } catch(e) {}
+        }
+
             if (data.result === "success") { adminUserList = data.users.filter(u => u.group !== 'Yönetim'); resolve(adminUserList); } 
             else resolve([]);
         }).catch(err => resolve([]));
