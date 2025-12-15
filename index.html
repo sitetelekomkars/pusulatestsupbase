@@ -184,6 +184,7 @@
                     <tbody id="leaderboard-body"></tbody>
                 </table>
                 <button class="penalty-btn" style="width:200px; background:#2e7d32; color:white; border-color:#1b5e20;" onclick="startGameFromLobby()">MAÇA BAŞLA     🏃    ‍    ♂️⚽    </button>
+                <button class="penalty-btn" style="width:200px; background:#0e1b42; color:#fabb00; border-color:#fabb00;" onclick="openDuelArena()">DUELLO ARENA ⚔️</button>
             </div>
             <div id="penalty-game-area" style="display:none;">
                 <div class="penalty-stats"><span>SKOR: <span id="p-score">0</span></span><span>TOP: <span id="p-balls">10</span></span></div>
@@ -416,6 +417,43 @@
                 <div class="quick-footer">
                     <button class="btn btn-link" onclick="resetQuickDecision()">Yeniden Başla</button>
                     <button class="btn btn-copy" onclick="closeModal('quick-modal')">Kapat</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- MODAL: DUELLO ARENA -->
+    <div id="duel-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 900px;">
+            <span class="close-modal" onclick="closeModal('duel-modal')">&times;</span>
+            <h2 style="text-align:center; color:var(--secondary); margin-top:0;">⚔️ Duello Arena</h2>
+
+            <div class="duel-grid">
+                <div class="duel-panel">
+                    <h3>🎯 Meydan Oku</h3>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <select id="duel-opponent" class="duel-select">
+                            <option value="">Rakip seç...</option>
+                        </select>
+                        <button class="btn btn-copy" onclick="createDuel()">Duello Başlat</button>
+                    </div>
+                    <p class="duel-help">Rakip kabul edince düello aktif olur. İki taraf da oynayıp skor gönderince kazanan otomatik belirlenir.</p>
+                </div>
+
+                <div class="duel-panel">
+                    <h3>📥 Gelen Meydan Okumalar</h3>
+                    <div id="duel-incoming" class="duel-list">Yükleniyor...</div>
+                </div>
+
+                <div class="duel-panel">
+                    <h3>🔥 Aktif Düellolar</h3>
+                    <div id="duel-active" class="duel-list">Yükleniyor...</div>
+                </div>
+
+                <div class="duel-panel">
+                    <h3>🏁 Tamamlanan (Son 10)</h3>
+                    <div id="duel-finished" class="duel-list">Yükleniyor...</div>
                 </div>
             </div>
         </div>
