@@ -42,7 +42,7 @@ function showGlobalError(msg){
 }
 
 // Apps Script URL'si
-let SCRIPT_URL = localStorage.getItem("https://script.google.com/macros/s/AKfycbywdciHyiPCEWGu9hIyN05HkeBgwPlFgzrDZY16K08svQhTcvXhN8A_DyBrzO8SalDu/exec") || ""; // Apps Script Web App URL
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywdciHyiPCEWGu9hIyN05HkeBgwPlFgzrDZY16K08svQhTcvXhN8A_DyBrzO8SalDu/exec"; // Apps Script Web App URL
 
 // Oyun Değişkenleri
 let jokers = { call: 1, half: 1, double: 1 };
