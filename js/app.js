@@ -42,12 +42,7 @@ function showGlobalError(msg){
 }
 
 // Apps Script URL'si
-// Apps Script Web App URL
-// Not: Bazı tarayıcılarda localStorage'daki eski/yanlış URL yüzünden "SCRIPT URL Ayarla" uyarısı çıkabiliyor.
-// Bu yüzden localStorage değeri açıkça geçerli bir web-app URL değilse yok sayıp varsayılan URL'i kullanıyoruz.
-const __DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywdciHyiPCEWGu9hIyN05HkeBgwPlFgzrDZY16K08svQhTcvXhN8A_DyBrzO8SalDu/exec";
-const __lsUrl = (localStorage.getItem("PUSULA_SCRIPT_URL") || "").trim();
-let SCRIPT_URL = /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/i.test(__lsUrl) ? __lsUrl : __DEFAULT_SCRIPT_URL;
+let SCRIPT_URL = localStorage.getItem("PUSULA_SCRIPT_URL") || "https://script.google.com/macros/s/AKfycbywdciHyiPCEWGu9hIyN05HkeBgwPlFgzrDZY16K08svQhTcvXhN8A_DyBrzO8SalDu/exec"; // Apps Script Web App URL
 
 // Oyun Değişkenleri
 let jokers = { call: 1, half: 1, double: 1 };
@@ -535,16 +530,25 @@ function loadWizardData() {
     });
 }
 function loadTechWizardData() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         fetch(SCRIPT_URL, {
-            method: 'POST', headers: { "Content-Type": "text/plain;charset=utf-8" },
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({ action: "getTechWizardData" })
-        }).then(response => response.json()).then(data => {
-            if (data.result === "success" && data.steps) { techWizardData = data.steps; resolve(); } 
-            else { techWizardData = {}; }
-        }).catch(error => { techWizardData = {}; });
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.result === "success" && data.steps) {
+                techWizardData = data.steps; // beklenen format: {Kategori:[{title,text,alert,code,next,style},...]}
+            } else {
+                techWizardData = {};
+            }
+            resolve();
+        })
+        .catch(() => { techWizardData = {}; resolve(); });
     });
 }
+
 // --- RENDER & FILTERING ---
 function renderCards(data) {
     activeCards = data;
@@ -3772,52 +3776,25 @@ function renderTechWizardInto(targetId){
     const box = document.getElementById(targetId);
     if(!box) return;
 
-    // Kaynak: TechWizardSteps sheet (action: getTechWizardData)
-    const ids = techWizardData && typeof techWizardData === 'object' ? Object.keys(techWizardData) : [];
-    if(ids.length === 0){
-        box.innerHTML = '<div style="padding:16px;opacity:.7">Sihirbaz içeriği bulunamadı. (Sheet: TechWizardSteps)</div>';
+    // Mevcut openTechWizard içeriğini burada üret
+    if(!Array.isArray(techWizardSteps) || techWizardSteps.length===0){
+        box.innerHTML = '<div style="padding:16px;opacity:.7">Sihirbaz içeriği bulunamadı.</div>';
         return;
     }
 
-    // StepId sıralaması: sayısal ise sayısal, değilse alfabetik
-    const sortedIds = ids.sort((a,b)=>{
-        const na = Number(a), nb = Number(b);
-        const aNum = !isNaN(na), bNum = !isNaN(nb);
-        if(aNum && bNum) return na-nb;
-        if(aNum) return -1;
-        if(bNum) return 1;
-        return a.localeCompare(b);
-    });
-
+    // Basit bir liste: adım kartları
     box.innerHTML = `
       <div style="padding:12px">
-        <div class="tech-alert"><b>İpucu:</b> Soruna en yakın başlığa tıkla. İstersen direkt sihirbazı da açabilirsin.</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 16px 0">
-          <button class="btn btn-copy" onclick="openTechWizard()" style="background:#0e1b42;color:#fff">Teknik Sihirbazı Aç</button>
-          <button class="btn btn-link" onclick="loadTechWizardData().then(()=>{Swal.fire({icon:'success',title:'Güncellendi',text:'Teknik sihirbaz verisi yeniden çekildi.'})})">Yenile</button>
-        </div>
-        ${sortedIds.map((id)=>{
-            const s = techWizardData[id] || {};
-            const preview = (s.text||'').toString().replace(/\s+/g,' ').slice(0,160);
-            return `
-              <div class="news-item" style="cursor:pointer" onclick="twStartFrom('${escapeForJsString(id)}')">
-                <span class="news-title">${escapeHtml(s.title||('Adım '+id))}</span>
-                <div class="news-desc">${escapeHtml(preview)}${(s.text||'').length>160?'...':''}</div>
-                <div class="news-tag" style="background:rgba(14,27,66,.08);color:#0e1b42;border:1px solid rgba(14,27,66,.15)">Başlat</div>
-              </div>
-            `;
-        }).join('')}
+        <div class="tech-alert"><b>İpucu:</b> Soruna en yakın başlığa tıkla. Adım adım yönergeler açılacak.</div>
+        ${techWizardSteps.map((s, idx)=>`
+          <div class="news-item" style="cursor:pointer" onclick="showTechWizardStep(${idx})">
+            <span class="news-title">${escapeHtml(s.title||('Adım '+(idx+1)))}</span>
+            <div class="news-desc">${escapeHtml((s.desc||'').slice(0,160))}${(s.desc||'').length>160?'...':''}</div>
+            <div class="news-tag" style="background:rgba(14,27,66,.08);color:#0e1b42;border:1px solid rgba(14,27,66,.15)">Detay</div>
+          </div>
+        `).join('')}
       </div>
     `;
-}
-
-// Teknik sihirbazı istenen adımdan başlat
-function twStartFrom(stepId){
-    try{
-        if(!techWizardData || !techWizardData[stepId]) return;
-        twState = { history: [], currentStep: String(stepId) };
-        openTechWizard();
-    }catch(e){ console.error(e); }
 }
 
 function showTechWizardStep(idx){
@@ -4021,6 +3998,32 @@ window.switchTechTab = async function(tab){
       const all = await loadTechDocsIfNeeded(false);
       const filtered = all.filter(x => x.categoryKey === tab);
       __renderTechList(tab, filtered);
+    } else if(tab === 'wizard'){
+      // Teknik Sihirbaz (TechWizardSteps)
+      try{
+        if(!techWizardData || Object.keys(techWizardData).length===0){
+          await loadTechWizardData();
+        }
+        // Fullscreen wizard list uses techWizardSteps (populated in loadTechWizardData)
+        if(typeof renderTechWizardInto === "function") renderTechWizardInto('x-wizard');
+      }catch(e){ console.error(e); }
+    } else if(tab === 'cards'){
+      // Teknik Kartlar (Teknik_Dokumanlar) - tüm teknik dokümanları listele
+      const all = await loadTechDocsIfNeeded(false);
+      const box = document.getElementById('x-cards');
+      if(box){
+        if(!all || all.length===0){
+          box.innerHTML = '<div style="padding:16px;opacity:.7">Teknik kart bulunamadı.</div>';
+        }else{
+          box.innerHTML = all.map((it)=>`
+            <div class="news-item" style="cursor:pointer" onclick="Swal.fire({title: __escapeHtml(it.baslik), html: '<div style=\'text-align:left;line-height:1.7\'>'+ (it.icerik||'').replace(/
+/g,'<br>') + (it.link?('<div style=\'margin-top:10px\'><a href=\''+__escapeHtml(it.link)+'\' target=\'_blank\'>Linki Aç</a></div>'):'') + '</div>'})">
+              <span class="news-title">${__escapeHtml(it.baslik||'')}</span>
+              <span class="news-tag" style="background:#eef;border:1px solid #dde3ff">${__escapeHtml(it.kategori||'')}</span>
+            </div>
+          `).join('');
+        }
+      }
     }
   }catch(e){
     console.error(e);
