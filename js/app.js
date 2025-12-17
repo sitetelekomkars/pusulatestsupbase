@@ -1,6 +1,6 @@
 const BAKIM_MODU = false;
 // Apps Script URL'si
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywdciHyiPCEWGu9hIyN05HkeBgwPlFgzrDZY16K08svQhTcvXhN8A_DyBrzO8SalDu/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby3kd04k2u9XdVDD1-vdbQQAsHNW6WLIn8bNYxTlVCL3U1a0WqZo6oPp9zfBWIpwJEinQ/exec";
 // Oyun Değişkenleri
 let jokers = { call: 1, half: 1, double: 1 };
 let doubleChanceUsed = false;
@@ -3401,17 +3401,27 @@ function renderHome(){
   }
 }
 
-// override: category filter now also supports home
+// override: category filter now also supports home (eski imza: filterCategory(btn, cat))
 const _origFilterCategory = window.filterCategory;
-window.filterCategory = function(category) {
-  if(category === 'home'){ openHome(); return; }
+window.filterCategory = function(a, b) {
+  // support both: (btn, cat) and (cat)
+  const btn = (typeof a === 'object' && a) ? a : null;
+  const cat = (typeof a === 'string') ? a : (typeof b === 'string' ? b : 'all');
+
+  if(cat === 'home'){ openHome(); return; }
+
   // any fullscreen module open? close it
-  closeTechArea(true); closeSalesArea(true);
+  closeTechArea(true);
+  closeSalesArea(true);
+
   const home = document.getElementById('home-screen');
   if(home) home.style.display = 'none';
   const grid = document.getElementById('cardGrid');
   if(grid) grid.style.display = 'grid';
-  if(typeof _origFilterCategory === 'function') return _origFilterCategory(category);
+
+  if(typeof _origFilterCategory === 'function') {
+    return _origFilterCategory(btn, cat);
+  }
 };
 
 // --------- TEKNİK FULLSCREEN ---------
