@@ -530,18 +530,25 @@ function loadWizardData() {
     });
 }
 function loadTechWizardData() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         fetch(SCRIPT_URL, {
-            method: 'POST', headers: { "Content-Type": "text/plain;charset=utf-8" },
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({ action: "getTechWizardData" })
-        }).then(response => response.json()).then(data => {
-            if (data.result === "success" && data.steps) { techWizardData = data.steps; try { window.techWizardSteps = Object.keys(techWizardData).map(k => ({ id:k, title:(techWizardData[k].title||""), desc: (techWizardData[k].text||"" ) + (techWizardData[k].alert ? ("
-
-"+techWizardData[k].alert) : ""), code: (techWizardData[k].script||""), btns: (techWizardData[k].buttons||[]).map(b=>({label:b.text, next:b.next, style:b.style})) })); } catch(e){} resolve(); } 
-            else { techWizardData = {}; }
-        }).catch(error => { techWizardData = {}; });
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.result === "success" && data.steps) {
+                techWizardData = data.steps; // beklenen format: {Kategori:[{title,text,alert,code,next,style},...]}
+            } else {
+                techWizardData = {};
+            }
+            resolve();
+        })
+        .catch(() => { techWizardData = {}; resolve(); });
     });
 }
+
 // --- RENDER & FILTERING ---
 function renderCards(data) {
     activeCards = data;
