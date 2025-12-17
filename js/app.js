@@ -636,46 +636,11 @@ function filterContent() {
     renderCards(filtered);
 }
 function showCardDetail(title, text) {
-    // Hem eski kullanım (title, text) hem de obje ile kullanım desteklenir.
-    try {
-        if (title && typeof title === 'object') {
-            const o = title;
-            const t = (o.text || o.body || o.desc || '').toString();
-            let extra = '';
-            if (o.script) {
-                extra += `<hr style="margin:14px 0;opacity:.18">
-                    <div style="text-align:left">
-                      <b>Script</b>
-                      <pre style="white-space:pre-wrap;margin:8px 0 0;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;font-size:.9rem;">${escapeHtml(o.script)}</pre>
-                      <div style="text-align:right;margin-top:10px">
-                        <button class="btn btn-copy" onclick="copyText('${escapeForJsString(o.script)}')"><i class="fas fa-copy"></i> Kopyala</button>
-                      </div>
-                    </div>`;
-            }
-            Swal.fire({
-                title: o.title || 'Detay',
-                html: `<div style="text-align:left; font-size:1rem; line-height:1.6;">${escapeHtml(t).replace(/\n/g,'<br>')}</div>${extra}`,
-                showCloseButton: true,
-                showConfirmButton: false,
-                width: '700px',
-                background: '#f8f9fa'
-            });
-            return;
-        }
-    } catch(e) {}
-
-    const safeTitle = (title || '').toString();
-    const safeText = (text || '').toString();
     Swal.fire({
-        title: safeTitle,
-        html: `<div style="text-align:left; font-size:1rem; line-height:1.6;">${safeText.replace(/\n/g,'<br>')}</div>`,
-        showCloseButton: true,
-        showConfirmButton: false,
-        width: '600px',
-        background: '#f8f9fa'
+        title: title, html: `<div style="text-align:left; font-size:1rem; line-height:1.6;">${text.replace(/\\n/g,'<br>')}</div>`,
+        showCloseButton: true, showConfirmButton: false, width: '600px', background: '#f8f9fa'
     });
 }
-
 function toggleEditMode() {
     if (!isAdminMode) return;
     isEditingActive = !isEditingActive;
@@ -3473,7 +3438,7 @@ function renderHomePanels(){
     // Favoriler kutusu: favori kartların ilk 6'sı
     const favEl = document.getElementById('home-favs');
     if(favEl){
-        const favs = (database||[]).filter(c=>isFavorite(c.id)).slice(0,6);
+        const favs = (cardsData||[]).filter(c=>isFavorite(c.id)).slice(0,6);
         if(favs.length===0){
             favEl.innerHTML = 'Henüz favori eklemedin. Kartlarda ⭐ simgesine basarak ekleyebilirsin.';
         }else{
@@ -3492,7 +3457,7 @@ function renderHomePanels(){
 
 // Kart detayını doğrudan açmak için küçük bir yardımcı
 function openCardDetail(cardId){
-    const card = (database||[]).find(x=>String(x.id)===String(cardId));
+    const card = (cardsData||[]).find(x=>String(x.id)===String(cardId));
     if(!card){Swal.fire('Hata','Kart bulunamadı.','error');return;}
     showCardDetail(card);
 }
@@ -3709,7 +3674,7 @@ const TECH_DOC_CONTENT = {"broadcast": [{"title": "Smart TV – Canlı Yayında 
 
 function renderTechSections(){
     // Teknik kartları çek
-    const techCards = (database||[]).filter(c=>String(c.category||'').toLowerCase()==='teknik');
+    const techCards = (cardsData||[]).filter(c=>String(c.category||'').toLowerCase()==='teknik');
 
     // Heuristik sınıflandırma
     const buckets = {broadcast:[], access:[], app:[], activation:[]};
