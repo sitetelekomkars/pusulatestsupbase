@@ -1,11 +1,15 @@
 const BAKIM_MODU = false;
 
-function showGlobalError(msg) {
-  // Kullanıcıya kırmızı bant göstermiyoruz. Sadece admin modda ufak toast.
-  console.warn(msg);
-  if (isAdminMode) {
-    Swal.fire({toast:true, position:'bottom-start', icon:'warning', title: String(msg||'Uyarı'), showConfirmButton:false, timer:2500});
-  }
+function showGlobalError(message){
+  // Kullanıcılara kırmızı bant gösterme (istek: ekran temiz kalsın)
+  // Sadece konsola yaz ve (locadmin/admin ise) küçük bir toast göster.
+  try{ console.warn("[Pusula]", message); }catch(e){}
+  try{
+    const role = localStorage.getItem("sSportRole")||"";
+    if(role==="admin" || role==="locadmin"){
+      Swal.fire({toast:true,position:'bottom-end',icon:'warning',title:String(message||'Uyarı'),showConfirmButton:false,timer:2500});
+    }
+  }catch(e){}
 }
 
 // Apps Script URL'si
@@ -21,7 +25,130 @@ const MONTH_NAMES = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Te
 let database = [], cardsData = [], newsData = [], sportsData = [], salesScripts = [], quizQuestions = [], quickDecisionQuestions = [];
 let techWizardData = {}; // Teknik Sihirbaz Verisi
 let currentUser = "";
-let isAdminMode = false;    
+
+// -------------------- Menu Permissions (LocAdmin) --------------------
+let menuPermissions = null; // { key: {allowedGroups:[], allowedRoles:[]} }
+function normalizeList(v){
+  if(!v) return [];
+  return String(v).split(',').map(s=>s.trim()).filter(Boolean);
+}
+function getMyGroup(){ return (localStorage.getItem("sSportGroup")||"").trim(); }
+function getMyRole(){ return (localStorage.getItem("sSportRole")||"").trim(); }
+
+function isAllowedByPerm(perm){
+  if(!perm) return true;
+  const role=getMyRole(), grp=getMyGroup();
+  const roles=perm.allowedRoles||[];
+  const groups=perm.allowedGroups||[];
+  if(roles.length && roles.indexOf(role)===-1) return false;
+  if(groups.length && groups.indexOf(grp)===-1) return false;
+  return true;
+}
+function applyMenuPermissions(){
+  try{
+    const navButtons = document.querySelectorAll('[data-menu-key]');
+    navButtons.forEach(btn=>{
+      const key = btn.getAttribute('data-menu-key');
+      const perm = menuPermissions && menuPermissions[key];
+      btn.style.display = isAllowedByPerm(perm) ? '' : 'none';
+    });
+    // Hızlı kısayollar (ana sayfa)
+    document.querySelectorAll('[data-shortcut-key]').forEach(el=>{
+      const key=el.getAttribute('data-shortcut-key');
+      const perm = menuPermissions && menuPermissions[key];
+      el.style.display = isAllowedByPerm(perm) ? '' : 'none';
+    });
+  }catch(e){}
+}
+function loadMenuPermissions(){
+  // herkes için okunabilir
+  return apiCall("getMenuPermissions", {}).then(res=>{
+    if(res && res.result==="success"){
+      menuPermissions = {};
+      (res.items||[]).forEach(it=>{
+        menuPermissions[it.key] = {
+          allowedGroups: normalizeList(it.allowedGroups),
+          allowedRoles: normalizeList(it.allowedRoles)
+        };
+      });
+      applyMenuPermissions();
+    }
+  }).catch(()=>{});
+}
+
+// LocAdmin panel
+function openMenuPermissions(){
+  const role=getMyRole();
+  if(role!=="locadmin" && role!=="admin"){ return; }
+  apiCall("getMenuPermissions",{}).then(res=>{
+    if(!res || res.result!=="success"){ Swal.fire("Hata","Yetkiler okunamadı","error"); return; }
+    const groups = ["Chat","Telesatış","Teknik"];
+    const menus = (res.items||[]);
+
+    const rows = menus.map(m=>{
+      const allowed = normalizeList(m.allowedGroups);
+      const cells = groups.map(g=>{
+        const checked = allowed.length===0 || allowed.indexOf(g)>-1;
+        return `<label style="display:flex;gap:6px;align-items:center;justify-content:center">
+          <input type="checkbox" data-mk="${m.key}" data-g="${g}" ${checked?'checked':''}/>
+        </label>`;
+      }).join('');
+      return `<tr>
+        <td style="text-align:left;font-weight:800;padding:8px 10px">${m.title}</td>
+        ${cells}
+      </tr>`;
+    }).join('');
+
+    const html = `
+      <div style="text-align:left">
+        <p style="margin:0 0 10px;color:#666">Menü/sekme bazlı “hangi grup görsün” ayarı. İşaretli olmayan gruplar menüyü görmez.</p>
+        <div style="max-height:55vh;overflow:auto;border:1px solid rgba(0,0,0,.08);border-radius:12px">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="position:sticky;top:0;background:#f7f7f7">
+                <th style="text-align:left;padding:10px">Menü</th>
+                ${groups.map(g=>`<th style="padding:10px;text-align:center">${g}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+    Swal.fire({
+      title:"Yetki Yönetimi",
+      html,
+      width: 820,
+      confirmButtonText:"Kaydet",
+      showCancelButton:true,
+      cancelButtonText:"Vazgeç",
+      preConfirm: ()=>{
+        const map={};
+        menus.forEach(m=>{ map[m.key]=[]; });
+        document.querySelectorAll('input[type="checkbox"][data-mk]').forEach(cb=>{
+          const k=cb.getAttribute('data-mk');
+          const g=cb.getAttribute('data-g');
+          if(cb.checked) map[k].push(g);
+        });
+        // boş dizi => kimse görmesin değil; burada "hepsi işaretliyse" zaten 3 grup döner.
+        return map;
+      }
+    }).then(r=>{
+      if(!r.isConfirmed) return;
+      const payload = r.value||{};
+      apiCall("setMenuPermissions",{ permissions: payload }).then(sv=>{
+        if(sv && sv.result==="success"){
+          Swal.fire("Kaydedildi","Yetkiler güncellendi.","success");
+          loadMenuPermissions();
+        } else {
+          Swal.fire("Hata", (sv&&sv.message)||"Kaydedilemedi", "error");
+        }
+      });
+    });
+  });
+}
+// --------------------------------------------------------------------
+let isAdminMode = false;
+let isLocAdmin = false;
 let isEditingActive = false;
 let sessionTimeout;
 let activeCards = [];
@@ -241,11 +368,13 @@ function checkSession() {
     const savedUser = localStorage.getItem("sSportUser");
     const savedToken = localStorage.getItem("sSportToken");
     const savedRole = localStorage.getItem("sSportRole");
+    const savedGroup = localStorage.getItem("sSportGroup");
     if (savedUser && savedToken) {
         currentUser = savedUser;
         document.getElementById("login-screen").style.display = "none";
         document.getElementById("user-display").innerText = currentUser;
         checkAdmin(savedRole);
+        try{ if(savedGroup){ const el=document.getElementById("t-side-role"); if(el) el.textContent=savedGroup; const el2=document.getElementById("tech-side-role"); if(el2) el2.textContent=savedGroup; } }catch(e){}
         startSessionTimer();
         
         if (BAKIM_MODU) {
@@ -295,6 +424,7 @@ function girisYap() {
             localStorage.setItem("sSportUser", currentUser);
             localStorage.setItem("sSportToken", data.token);
             localStorage.setItem("sSportRole", data.role);
+            if (data.group) localStorage.setItem("sSportGroup", data.group);
             
             const savedRole = data.role;
             if (data.forceChange === true) {
@@ -306,8 +436,12 @@ function girisYap() {
             } else {
                 document.getElementById("login-screen").style.display = "none";
                 document.getElementById("user-display").innerText = currentUser;
+                const savedGroup = data.group || localStorage.getItem('sSportGroup') || '';
                 checkAdmin(savedRole);
                 startSessionTimer();
+                // Menü yetkilerini ve ana sayfa bloklarını login sonrası yükle
+                try{ loadMenuPermissions(); }catch(e){}
+                try{ loadHomeBlocks(); }catch(e){}
                 
                 if (BAKIM_MODU) {
                     document.getElementById("maintenance-screen").style.display = "flex";
@@ -340,7 +474,8 @@ function checkAdmin(role) {
     const addCardDropdown = document.getElementById('dropdownAddCard');
     const quickEditDropdown = document.getElementById('dropdownQuickEdit');
     
-    isAdminMode = (role === "admin");
+    isAdminMode = (role === "admin" || role === "locadmin");
+    isLocAdmin = (role === "locadmin");
     isEditingActive = false;
     document.body.classList.remove('editing');
     
@@ -371,6 +506,7 @@ function checkAdmin(role) {
         if(addCardDropdown) addCardDropdown.style.display = 'flex';
         if(quickEditDropdown) {
             quickEditDropdown.style.display = 'flex';
+        const perms = document.getElementById('dropdownPerms'); if(perms) perms.style.display = 'flex';
             quickEditDropdown.innerHTML = '<i class="fas fa-pen" style="color:var(--secondary);"></i> Düzenlemeyi Aç';
             quickEditDropdown.classList.remove('active');
         }
@@ -392,6 +528,8 @@ function logout() {
     
     // Fullscreen'i kapat
     document.getElementById('quality-fullscreen').style.display = 'none';
+    try{ document.getElementById('tech-fullscreen').style.display='none'; }catch(e){}
+    try{ document.getElementById('telesales-fullscreen').style.display='none'; }catch(e){}
 }
 function startSessionTimer() {
     if (sessionTimeout) clearTimeout(sessionTimeout);
@@ -434,125 +572,6 @@ async function changePasswordPopup(isMandatory = false) {
         }).catch(err => { Swal.fire('Hata', 'Sunucu hatası.', 'error'); if(isMandatory) changePasswordPopup(true); });
     } else if (isMandatory) { changePasswordPopup(true); }
 }
-
-// --- ANA SAYFA (HOME) ---
-let homeData = { today: [], announcements: [], quote: "" };
-
-function openHome(){
-  // Home görünümü: dashboard aç, kart grid gizle
-  document.getElementById('home-dashboard').style.display = 'block';
-  document.getElementById('cardGrid').style.display = 'none';
-  // Home butonunu aktif yap
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  const hb = document.querySelector('.btn-home'); if(hb) hb.classList.add('active');
-  renderHome();
-}
-
-function renderHome(){
-  // Admin butonları
-  const showAdmin = (isAdminMode && isEditingActive);
-  const b1 = document.getElementById('btnAddToday'); if(b1) b1.style.display = showAdmin ? 'inline-flex' : 'none';
-  const b2 = document.getElementById('btnAddAnnouncement'); if(b2) b2.style.display = showAdmin ? 'inline-flex' : 'none';
-  const b3 = document.getElementById('btnEditQuote'); if(b3) b3.style.display = showAdmin ? 'inline-flex' : 'none';
-
-  const todayEl = document.getElementById('home-today-list');
-  const annEl = document.getElementById('home-announcement-list');
-  const quoteEl = document.getElementById('home-quote-box');
-  if(todayEl){
-    todayEl.innerHTML = (homeData.today || []).slice(0,8).map(x => homeItemHtml(x,'today')).join('') || '<div style="color:#777;padding:8px">Kayıt yok.</div>';
-  }
-  if(annEl){
-    annEl.innerHTML = (homeData.announcements || []).slice(0,8).map(x => homeItemHtml(x,'announcement')).join('') || '<div style="color:#777;padding:8px">Kayıt yok.</div>';
-  }
-  if(quoteEl){
-    quoteEl.innerHTML = homeData.quote ? `<div style="width:100%">${escapeHtml(homeData.quote)}</div>` : '<span style="color:#8a7a42">Henüz günün sözü girilmedi.</span>';
-  }
-}
-
-function homeItemHtml(x, kind){
-  const editBtn = (isAdminMode && isEditingActive) ? `<button class="mini-add-btn" style="float:right" onclick="editHomeItem('${kind}','${escapeHtmlAttr(x.id||x.title||'')}')">Düzenle</button>` : '';
-  return `<div class="home-item">
-    <div class="date">${escapeHtml(x.date || '')} ${editBtn}</div>
-    <div class="title">${escapeHtml(x.title || '')}</div>
-    <div class="desc">${escapeHtml(x.desc || '')}</div>
-  </div>`;
-}
-
-function openHomeEditor(kind){
-  if(!(isAdminMode && isEditingActive)) return;
-  if(kind === 'quote'){
-    Swal.fire({
-      title:'Günün Sözü',
-      input:'textarea',
-      inputValue: homeData.quote || '',
-      inputPlaceholder:'Günün sözü...',
-      showCancelButton:true,
-      confirmButtonText:'Kaydet'
-    }).then(res=>{
-      if(res.isConfirmed){
-        updateHomeData({kind:'quote', value: res.value || ''});
-      }
-    });
-    return;
-  }
-  const titleLabel = kind==='today' ? 'Bugün Neler Var?' : 'Duyuru';
-  Swal.fire({
-    title: titleLabel + ' Ekle',
-    html: `
-      <input id="h-title" class="swal2-input" placeholder="Başlık">
-      <input id="h-date" class="swal2-input" placeholder="Tarih (örn: 18.12.2025)" value="${formatDateToDDMMYYYY(new Date())}">
-      <textarea id="h-desc" class="swal2-textarea" placeholder="Açıklama"></textarea>
-    `,
-    focusConfirm:false,
-    showCancelButton:true,
-    confirmButtonText:'Kaydet',
-    preConfirm:()=>[
-      document.getElementById('h-title').value,
-      document.getElementById('h-date').value,
-      document.getElementById('h-desc').value
-    ]
-  }).then(r=>{
-    if(r.isConfirmed){
-      updateHomeData({kind, title:r.value[0], date:r.value[1], desc:r.value[2]});
-    }
-  });
-}
-
-function editHomeItem(kind, idKey){
-  // Basit: şu an sadece ekleme; düzenleme için server'da id gerekir.
-  Swal.fire('Bilgi','Düzenleme için kayıt ID yapısı aktif edilince açılacak. Şimdilik yeni kayıt ekleyebilirsin.','info');
-}
-
-async function loadHomeData(){
-  try{
-    const r = await fetch(SCRIPT_URL,{method:'POST',headers:{ "Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:'getHome'})});
-    const d = await r.json();
-    if(d && d.result==='success'){
-      homeData = d.home || homeData;
-    }
-  }catch(e){ /* sessiz */ }
-}
-
-async function updateHomeData(payload){
-  Swal.fire({title:'Kaydediliyor',didOpen:()=>Swal.showLoading(),showConfirmButton:false});
-  try{
-    const r = await fetch(SCRIPT_URL,{method:'POST',headers:{ "Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:'updateHome', payload, username:currentUser, token:getToken()})});
-    const d = await r.json();
-    if(d && d.result==='success'){
-      await loadHomeData();
-      Swal.fire({icon:'success',title:'Kaydedildi',timer:1200,showConfirmButton:false});
-      renderHome();
-    }else{
-      Swal.fire('Hata', (d&&d.message)||'Kaydedilemedi','error');
-    }
-  }catch(e){
-    Swal.fire('Hata','Bağlantı hatası','error');
-  }
-}
-
-function escapeHtml(str){ return String(str||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-function escapeHtmlAttr(str){ return escapeHtml(str).replace(/\s/g,' '); }
-
 // --- DATA FETCHING ---
 function loadContentData() {
     document.getElementById('loading').style.display = 'block';
@@ -679,11 +698,7 @@ function updateSearchResultCount(count, total) {
 
 
 
-function filterCategory(btn, cat){
-  // Home kapat
-  const hd=document.getElementById('home-dashboard'); if(hd) hd.style.display='none';
-  const cg=document.getElementById('cardGrid'); if(cg) cg.style.display='grid';
-
+function filterCategory(btn, cat) {
     // Ana Sayfa özel ekran
     if (cat === "home") {
         currentCategory = "home";
@@ -1291,13 +1306,8 @@ function showSportDetail(index) {
     });
 }
 function openSales() {
-    document.getElementById('sales-modal').style.display = 'flex';
-    const c = document.getElementById('sales-grid');
-    c.innerHTML = '';
-    salesScripts.forEach((s, index) => {
-        let editBtn = (isAdminMode && isEditingActive) ? `<i class="fas fa-pencil-alt edit-icon" style="top:10px; right:40px; z-index:50;" onclick="event.stopPropagation(); editSales('${escapeForJsString(s.title)}')"></i>` : '';
-        c.innerHTML += `<div class="sales-item" id="sales-${index}" onclick="toggleSales('${index}')">${editBtn}<div class="sales-header"><span class="sales-title">${s.title}</span><i class="fas fa-chevron-down" id="icon-${index}" style="color:#10b981;"></i></div><div class="sales-text">${(s.text || '').replace(/\n/g,'<br>')}<div style="text-align:right; margin-top:15px;"><button class="btn btn-copy" onclick="event.stopPropagation(); copyText('${escapeForJsString(s.text || '')}')"><i class="fas fa-copy"></i> Kopyala</button></div></div></div>`;
-    });
+    // TeleSatış artık tam ekran modül
+    openTelesalesArea();
 }
 function toggleSales(index) {
     const item = document.getElementById(`sales-${index}`);
@@ -1955,11 +1965,8 @@ function renderStep(k){
 // --- TECH WIZARD ---
 const twState = { currentStep: 'start', history: [] };
 function openTechWizard() {
-    document.getElementById('tech-wizard-modal').style.display = 'flex';
-    if (Object.keys(techWizardData).length === 0) {
-        Swal.fire({ title: 'Veriler Yükleniyor...', didOpen: () => Swal.showLoading() });
-        loadTechWizardData().then(() => { Swal.close(); twResetWizard(); });
-    } else { twRenderStep(); }
+    // Teknik Sihirbaz artık Teknik (tam ekran) içinde
+    openTechArea('wizard');
 }
 function twRenderStep() {
     const contentDiv = document.getElementById('tech-wizard-content');
@@ -3591,6 +3598,8 @@ async function openTelesalesArea(){
     const wrap = document.getElementById('telesales-fullscreen');
     if(!wrap) return;
     wrap.style.display = 'flex';
+    document.body.classList.add('fs-open');
+    document.body.style.overflow='hidden';
 
     // Sidebar profil
     const av = document.getElementById('t-side-avatar');
@@ -3633,6 +3642,8 @@ async function openTelesalesArea(){
 function closeFullTelesales(){
     const wrap = document.getElementById('telesales-fullscreen');
     if(wrap) wrap.style.display = 'none';
+    document.body.classList.remove('fs-open');
+    document.body.style.overflow='';
 }
 
 function switchTelesalesTab(tab){
@@ -3746,6 +3757,8 @@ function openTechArea(tab){
     const wrap = document.getElementById('tech-fullscreen');
     if(!wrap) return;
     wrap.style.display = 'flex';
+    document.body.classList.add('fs-open');
+    document.body.style.overflow='hidden';
 
     // Sidebar profil
     const av = document.getElementById('x-side-avatar');
@@ -3762,6 +3775,8 @@ function openTechArea(tab){
 function closeFullTech(){
     const wrap = document.getElementById('tech-fullscreen');
     if(wrap) wrap.style.display = 'none';
+    document.body.classList.remove('fs-open');
+    document.body.style.overflow='';
 }
 
 function switchTechTab(tab){
