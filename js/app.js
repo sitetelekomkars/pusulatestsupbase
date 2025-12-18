@@ -466,7 +466,11 @@ function checkSession() {
         checkAdmin(savedRole);
         try{ if(savedGroup){ const el=document.getElementById("t-side-role"); if(el) el.textContent=savedGroup; const el2=document.getElementById("tech-side-role"); if(el2) el2.textContent=savedGroup; } }catch(e){}
         startSessionTimer();
-        
+
+        // ✅ Yenilemede de menü yetkilerini uygula
+        try { loadMenuPermissions(); } catch (e) {}
+        try { loadHomeBlocks(); } catch (e) {}
+
         if (BAKIM_MODU) {
             document.getElementById("maintenance-screen").style.display = "flex";
         } else {
