@@ -13,7 +13,7 @@ function showGlobalError(message){
 }
 
 // Apps Script URL'si
-let SCRIPT_URL = localStorage.getItem("PUSULA_SCRIPT_URL") || "https://script.google.com/macros/s/AKfycbz6dDFHv-49h-13EwNPVCqpj-H4xjRqNpkz1JPvkixDkOkM_AUyN2cgYpH7-j9a5Tg/exec"; // Apps Script Web App URL
+let SCRIPT_URL = localStorage.getItem("PUSULA_SCRIPT_URL") || "https://script.google.com/macros/s/AKfycbywdciHyiPCEWGu9hIyN05HkeBgwPlFgzrDZY16K08svQhTcvXhN8A_DyBrzO8SalDu/exec"; // Apps Script Web App URL
 
 // ---- API CALL helper (Menu/Yetki vs için gerekli) ----
 async function apiCall(action, payload = {}) {
@@ -126,8 +126,9 @@ function loadMenuPermissions(){
 // LocAdmin panel
 function openMenuPermissions(){
   const role=getMyRole();
-  if(role!=="locadmin" && role!=="admin"){
-    Swal.fire("Yetkisiz", "Bu ekrana erişimin yok.", "warning");
+  // Yetki Yönetimi: SADECE locadmin erişebilir (admin dahil hiç kimse görmez)
+  if(role!=="locadmin"){
+    Swal.fire("Yetkisiz", "Bu ekran sadece Local Admin içindir.", "warning");
     return;
   }
   apiCall("getMenuPermissions",{}).then(res=>{
@@ -596,13 +597,15 @@ function checkAdmin(role) {
         if(addCardDropdown) addCardDropdown.style.display = 'flex';
         if(quickEditDropdown) {
             quickEditDropdown.style.display = 'flex';
-        const perms = document.getElementById('dropdownPerms'); if(perms) perms.style.display = 'flex';
+        const perms = document.getElementById('dropdownPerms');
+            if(perms) perms.style.display = isLocAdmin ? 'flex' : 'none';
             quickEditDropdown.innerHTML = '<i class="fas fa-pen" style="color:var(--secondary);"></i> Düzenlemeyi Aç';
             quickEditDropdown.classList.remove('active');
         }
     } else {
         if(addCardDropdown) addCardDropdown.style.display = 'none';
         if(quickEditDropdown) quickEditDropdown.style.display = 'none';
+        const perms = document.getElementById('dropdownPerms'); if(perms) perms.style.display = 'none';
     }
 }
 function logout() {
