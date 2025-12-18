@@ -51,7 +51,7 @@ let firstAnswerIndex = -1;
 const VALID_CATEGORIES = ['Teknik', 'İkna', 'Kampanya', 'Bilgi'];
 const MONTH_NAMES = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 // --- GLOBAL DEĞİŞKENLER ---
-let database = [], newsData = [], sportsData = [], salesScripts = [], quizQuestions = [], quickDecisionQuestions = [];
+let database = [], cardsData = [], newsData = [], sportsData = [], salesScripts = [], quizQuestions = [], quickDecisionQuestions = [];
 let techWizardData = {}; // Teknik Sihirbaz Verisi
 let currentUser = "";
 let isAdminMode = false;    
@@ -517,6 +517,8 @@ function loadContentData() {
             try { updateSearchResultCount(activeCards.length || database.length, database.length); } catch(e) {}
         } else { document.getElementById('loading').innerHTML = `Veriler alınamadı: ${data.message || 'Bilinmeyen Hata'}`; }
     }).catch(error => { document.getElementById('loading').innerHTML = 'Bağlantı Hatası! Sunucuya ulaşılamıyor.'; });
+            cardsData = database; // geriye dönük uyumluluk
+
 }
 function loadWizardData() {
     return new Promise((resolve, reject) => {
@@ -626,33 +628,34 @@ function filterContent() {
     updateSearchResultCount(filtered.length, database.length);
     renderCards(filtered);
 }
-function showCardDetail(arg1, arg2) {
-    // Eski çağrılar (title, text) + yeni çağrılar (cardObj) uyumlu
-    let title = '';
-    let text = '';
-    let script = '';
-
-    if (arg1 && typeof arg1 === 'object') {
-        title = arg1.title || '';
-        text = arg1.text || '';
-        script = arg1.script || '';
-    } else {
-        title = arg1 || '';
-        text = arg2 || '';
+function showCardDetail(title, text) {
+    // Geriye dönük uyumluluk: showCardDetail(cardObj) çağrısını da destekle
+    if (title && typeof title === 'object') {
+        const c = title;
+        const t = c.title || c.name || 'Detay';
+        const body = (c.text || c.desc || '').toString();
+        const script = (c.script || '').toString();
+        const alertTxt = (c.alert || '').toString();
+        const html = `
+          <div style="text-align:left; font-size:1rem; line-height:1.6; white-space:pre-line;">
+            ${escapeHtml(body).replace(/\n/g,'<br>')}
+            ${script ? `<div class="tech-script-box" style="margin-top:12px">
+                <span class="tech-script-label">Müşteriye iletilecek:</span>${escapeHtml(script).replace(/\n/g,'<br>')}
+              </div>` : ''}
+            ${alertTxt ? `<div class="tech-alert" style="margin-top:12px">${escapeHtml(alertTxt).replace(/\n/g,'<br>')}</div>` : ''}
+          </div>`;
+        Swal.fire({ title: t, html, showCloseButton: true, showConfirmButton: false, width: '820px', background: '#f8f9fa' });
+        return;
     }
 
-    const safeText = String(text || '').replace(/\n/g,'<br>');
-    const safeScript = script ? `<div class="script-box" style="margin-top:12px"><span class="script-label">Müşteriye iletilecek:</span>${escapeHtml(script)}<button class="copy-btn" onclick="copyToClipboard('${escapeForJsString(script)}')">Kopyala</button></div>` : '';
-
+    const safeText = (text ?? '').toString();
     Swal.fire({
-        title: escapeHtml(String(title || '')),
-        html: `<div style="text-align:left; font-size:1rem; line-height:1.6;">${safeText}</div>${safeScript}`,
-        showCloseButton: true,
-        showConfirmButton: false,
-        width: '700px',
-        background: '#f8f9fa'
+        title: title,
+        html: `<div style="text-align:left; font-size:1rem; line-height:1.6;">${escapeHtml(safeText).replace(/\n/g,'<br>')}</div>`,
+        showCloseButton: true, showConfirmButton: false, width: '600px', background: '#f8f9fa'
     });
 }
+
 function toggleEditMode() {
     if (!isAdminMode) return;
     isEditingActive = !isEditingActive;
@@ -3450,7 +3453,7 @@ function renderHomePanels(){
     // Favoriler kutusu: favori kartların ilk 6'sı
     const favEl = document.getElementById('home-favs');
     if(favEl){
-        const favs = (database||[]).filter(c=>isFavorite(c.id)).slice(0,6);
+        const favs = (cardsData||[]).filter(c=>isFavorite(c.id)).slice(0,6);
         if(favs.length===0){
             favEl.innerHTML = 'Henüz favori eklemedin. Kartlarda ⭐ simgesine basarak ekleyebilirsin.';
         }else{
@@ -3469,7 +3472,7 @@ function renderHomePanels(){
 
 // Kart detayını doğrudan açmak için küçük bir yardımcı
 function openCardDetail(cardId){
-    const card = (database||[]).find(x=>String(x.id)===String(cardId));
+    const card = (cardsData||[]).find(x=>String(x.id)===String(cardId));
     if(!card){Swal.fire('Hata','Kart bulunamadı.','error');return;}
     showCardDetail(card);
 }
@@ -3788,117 +3791,86 @@ function renderTechWizardInto(targetId){
     const box = document.getElementById(targetId);
     if(!box) return;
 
-    // Ayrı state: modal sihirbazı (twState) bozmadan gömülü çalışsın
+    // Ayrı state: fullscreen içindeki gömülü sihirbaz
     window.embeddedTwState = window.embeddedTwState || { currentStep: 'start', history: [] };
 
     // Veri yoksa yükle
-    if(!window.techWizardData || Object.keys(techWizardData).length === 0){
-        box.innerHTML = '<div style="padding:16px;opacity:.7">Sihirbaz yükleniyor…</div>';
-        if(typeof loadTechWizardData === 'function'){
-            loadTechWizardData().then(()=>renderTechWizardInto(targetId)).catch(()=> {
-                box.innerHTML = '<div style="padding:16px;color:#d32f2f">Sihirbaz verisi yüklenemedi.</div>';
-            });
-        }
+    if(!techWizardData || Object.keys(techWizardData).length === 0){
+        box.innerHTML = '<div style="padding:16px;opacity:.7">Sihirbaz yükleniyor...</div>';
+        loadTechWizardData().then(()=>renderTechWizardInto(targetId));
         return;
     }
 
-    const st = window.embeddedTwState;
+    embeddedTwRender(targetId);
+}
+
+function embeddedTwRender(targetId){
+    const box = document.getElementById(targetId);
+    if(!box) return;
+
+    const st = window.embeddedTwState || { currentStep:'start', history:[] };
     const stepData = techWizardData[st.currentStep];
 
     if(!stepData){
-        box.innerHTML = `<div style="padding:16px;color:#d32f2f">Hata: Adım bulunamadı (${st.currentStep}).</div>`;
+        box.innerHTML = `<div class="tech-alert">Hata: Adım bulunamadı (${escapeHtml(String(st.currentStep))}).</div>`;
         return;
     }
 
-    const showBack = st.history.length > 0;
+    const backVisible = st.history && st.history.length>0;
 
     let html = `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px">
-        <div style="display:flex;gap:8px">
-          ${showBack ? `<button class="tech-btn tech-btn-option" onclick="embeddedTwBack('${targetId}')">⬅ Geri</button>` : ``}
+      <div style="display:flex; gap:8px; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap">
+        <div style="display:flex; gap:8px; align-items:center">
+          ${backVisible ? `<button type="button" class="tech-btn tech-btn-option" onclick="embeddedTwBack('${targetId}')">⬅ Geri</button>` : ''}
+          <button type="button" class="tech-btn tech-btn-option" onclick="embeddedTwReset('${targetId}')">↻ Sıfırla</button>
         </div>
-        <button class="tech-btn tech-btn-option" onclick="embeddedTwReset('${targetId}')">↻ Sıfırla</button>
+        <div style="opacity:.7; font-size:.9rem">Adım: ${escapeHtml(stepData.title || '')}</div>
       </div>
+
       <div class="tech-step-title">${escapeHtml(stepData.title || '')}</div>
     `;
 
     if(stepData.text){
-        html += `<div style="white-space:pre-line; font-size:1rem; margin:10px 0 15px 0;">${escapeHtml(stepData.text)}</div>`;
+        html += `<div style="font-size:1rem; margin:10px 0; white-space:pre-line">${escapeHtml(stepData.text)}</div>`;
     }
-
     if(stepData.script){
-        html += `
-          <div class="tech-script-box">
-            <span class="tech-script-label">Müşteriye iletilecek:</span>
-            ${escapeHtml(stepData.script)}
-            <button class="tech-copy-btn" onclick="copyToClipboard('${escapeForJsString(stepData.script)}')">Kopyala</button>
-          </div>
-        `;
+        html += `<div class="tech-script-box"><span class="tech-script-label">Müşteriye iletilecek:</span>${escapeHtml(stepData.script)}</div>`;
     }
-
     if(stepData.alert){
         html += `<div class="tech-alert">${escapeHtml(stepData.alert)}</div>`;
     }
 
-    if(stepData.buttons && stepData.buttons.length){
-        html += `<div class="tech-buttons-area">` + stepData.buttons.map(b=>{
-            const cls = (b.style === 'option') ? 'tech-btn-option' : 'tech-btn-primary';
-            const next = escapeForJsString(b.next || 'start');
-            return `<button class="tech-btn ${cls}" onclick="embeddedTwGo('${targetId}','${next}')">${escapeHtml(b.text || '')}</button>`;
-        }).join('') + `</div>`;
+    if(Array.isArray(stepData.buttons) && stepData.buttons.length){
+        html += `<div class="tech-buttons-area">`;
+        stepData.buttons.forEach(btn=>{
+            const cls = btn.style === 'option' ? 'tech-btn-option' : 'tech-btn-primary';
+            html += `<button type="button" class="tech-btn ${cls}" onclick="embeddedTwChangeStep('${targetId}','${escapeForJsString(btn.next||'start')}')">${escapeHtml(btn.text||'')}</button>`;
+        });
+        html += `</div>`;
     }
 
     box.innerHTML = html;
 }
 
-function embeddedTwGo(targetId, next){
+function embeddedTwChangeStep(targetId, newStep){
+    window.embeddedTwState = window.embeddedTwState || { currentStep:'start', history:[] };
     window.embeddedTwState.history.push(window.embeddedTwState.currentStep);
-    window.embeddedTwState.currentStep = next;
-    renderTechWizardInto(targetId);
+    window.embeddedTwState.currentStep = newStep;
+    embeddedTwRender(targetId);
 }
 function embeddedTwBack(targetId){
+    window.embeddedTwState = window.embeddedTwState || { currentStep:'start', history:[] };
     if(window.embeddedTwState.history.length){
         window.embeddedTwState.currentStep = window.embeddedTwState.history.pop();
-        renderTechWizardInto(targetId);
+        embeddedTwRender(targetId);
     }
 }
 function embeddedTwReset(targetId){
-    window.embeddedTwState.currentStep = 'start';
-    window.embeddedTwState.history = [];
-    renderTechWizardInto(targetId);
+    window.embeddedTwState = { currentStep:'start', history:[] };
+    embeddedTwRender(targetId);
 }
 
-function showTechWizardStep(idxOrKey){
-    // Eski yapıyla uyum: techWizardSteps varsa onu kullan, yoksa techWizardData üzerinden çalış
-    if(typeof techWizardSteps !== 'undefined' && Array.isArray(techWizardSteps) && typeof idxOrKey === 'number'){
-        const s = techWizardSteps[idxOrKey];
-        if(!s) return;
-        Swal.fire({
-            title: `<i class="fas fa-magic" style="color:#0e1b42"></i> ${escapeHtml(s.title||'Teknik Sihirbaz')}`,
-            html: `<div style="text-align:left;line-height:1.65">
-                    ${(String(s.desc||'')).replace(/\n/g,'<br>')}
-                    ${s.code ? `<div class="tech-code-block" style="margin-top:12px">${escapeHtml(s.code)}</div>`:''}
-                  </div>`,
-            showCloseButton:true, showConfirmButton:false, width:'820px', background:'#f8f9fa'
-        });
-        return;
-    }
 
-    // Yeni veri yapısı
-    if(!window.techWizardData || Object.keys(techWizardData).length===0){
-        openTechWizard();
-        return;
-    }
-
-    const key = (typeof idxOrKey === 'string') ? idxOrKey : 'start';
-    twState.currentStep = key;
-    twState.history = [];
-    openTechWizard();
-}
-
-/* -------------------------
-   Spor Rehberi: Yayın hakkı bitiş bilgisi
---------------------------*/
 function applySportsRights(){
     if(!Array.isArray(sportsData) || sportsData.length===0) return;
     const rights = (window.sportRightsFromSheet && window.sportRightsFromSheet.length) ? window.sportRightsFromSheet : SPORTS_RIGHTS_FALLBACK;
