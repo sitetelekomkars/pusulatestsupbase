@@ -4344,39 +4344,48 @@ function renderTechSections(){
 
 let techEditMode = false;
 
-function renderTechList(bucketKey, q, listId){
+function renderTechList(bucketKey, q, listId) {
     const listEl = document.getElementById(listId);
-    if(!listEl) return;
+    if (!listEl) return;
 
+    // Veri kaynağı kontrolü
     const all = (window.__techBuckets && window.__techBuckets[bucketKey]) ? window.__techBuckets[bucketKey] : [];
-    const query = String(q||'').trim().toLowerCase();
+    const query = String(q || '').trim().toLowerCase();
 
-    const filtered = !query ? all : all.filter(c=>{
-        const hay = `${c.title||''} ${c.text||''} ${c.script||''} ${c.link||''}`.toLowerCase();
+    // Filtreleme mantığı
+    const filtered = !query ? all : all.filter(c => {
+        const hay = `${c.title || ''} ${c.text || ''} ${c.script || ''} ${c.link || ''}`.toLowerCase();
         return hay.includes(query);
     });
 
-    // TeleSatış'ta ayrı bir düzenleme modu yok; yalnızca global Düzenlemeyi Aç (isEditingActive) açıksa admin kontrolleri görünür.
-    const bar = ((isAdminMode && isEditingActive) ?? `
+    // Admin Bar Mantığı Düzeltildi
+    // isAdminMode ve isEditingActive true ise bar içeriğini oluştur, değilse boş string dön.
+    let bar = '';
+    if (typeof isAdminMode !== 'undefined' && isAdminMode && typeof isEditingActive !== 'undefined' && isEditingActive) {
+        bar = `
         <div style="display:flex;gap:10px;align-items:center;margin:10px 0 14px;">
-          <button class="x-btn x-btn-admin" onclick="toggleTechEdit()"><i class="fas fa-pen"></i> ${techEditMode ? 'Düzenlemeyi Kapat' : 'Düzenlemeyi Aç'}</button>
-          ${techEditMode ? `<button class="x-btn x-btn-admin" onclick="addTechCard('${bucketKey}')"><i class="fas fa-plus"></i> Kart Ekle</button>` : ``}
+          <button class="x-btn x-btn-admin" onclick="toggleTechEdit()">
+            <i class="fas fa-pen"></i> ${techEditMode ? 'Düzenlemeyi Kapat' : 'Düzenlemeyi Aç'}
+          </button>
+          ${techEditMode ? `<button class="x-btn x-btn-admin" onclick="addTechCard('${bucketKey}')"><i class="fas fa-plus"></i> Kart Ekle</button>` : ''}
           <span style="color:#888;font-weight:800;font-size:.9rem">Bu düzenlemeler tarayıcıda saklanır (local).</span>
         </div>
-    ` : '');
+        `;
+    }
 
-    if(!filtered.length){
+    // Kayıt bulunamadı durumu
+    if (!filtered.length) {
         listEl.innerHTML = bar + '<div class="home-mini-item">Kayıt bulunamadı.</div>';
         return;
     }
 
+    // Listeyi Render Et
     listEl.innerHTML = bar + `
       <div class="x-card-grid">
-        ${filtered.map((c, idx)=> techCardHtml(c, idx)).join('')}
+        ${filtered.map((c, idx) => techCardHtml(c, idx)).join('')}
       </div>
     `;
 }
-
 function techCardKey(c, idx){
     return (c && (c.id || c.code)) ? String(c.id||c.code) : `${(c.title||'').slice(0,40)}__${idx}`;
 }
