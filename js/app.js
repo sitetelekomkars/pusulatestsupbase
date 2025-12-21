@@ -3723,7 +3723,9 @@ function renderHomePanels(){
         (async()=>{
             try{
                 const items = await fetchBroadcastFlow();
-                const todayISO = new Date().toISOString().slice(0,10);
+                const d = new Date();
+const todayISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
 
                 const toISO = (val)=>{
                     const s = String(val||'').trim();
