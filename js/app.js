@@ -879,12 +879,15 @@ function filterContent() {
     updateSearchResultCount(filtered.length, database.length);
     renderCards(filtered);
 }
-function normalizeRichText(v){
+function normalizeRichText(v) {
   const s = (v ?? '').toString();
   return s
-    .replace(/\\u003cbr\\s*\\/?\\u003e/gi, '\n')
-    .replace(/<br\s*\/?>(\r?\n)?/gi, '\n')
-    .replace(/\\n/g, '\n');
+    // Unicode kullanarak <br> veya <br/> yakalamak için:
+    .replace(/\u003cbr\s*\/?\u003e/gi, '\n') 
+    // Veya doğrudan karakterlerle yazmak daha okunurdur:
+    .replace(/<br\s*\/?>/gi, '\n')
+    // Metindeki fiziksel \n yazılarını gerçek satır sonuna çevirmek için:
+    .replace(/\\n/g, '\n'); 
 }
 
 function showCardDetail(title, text) {
