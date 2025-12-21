@@ -456,7 +456,12 @@ function copyText(t) {
 }
 document.addEventListener('contextmenu', event => event.preventDefault());
 document.onkeydown = function(e) { if(e.keyCode == 123) return false; }
-document.addEventListener('DOMContentLoaded', () => { checkSession(); });
+document.addEventListener('DOMContentLoaded', () => {
+  checkSession();
+  // Ana sayfa Günün Sözü kalem butonu
+  const qb = document.getElementById('home-edit-quote');
+  if(qb){ qb.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); editHomeBlock('quote'); }); }
+});
 // --- SESSION & LOGIN ---
 function checkSession() {
     const savedUser = localStorage.getItem("sSportUser");
@@ -837,9 +842,10 @@ function filterCategory(btn, cat) {
 
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    // Açık fullscreen alanları yenile
+    try{ if(document.getElementById('tech-fullscreen')?.style?.display==='flex') renderTechFullscreen(); }catch(e){}
+    try{ if(document.getElementById('telesales-fullscreen')?.style?.display==='flex') renderTelesalesFullscreen(); }catch(e){}
     filterContent();
-    try{ const tfs=document.getElementById('telesales-fullscreen'); if(tfs && tfs.style.display==='flex'){ renderTelesalesDataOffers(); renderTelesalesScripts(); } }catch(e){}
-    try{ const xfs=document.getElementById('tech-fullscreen'); if(xfs && xfs.style.display==='flex'){ const active=document.querySelector('#tech-fullscreen .q-nav-item.active'); if(active){ const oc=active.getAttribute('onclick')||''; const m=oc.match(/switchTechTab\('([^']+)'\)/); if(m && window.switchTechTab) window.switchTechTab(m[1]); } } }catch(e){}
 }
 function filterContent() {
     const search = document.getElementById('searchInput').value.toLocaleLowerCase('tr-TR').trim();
@@ -873,14 +879,22 @@ function filterContent() {
     updateSearchResultCount(filtered.length, database.length);
     renderCards(filtered);
 }
+function normalizeRichText(v){
+  const s = (v ?? '').toString();
+  return s
+    .replace(/\\u003cbr\\s*\\/?\\u003e/gi, '\n')
+    .replace(/<br\s*\/?>(\r?\n)?/gi, '\n')
+    .replace(/\\n/g, '\n');
+}
+
 function showCardDetail(title, text) {
     // Geriye dönük uyumluluk: showCardDetail(cardObj) çağrısını da destekle
     if (title && typeof title === 'object') {
         const c = title;
         const t = c.title || c.name || 'Detay';
-        const body = (c.text || c.desc || '').toString();
-        const script = (c.script || '').toString();
-        const alertTxt = (c.alert || '').toString();
+        const body = normalizeRichText(c.text || c.desc || '');
+        const script = normalizeRichText(c.script || '');
+        const alertTxt = normalizeRichText(c.alert || '');
         const link = (c.link || '').toString();
         const html = `
           <div style="text-align:left; font-size:1rem; line-height:1.6; white-space:pre-line;">
@@ -895,7 +909,7 @@ function showCardDetail(title, text) {
         return;
     }
 
-    const safeText = (text ?? '').toString();
+    const safeText = normalizeRichText(text ?? '');
     Swal.fire({
         title: title,
         html: `<div style="text-align:left; font-size:1rem; line-height:1.6;">${escapeHtml(safeText).replace(/\n/g,'<br>')}</div>`,
@@ -906,6 +920,9 @@ function showCardDetail(title, text) {
 function toggleEditMode() {
     if (!isAdminMode) return;
     isEditingActive = !isEditingActive;
+    // Tek kontrol noktası: tüm modüller aynı düzenleme modunu kullanır
+    window.telesalesEditMode = isEditingActive;
+    window.techEditMode = isEditingActive;
     document.body.classList.toggle('editing', isEditingActive);
     
     const btn = document.getElementById('dropdownQuickEdit');
@@ -917,9 +934,10 @@ function toggleEditMode() {
         btn.classList.remove('active');
         btn.innerHTML = '<i class="fas fa-pen" style="color:var(--secondary);"></i> Düzenlemeyi Aç';
     }
+    // Açık fullscreen alanları yenile
+    try{ if(document.getElementById('tech-fullscreen')?.style?.display==='flex') renderTechFullscreen(); }catch(e){}
+    try{ if(document.getElementById('telesales-fullscreen')?.style?.display==='flex') renderTelesalesFullscreen(); }catch(e){}
     filterContent();
-    try{ const tfs=document.getElementById('telesales-fullscreen'); if(tfs && tfs.style.display==='flex'){ renderTelesalesDataOffers(); renderTelesalesScripts(); } }catch(e){}
-    try{ const xfs=document.getElementById('tech-fullscreen'); if(xfs && xfs.style.display==='flex'){ const active=document.querySelector('#tech-fullscreen .q-nav-item.active'); if(active){ const oc=active.getAttribute('onclick')||''; const m=oc.match(/switchTechTab\('([^']+)'\)/); if(m && window.switchTechTab) window.switchTechTab(m[1]); } } }catch(e){}
     if(document.getElementById('guide-modal').style.display === 'flex') openGuide();
     if(document.getElementById('sales-modal').style.display === 'flex') openSales();
     if(document.getElementById('news-modal').style.display === 'flex') openNews();
@@ -3693,21 +3711,25 @@ function renderHomePanels(){
                     return '';
                 };
 
-                const nowMs = Date.now();
+                const now = new Date();
+                const nowSecs = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
+                const timeToSecs = (t)=>{
+                  const s = String(t||'').trim();
+                  const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+                  if(!m) return null;
+                  return (parseInt(m[1],10)||0)*3600 + (parseInt(m[2],10)||0)*60 + (parseInt(m[3]||'0',10)||0);
+                };
                 const todays = (items||[]).filter(it=>{
                     const iso = toISO(it.dateISO || it.date);
                     if(iso !== todayISO) return false;
-                    // saati geçenleri gösterme
-                    const ep = Number(it.startEpoch || 0);
-                    if(ep) return ep >= nowMs;
-                    // epoch yoksa basit HH:mm parse
-                    const t = String(it.time||'').match(/^(\d{1,2}):(\d{2})/);
-                    if(!t) return true;
-                    const hh = parseInt(t[1],10)||0;
-                    const mm = parseInt(t[2],10)||0;
-                    const d = new Date();
-                    d.setHours(hh, mm, 0, 0);
-                    return d.getTime() >= nowMs;
+                    const ts = timeToSecs(it.time);
+                    if(ts === null) return true;
+                    // saati geçen karşılaşma gözükmesin
+                    return ts >= nowSecs;
+                }).sort((a,b)=>{
+                    const ta = timeToSecs(a.time) ?? 0;
+                    const tb = timeToSecs(b.time) ?? 0;
+                    return ta - tb;
                 });
 
                 if(!todays.length){
@@ -3718,12 +3740,13 @@ function renderHomePanels(){
                         const time = escapeHtml(it.time || '');
                         const title = escapeHtml(it.match || it.title || it.event || '');
                         const ch = escapeHtml(it.channel || it.platform || '');
-                        const sp = escapeHtml(it.announcer || it.spiker || it.commentator || '');
                         const league = escapeHtml(it.league || it.category || '');
+                        const spiker = escapeHtml(it.spiker || it.spikerler || it.announcer || it.commentator || '');
                         return `
                           <div class="home-mini-item">
-                            <div class="home-mini-date">${time}${league?` • ${league}`:''}${ch?` • ${ch}`:''}${sp?` • ${sp}`:''}</div>
+                            <div class="home-mini-date">${time}${league?` • ${league}`:''}${ch?` • ${ch}`:''}</div>
                             <div class="home-mini-title">${title || 'Maç'}</div>
+                            ${spiker?`<div class="home-mini-desc" style="margin-top:2px"><i class=\"fas fa-microphone\" style=\"opacity:.7;margin-right:6px\"></i>${spiker}</div>`:''}
                           </div>
                         `;
                     }).join('') + (todays.length>shown.length ? `<div style="color:#666;font-size:.9rem;margin-top:6px">+${todays.length-shown.length} maç daha…</div>` : '');
@@ -3934,8 +3957,8 @@ function renderTelesalesDataOffers(){
 
     const bar = (isAdminMode ? `
         <div style="grid-column:1/-1;display:flex;gap:10px;align-items:center;margin:6px 0 12px;">
-          <button class="x-btn x-btn-admin" onclick="toggleTelesalesEdit()"><i class="fas fa-pen"></i> ${isEditingActive ? 'Düzenlemeyi Kapat' : 'Düzenlemeyi Aç'}</button>
-          ${isEditingActive ? `<button class="x-btn x-btn-admin" onclick="addTelesalesOffer()"><i class="fas fa-plus"></i> Teklif Ekle</button>` : ``}
+          <button class="x-btn x-btn-admin" onclick="toggleTelesalesEdit()"><i class="fas fa-pen"></i> ${window.telesalesEditMode ? 'Düzenlemeyi Kapat' : 'Düzenlemeyi Aç'}</button>
+          ${window.telesalesEditMode ? `<button class="x-btn x-btn-admin" onclick="addTelesalesOffer()"><i class="fas fa-plus"></i> Teklif Ekle</button>` : ``}
           <span style="color:#888;font-weight:800;font-size:.9rem">Bu düzenlemeler tarayıcıda saklanır (local).</span>
         </div>
     ` : '');
@@ -3955,16 +3978,14 @@ function renderTelesalesDataOffers(){
             <div class="t-training-title">${escapeHtml(o.title||'Teklif')}</div>
             <div class="t-training-badge">${escapeHtml(o.segment||o.tag||'')}</div>
           </div>
-          <div class="t-training-body">
-            <div class="t-training-desc">${escapeHtml((o.desc||'').slice(0,140))}${(o.desc||'').length>140?'...':''}</div>
-            <div style="margin-top:10px;color:#999;font-size:.8rem">(Detay için tıkla)</div>
-            ${(isAdminMode && isEditingActive) ? `
-              <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+          <div class="t-training-desc">${escapeHtml((o.desc||'').slice(0,140))}${(o.desc||'').length>140?'...':''}</div>
+          <div style="margin-top:10px;color:#999;font-size:.8rem">(Detay için tıkla)</div>
+          ${(isAdminMode && window.telesalesEditMode) ? `
+            <div style="margin-top:12px;display:flex;gap:10px">
               <button class="x-btn x-btn-admin" onclick="event.stopPropagation(); editTelesalesOffer(${idx});"><i class="fas fa-pen"></i> Düzenle</button>
               <button class="x-btn x-btn-admin" onclick="event.stopPropagation(); deleteTelesalesOffer(${idx});"><i class="fas fa-trash"></i> Sil</button>
             </div>
-            ` : ``}
-          </div>
+          ` : ``}
         </div>
     `).join('');
 }
@@ -3972,8 +3993,9 @@ function renderTelesalesDataOffers(){
 window.telesalesEditMode = false;
 
 function toggleTelesalesEdit(){
-    // TeleSatış düzenlemeleri global Düzenlemeyi Aç/Kapat üzerinden yönetilir.
-    toggleEditMode();
+    window.telesalesEditMode = !window.telesalesEditMode;
+    renderTelesalesDataOffers();
+    renderTelesalesScripts();
 }
 
 function getTelesalesOffersStore(){
@@ -3989,8 +4011,6 @@ function saveTelesalesOffersStore(arr){
 }
 
 function addTelesalesOffer(){
-    if(!isAdminMode || !isEditingActive){ Swal.fire('Yetkisiz','Düzenleme modu kapalı.','warning'); return; }
-    if(!isAdminMode || !isEditingActive){ Swal.fire('Yetkisiz','Düzenleme modu kapalı.','warning'); return; }
     Swal.fire({
         title:"TeleSatış Teklifi Ekle",
         html: `
@@ -4023,8 +4043,6 @@ function addTelesalesOffer(){
 }
 
 function editTelesalesOffer(idx){
-    if(!isAdminMode || !isEditingActive){ Swal.fire('Yetkisiz','Düzenleme modu kapalı.','warning'); return; }
-    if(!isAdminMode || !isEditingActive){ Swal.fire('Yetkisiz','Düzenleme modu kapalı.','warning'); return; }
     const arr = getTelesalesOffersStore();
     const o = arr[idx];
     if(!o) return;
@@ -4059,8 +4077,6 @@ function editTelesalesOffer(idx){
 }
 
 function deleteTelesalesOffer(idx){
-    if(!isAdminMode || !isEditingActive){ Swal.fire('Yetkisiz','Düzenleme modu kapalı.','warning'); return; }
-    if(!isAdminMode || !isEditingActive){ Swal.fire('Yetkisiz','Düzenleme modu kapalı.','warning'); return; }
     Swal.fire({
         title:"Silinsin mi?",
         icon:"warning",
@@ -4103,8 +4119,8 @@ function renderTelesalesScripts(){
 
     const bar = (isAdminMode ? `
         <div style="display:flex;gap:10px;align-items:center;margin:6px 0 12px;">
-          <button class="x-btn x-btn-admin" onclick="toggleTelesalesEdit()"><i class="fas fa-pen"></i> ${isEditingActive ? 'Düzenlemeyi Kapat' : 'Düzenlemeyi Aç'}</button>
-          ${isEditingActive ? `<button class="x-btn x-btn-admin" onclick="addTelesalesScript()"><i class="fas fa-plus"></i> Script Ekle</button>` : ``}
+          <button class="x-btn x-btn-admin" onclick="toggleTelesalesEdit()"><i class="fas fa-pen"></i> ${window.telesalesEditMode ? 'Düzenlemeyi Kapat' : 'Düzenlemeyi Aç'}</button>
+          ${window.telesalesEditMode ? `<button class="x-btn x-btn-admin" onclick="addTelesalesScript()"><i class="fas fa-plus"></i> Script Ekle</button>` : ``}
         </div>
     ` : '');
 
@@ -4119,13 +4135,12 @@ function renderTelesalesScripts(){
         <div class="news-desc" style="white-space:pre-line">${escapeHtml(s.text||'')}</div>
         <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:10px">
           <div class="news-tag" style="background:rgba(16,185,129,.08);color:#10b981;border:1px solid rgba(16,185,129,.25)">Tıkla & Kopyala</div>
-          ${(isAdminMode && isEditingActive) ? `
+          ${(isAdminMode && window.telesalesEditMode) ? `
             <div style="display:flex;gap:8px">
               <button class="x-btn x-btn-admin" onclick="event.stopPropagation(); editTelesalesScript(${i});"><i class="fas fa-pen"></i></button>
               <button class="x-btn x-btn-admin" onclick="event.stopPropagation(); deleteTelesalesScript(${i});"><i class="fas fa-trash"></i></button>
             </div>
-            ` : ``}
-          </div>
+          ` : ``}
         </div>
       </div>
     `).join('');
@@ -4143,8 +4158,6 @@ function saveTelesalesScriptsStore(arr){
 }
 
 function addTelesalesScript(){
-    if(!isAdminMode || !isEditingActive){ Swal.fire('Yetkisiz','Düzenleme modu kapalı.','warning'); return; }
-    if(!isAdminMode || !isEditingActive){ Swal.fire('Yetkisiz','Düzenleme modu kapalı.','warning'); return; }
     Swal.fire({
         title:"Script Ekle",
         html: `
@@ -4170,8 +4183,6 @@ function addTelesalesScript(){
 }
 
 function editTelesalesScript(idx){
-    if(!isAdminMode || !isEditingActive){ Swal.fire('Yetkisiz','Düzenleme modu kapalı.','warning'); return; }
-    if(!isAdminMode || !isEditingActive){ Swal.fire('Yetkisiz','Düzenleme modu kapalı.','warning'); return; }
     const arr = getTelesalesScriptsStore();
     const s = arr[idx];
     if(!s) return;
@@ -4198,8 +4209,6 @@ function editTelesalesScript(idx){
     });
 }
 function deleteTelesalesScript(idx){
-    if(!isAdminMode || !isEditingActive){ Swal.fire('Yetkisiz','Düzenleme modu kapalı.','warning'); return; }
-    if(!isAdminMode || !isEditingActive){ Swal.fire('Yetkisiz','Düzenleme modu kapalı.','warning'); return; }
     Swal.fire({title:"Silinsin mi?", icon:"warning", showCancelButton:true, confirmButtonText:"Sil", cancelButtonText:"Vazgeç"}).then(res=>{
         if(!res.isConfirmed) return;
         const arr = getTelesalesScriptsStore().filter((_,i)=>i!==idx);
@@ -4391,8 +4400,7 @@ function techCardHtml(c, idx){
           ${isAdminMode && techEditMode ? `
             <button class="x-btn x-btn-admin" onclick="editTechCard(${JSON.stringify(key)})"><i class="fas fa-pen"></i> Düzenle</button>
             <button class="x-btn x-btn-admin" onclick="deleteTechCard(${JSON.stringify(key)})"><i class="fas fa-trash"></i> Sil</button>
-            ` : ``}
-          </div>
+          ` : ``}
         </div>
       </div>
     `;
@@ -4837,6 +4845,22 @@ function __renderTechList(tabKey, items){
     return;
   }
 
+  // Search box
+  const searchId = `x-tech-search-${tabKey}`;
+  let searchBox = document.getElementById(searchId);
+  if(!searchBox){
+    searchBox = document.createElement("div");
+    searchBox.id = searchId;
+    searchBox.style.padding = "12px 0 0 0";
+    searchBox.innerHTML = `
+      <div style="display:flex;gap:10px;align-items:center;padding:0 4px 12px 4px">
+        <input id="${searchId}-inp" placeholder="Sorunlarda ara..." style="flex:1;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12)">
+        <span style="font-size:12px;opacity:.7" id="${searchId}-cnt"></span>
+      </div>
+    `;
+    listEl.parentElement.insertBefore(searchBox, listEl);
+  }
+
   function render(filtered){
     document.getElementById(`${searchId}-cnt`).textContent = `${filtered.length} kayıt`;
     listEl.innerHTML = filtered.map((it, idx) => {
@@ -4881,7 +4905,7 @@ async function loadTechDocsIfNeeded(force=false){
     return rows;
   }catch(e){
     console.error("[TECH DOCS]", e);
-    // uyarı gösterme (sessiz geç)
+    if(typeof showGlobalError === "function") showGlobalError("Teknik döküman verisi çekilemedi. SCRIPT_URL ve Web App yetkilerini kontrol et.");
     return [];
   }
 }
@@ -4941,4 +4965,14 @@ window.switchTechTab = async function(tab){
 };
 
 // expose for onclick
-try{ window.openMenuPermissions = openMenuPermissions; }catch(e){}
+try{ window.openMenuPermissions = openMenuPermissions; }catch(e){
+function openTechDocDetail(catKey, idx){
+  try{
+    const all = window.__techDocsCache || {};
+    const list = all[catKey] || [];
+    const item = list[idx];
+    if(!item) return;
+    showCardDetail(item);
+  }catch(e){}
+}
+}
