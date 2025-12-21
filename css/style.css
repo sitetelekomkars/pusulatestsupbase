@@ -1111,10 +1111,10 @@ body.editing .edit-icon { display: block !important; }
 .q-input{min-width:220px;flex:1}
 .q-select{min-width:180px}
 .q-count{margin-left:auto;color:#6b7280;font-size:.9rem}
-.q-card-grid{display:grid;grid-template-columns:repeat(3,minmax(240px,1fr));gap:18px}
+.q-card-grid{display:grid;grid-template-columns:repeat(3,minmax(240px,1fr));gap:24px}
 @media (max-width:1100px){.q-card-grid{grid-template-columns:repeat(2,minmax(220px,1fr));}}
 @media (max-width:720px){.q-sidebar{width:240px;min-width:240px}.q-card-grid{grid-template-columns:1fr;}}
-.q-training-card{background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.06);padding:16px;box-shadow:0 4px 14px rgba(0,0,0,.04);transition:.15s}
+.q-training-card{background:#fff;border-radius:14px;border:2px solid rgba(0,0,0,.08);padding:16px;box-shadow:0 6px 18px rgba(0,0,0,.06);transition:.15s}
 .q-training-card:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(0,0,0,.07)}
 .t-training-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .t-training-badge{background:#fabb00;color:#0e1b42;font-weight:900;font-size:.75rem;border-radius:999px;padding:4px 10px;white-space:nowrap}
