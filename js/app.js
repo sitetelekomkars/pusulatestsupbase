@@ -16,33 +16,15 @@ function showGlobalError(message){
 let SCRIPT_URL = localStorage.getItem("PUSULA_SCRIPT_URL") || "https://script.google.com/macros/s/AKfycbz6dDFHv-49h-13EwNPVCqpj-H4xjRqNpkz1JPvkixDkOkM_AUyN2cgYpH7-j9a5Tg/exec"; // Apps Script Web App URL
 
 // ---- API CALL helper (Menu/Yetki vs için gerekli) ----
-async function _sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
-
-// NetworkError / geçici Apps Script kesintilerinde otomatik retry
-async function fetchJsonWithRetry(url, options, attempts = 3){
-  let lastErr = null;
-  for(let i=0;i<attempts;i++){
-    try{
-      const res = await fetch(url, options);
-      const json = await res.json();
-      return json;
-    }catch(err){
-      lastErr = err;
-      // 0: 0ms, 1: 450ms, 2: 900ms
-      if(i < attempts-1) await _sleep(450 * (i+1));
-    }
-  }
-  throw lastErr || new Error('NetworkError');
-}
-
 async function apiCall(action, payload = {}) {
   const username = (typeof currentUser !== "undefined" && currentUser) ? currentUser : (localStorage.getItem("sSportUser") || "");
   const token = (typeof getToken === "function" ? getToken() : localStorage.getItem("sSportToken")) || "";
-  const json = await fetchJsonWithRetry(SCRIPT_URL, {
+  const res = await fetch(SCRIPT_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({ action, username, token, ...payload })
-  }, 3);
+  });
+  const json = await res.json();
   if (json.result !== "success") throw new Error(json.message || json.error || "API error");
   return json;
 }
@@ -144,83 +126,6 @@ function loadMenuPermissions(){
     }
   }).catch(()=>{});
 }
-
-
-// -------------------- HomeBlocks (Ana Sayfa blokları) --------------------
-let homeBlocksCache = null; // { key: {title,content,visibleGroups,updatedAt,updatedBy} }
-
-function _decodeUnicodeEscapes(v){
-  const s = (v ?? '').toString();
-  return s
-    .replace(/\\u003c/g,'<')
-    .replace(/\\u003e/g,'>')
-    .replace(/\\u0026/g,'&')
-    .replace(/\\n/g,'\n');
-}
-
-function renderHomeBlocks(){
-  try{
-    const quoteEl = document.getElementById('home-quote');
-    if(quoteEl){
-      const q = homeBlocksCache && homeBlocksCache.quote ? (homeBlocksCache.quote.content||'') : '';
-      const qText = _decodeUnicodeEscapes(q).trim();
-      quoteEl.textContent = qText ? qText : 'Bugün için bir söz eklenmemiş.';
-    }
-    const showEd = !!(isAdminMode && isEditingActive);
-    const b1=document.getElementById('home-edit-today'); if(b1) b1.style.display = showEd ? 'inline-flex' : 'none';
-    const b2=document.getElementById('home-edit-ann');   if(b2) b2.style.display = showEd ? 'inline-flex' : 'none';
-    const b3=document.getElementById('home-edit-quote'); if(b3) b3.style.display = showEd ? 'inline-flex' : 'none';
-  }catch(e){}
-}
-
-function loadHomeBlocks(){
-  return apiCall('getHomeBlocks',{}).then(res=>{
-    const items = (res.items || []);
-    homeBlocksCache = {};
-    items.forEach(it=>{
-      if(!it || !it.key) return;
-      homeBlocksCache[it.key] = it;
-    });
-    renderHomeBlocks();
-  }).catch(()=>{});
-}
-
-async function editHomeBlock(key){
-  if(!isAdminMode) return;
-  if(!isEditingActive){
-    Swal.fire('Düzenleme Kapalı','Önce "Düzenlemeyi Aç" yapmalısın.','info');
-    return;
-  }
-  const current = (homeBlocksCache && homeBlocksCache[key] ? (homeBlocksCache[key].content||'') : '');
-  const curText = _decodeUnicodeEscapes(current);
-
-  const titleMap = { today:'Bugün Neler Var?', ann:'Duyurular', quote:'Günün Sözü' };
-  const { value: v } = await Swal.fire({
-    title: (titleMap[key]||'Blok') + ' Düzenle',
-    input: 'textarea',
-    inputValue: curText,
-    inputPlaceholder: 'İçerik...',
-    showCancelButton: true,
-    confirmButtonText: 'Kaydet',
-    cancelButtonText: 'Vazgeç'
-  });
-  if(v === undefined) return;
-
-  Swal.fire({ title:'Kaydediliyor...', didOpen:()=>Swal.showLoading(), showConfirmButton:false });
-  try{
-    await apiCall('updateHomeBlock', {
-      key,
-      title: (homeBlocksCache && homeBlocksCache[key] && homeBlocksCache[key].title) ? homeBlocksCache[key].title : (titleMap[key]||key),
-      content: (v||'').toString(),
-      visibleGroups: (homeBlocksCache && homeBlocksCache[key] && homeBlocksCache[key].visibleGroups) ? homeBlocksCache[key].visibleGroups : ''
-    });
-    await loadHomeBlocks();
-    Swal.fire({ icon:'success', title:'Kaydedildi', timer:1100, showConfirmButton:false });
-  }catch(e){
-    Swal.fire('Hata', (e && e.message) ? e.message : 'Kaydedilemedi', 'error');
-  }
-}
-// -------------------- /HomeBlocks --------------------
 
 // LocAdmin panel
 function openMenuPermissions(){
@@ -613,11 +518,12 @@ function girisYap() {
     document.querySelector('.login-btn').disabled = true;
     
     const hashedPass = CryptoJS.SHA256(uPass).toString();
-    fetchJsonWithRetry(SCRIPT_URL, {
+    fetch(SCRIPT_URL, {
         method: 'POST',
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({ action: "login", username: uName, password: hashedPass })
-    }, 3).then(data => {
+    }).then(response => response.json())
+    .then(data => {
         loadingMsg.style.display = "none";
         document.querySelector('.login-btn').disabled = false;
         
@@ -668,7 +574,7 @@ function girisYap() {
     }).catch(error => {
         loadingMsg.style.display = "none";
         document.querySelector('.login-btn').disabled = false;
-        errorMsg.innerText = "Bağlantı sorunu! Lütfen tekrar deneyin.";
+        errorMsg.innerText = "Sunucu hatası! Lütfen sayfayı yenileyin.";
         errorMsg.style.display = "block";
     });
 }
@@ -789,21 +695,20 @@ function loadContentData() {
         document.getElementById('loading').style.display = 'none';
         if (data.result === "success") {
             const rawData = data.data;
-            const __decAll = (s)=> (s ?? '').toString().replace(/\\u003c/g,'<').replace(/\\u003e/g,'>').replace(/\\u0026/g,'&').replace(/\\n/g,'\n');
             database = rawData.filter(i => ['card','bilgi','teknik','kampanya','ikna'].includes(i.Type.toLowerCase())).map(i => ({
-                title: i.Title, category: i.Category, text: __decAll(i.Text), script: __decAll(i.Script), code: __decAll(i.Code), link: __decAll(i.Link), date: formatDateToDDMMYYYY(i.Date)
+                title: i.Title, category: i.Category, text: i.Text, script: i.Script, code: i.Code, link: i.Link, date: formatDateToDDMMYYYY(i.Date)
             }));
             // Yeni eklenenleri üstte göstermek için tarihe göre (azalan) sırala
             database.sort((a,b) => parseDateTRToTS(b.date) - parseDateTRToTS(a.date));
             newsData = rawData.filter(i => i.Type.toLowerCase() === 'news').map(i => ({
-                date: formatDateToDDMMYYYY(i.Date), title: i.Title, desc: __decAll(i.Text), type: i.Category, status: i.Status
+                date: formatDateToDDMMYYYY(i.Date), title: i.Title, desc: i.Text, type: i.Category, status: i.Status
             }));
             sportsData = rawData.filter(i => i.Type.toLowerCase() === 'sport').map(i => ({
-                title: i.Title, icon: i.Icon, desc: __decAll(i.Text), tip: __decAll(i.Tip), detail: __decAll(i.Detail), pronunciation: __decAll(i.Pronunciation)
+                title: i.Title, icon: i.Icon, desc: i.Text, tip: i.Tip, detail: i.Detail, pronunciation: i.Pronunciation
             }));
             try{ applySportsRights(); }catch(e){}
 
-            salesScripts = rawData.filter(i => i.Type.toLowerCase() === 'sales').map(i => ({ title: i.Title, text: __decAll(i.Text) }));
+            salesScripts = rawData.filter(i => i.Type.toLowerCase() === 'sales').map(i => ({ title: i.Title, text: i.Text }));
             quizQuestions = rawData.filter(i => i.Type.toLowerCase() === 'quiz').map(i => ({
                 q: i.Text, opts: i.QuizOptions ? i.QuizOptions.split(',').map(o => o.trim()) : [], a: parseInt(i.QuizAnswer)
             }));
@@ -971,29 +876,67 @@ function filterContent() {
     renderCards(filtered);
 }
 function showCardDetail(title, text) {
+    // Sheet kaynaklı içeriklerde "<br>", "\\u003cbr>" gibi kaçışlar olabiliyor.
+    // Güvenli şekilde (kısıtlı tag seti) HTML render etmek için normalize eder.
+    const normalizeRichTextToHtml = (raw)=>{
+        let s = (raw ?? '').toString();
+
+        // Bazı hücrelerde HTML entity olarak (&lt;br&gt; gibi) gelebiliyor. Önce çöz.
+        s = s
+          .replace(/&amp;/gi,'&')
+          .replace(/&lt;/gi,'<')
+          .replace(/&gt;/gi,'>');
+
+        // Sık görülen kaçışlar
+        s = s
+          // "\u003cbr>" gibi literal kaçışları gerçek tag'e çevir
+          .replace(/\\u003cbr\\u003e/gi, '<br>')
+          .replace(/\\u003cbr\s*\\/\\u003e/gi, '<br>')
+          .replace(/\\u003c\s*br\s*\\u003e/gi, '<br>')
+          .replace(/\\u003c\s*br\s*\\/\\u003e/gi, '<br>')
+          .replace(/\\u003c/gi,'<')
+          .replace(/\\u003e/gi,'>')
+          // literal \n -> gerçek newline
+          .replace(/\\n/g, '\n');
+
+        // HTML br taglerini newline'a çevirip güvenli escape uygula
+        const toNewline = s.replace(/<\s*br\s*\/?\s*>/gi, '\n');
+        let escaped = escapeHtml(toNewline);
+
+        // Sadece güvenli birkaç tag'i geri aç (atribütsüz)
+        escaped = escaped
+          .replace(/&lt;br\s*\/?&gt;/gi, '<br>')
+          .replace(/&lt;\s*b\s*&gt;/gi, '<b>')
+          .replace(/&lt;\s*\/\s*b\s*&gt;/gi, '</b>')
+          .replace(/&lt;\s*strong\s*&gt;/gi, '<strong>')
+          .replace(/&lt;\s*\/\s*strong\s*&gt;/gi, '</strong>')
+          .replace(/&lt;\s*i\s*&gt;/gi, '<i>')
+          .replace(/&lt;\s*\/\s*i\s*&gt;/gi, '</i>')
+          .replace(/&lt;\s*em\s*&gt;/gi, '<em>')
+          .replace(/&lt;\s*\/\s*em\s*&gt;/gi, '</em>')
+          .replace(/&lt;\s*u\s*&gt;/gi, '<u>')
+          .replace(/&lt;\s*\/\s*u\s*&gt;/gi, '</u>');
+
+        // newline'ları br'e çevir
+        return escaped.replace(/\n/g,'<br>');
+    };
+
     // Geriye dönük uyumluluk: showCardDetail(cardObj) çağrısını da destekle
     if (title && typeof title === 'object') {
         const c = title;
         const t = c.title || c.name || 'Detay';
         const body = (c.text || c.desc || '').toString();
         const script = (c.script || '').toString();
-        const __dec = (s)=> (s ?? '').toString()
-          .replace(/\\u003c/g,'<')
-          .replace(/\\u003e/g,'>')
-          .replace(/\\u0026/g,'&')
-          .replace(/\\n/g,'\n');
-        const bodyNorm = __dec(body).replace(/<br\s*\/?>/gi,'\n');
-        const scriptNorm = __dec(script).replace(/<br\s*\/?>/gi,'\n');
         const alertTxt = (c.alert || '').toString();
         const link = (c.link || '').toString();
         const html = `
           <div style="text-align:left; font-size:1rem; line-height:1.6; white-space:pre-line;">
-            ${sanitizeBasicHtml(bodyNorm).replace(/\n/g,'<br>')}
+            ${normalizeRichTextToHtml(body)}
             ${link ? `<div style="margin-top:12px"><a href="${escapeHtml(link)}" target="_blank" rel="noreferrer" style="font-weight:800;color:var(--info);text-decoration:none"><i class=\"fas fa-link\"></i> Link</a></div>` : ''}
             ${script ? `<div class="tech-script-box" style="margin-top:12px">
-                <span class="tech-script-label">Müşteriye iletilecek:</span>${escapeHtml(scriptNorm).replace(/\n/g,'<br>')}
+                <span class="tech-script-label">Müşteriye iletilecek:</span>${normalizeRichTextToHtml(script)}
               </div>` : ''}
-            ${alertTxt ? `<div class="tech-alert" style="margin-top:12px">${escapeHtml(alertTxt).replace(/\n/g,'<br>')}</div>` : ''}
+            ${alertTxt ? `<div class="tech-alert" style="margin-top:12px">${normalizeRichTextToHtml(alertTxt)}</div>` : ''}
           </div>`;
         Swal.fire({ title: t, html, showCloseButton: true, showConfirmButton: false, width: '820px', background: '#f8f9fa' });
         return;
@@ -1002,7 +945,7 @@ function showCardDetail(title, text) {
     const safeText = (text ?? '').toString();
     Swal.fire({
         title: title,
-        html: `<div style="text-align:left; font-size:1rem; line-height:1.6;">${escapeHtml(safeText).replace(/\n/g,'<br>')}</div>`,
+        html: `<div style="text-align:left; font-size:1rem; line-height:1.6;">${normalizeRichTextToHtml(safeText)}</div>`,
         showCloseButton: true, showConfirmButton: false, width: '600px', background: '#f8f9fa'
     });
 }
@@ -1324,7 +1267,20 @@ function openNews() {
 // ✅ Yayın Akışı (E-Tablo'dan)
 // =========================
 async function fetchBroadcastFlow() {
-    const d = await apiCall('getBroadcastFlow', {});
+    const r = await fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+            action: "getBroadcastFlow",
+            username: (typeof currentUser !== "undefined" ? currentUser : ""),
+            token: (typeof getToken === "function" ? getToken() : "")
+        })
+    });
+
+    const d = await r.json();
+    if (!d || d.result !== "success") {
+        throw new Error((d && d.message) ? d.message : "Yayın akışı alınamadı.");
+    }
     return d.items || [];
 }
 
@@ -1478,15 +1434,7 @@ async function openBroadcastFlow() {
     });
 
   } catch (err) {
-    const msg = (err && err.message) ? err.message : "Yayın akışı alınamadı.";
-    Swal.fire({
-      icon: 'error',
-      title: 'Bağlantı sorunu',
-      html: `<div style="text-align:left;line-height:1.6">${escapeHtml(msg)}<br><br>İstersen tekrar deneyebilirim.</div>`,
-      showCancelButton: true,
-      confirmButtonText: 'Tekrar Dene',
-      cancelButtonText: 'Kapat'
-    }).then(r=>{ if(r.isConfirmed) openBroadcastFlow(); });
+    Swal.fire("Hata", err?.message || "Yayın akışı alınamadı.", "error");
   }
 }
 
@@ -1517,6 +1465,26 @@ function _formatBroadcastDateTr(it) {
     return s; // en kötü haliyle göster
 }
 
+
+function sanitizeAllowBasicTags(str){
+    // İçerikler Google Sheet'ten geldiği için bazen \u003cbr\u003e gibi double-escape olur.
+    let s = String(str ?? "");
+    // unicode escape'leri çöz
+    s = s.replace(/\\u003c/g, "<").replace(/\\u003e/g, ">").replace(/\\n/g, "\n");
+    // önce komple escape et
+    s = escapeHtml(s);
+    // izin verilen basit tag'leri geri aç
+    s = s.replaceAll("&lt;br&gt;", "<br>")
+         .replaceAll("&lt;br/&gt;", "<br>")
+         .replaceAll("&lt;br /&gt;", "<br>")
+         .replaceAll("&lt;b&gt;", "<b>")
+         .replaceAll("&lt;/b&gt;", "</b>");
+    // newline'ları br yap
+    s = s.replace(/\n/g, "<br>");
+    return s;
+}
+
+
 function escapeHtml(str) {
     return String(str ?? "")
         .replaceAll("&", "&amp;")
@@ -1524,41 +1492,6 @@ function escapeHtml(str) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
-}
-
-// Basit HTML allowlist (b, strong, i, em, u, br, ul/ol/li, a)
-// Kampanya/teknik detaylarında <b>...</b> gibi etiketlerin düz metin olarak görünmesini engeller.
-function sanitizeBasicHtml(input){
-  let html = (input ?? '').toString();
-  // script/style bloklarını tamamen kaldır
-  html = html
-    .replace(/<\s*script[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi, '')
-    .replace(/<\s*style[^>]*>[\s\S]*?<\s*\/\s*style\s*>/gi, '');
-
-  // event handler attribute'larını kaldır
-  html = html
-    .replace(/\s+on\w+\s*=\s*"[^"]*"/gi, '')
-    .replace(/\s+on\w+\s*=\s*'[^']*'/gi, '')
-    .replace(/\s+on\w+\s*=\s*[^\s>]+/gi, '');
-
-  // javascript: linklerini temizle
-  html = html.replace(/href\s*=\s*"\s*javascript:[^"]*"/gi, 'href="#"');
-  html = html.replace(/href\s*=\s*'\s*javascript:[^']*'/gi, "href='#'");
-
-  // allowlist dışındaki tag'leri kaldır
-  html = html.replace(/<(?!\/?(b|strong|i|em|u|br|ul|ol|li|a)(\s|\/|>))[^>]+>/gi, '');
-
-  // <a> tag'lerinde sadece href/target/rel kalsın
-  html = html.replace(/<a\s+([^>]+)>/gi, (m, attrs)=>{
-    let href = (attrs.match(/href\s*=\s*"([^"]*)"/i) || attrs.match(/href\s*=\s*'([^']*)'/i) || [null,''])[1] || '#';
-    let target = (attrs.match(/target\s*=\s*"([^"]*)"/i) || attrs.match(/target\s*=\s*'([^']*)'/i) || [null,''])[1] || '_blank';
-    // güvenli varsayılanlar
-    if(!href) href = '#';
-    if(/^\s*javascript:/i.test(href)) href = '#';
-    return `<a href="${escapeHtml(href)}" target="${escapeHtml(target)}" rel="noreferrer">`;
-  });
-
-  return html;
 }
 
 function openGuide() {
@@ -3806,9 +3739,17 @@ function hideHomeScreen(){
 }
 
 function renderHomePanels(){
-    // HomeBlocks (quote/today/ann) sheet'ten çek
-    if(!homeBlocksCache){ try{ loadHomeBlocks(); }catch(e){} }
-
+    // HomeBlocks (quote vb.) sheet'ten çekilip localStorage'a yazılır
+    // Render sırasında gecikme olmasın diye async çağırıp geldiğinde tekrar boyarız.
+    loadHomeBlocks().then(()=>{
+        try{
+            const quoteEl2 = document.getElementById('home-quote');
+            if(quoteEl2){
+                const q2 = (localStorage.getItem('homeQuote') || '').trim();
+                quoteEl2.innerHTML = q2 ? escapeHtml(q2) : '<span style="color:#999">Bugün için bir söz eklenmemiş.</span>';
+            }
+        }catch(e){}
+    });
     // --- BUGÜN NELER VAR? (Yayın Akışı / bugünün maçları) ---
     const todayEl = document.getElementById('home-today');
     if(todayEl){
@@ -3854,7 +3795,7 @@ function renderHomePanels(){
                         const title = escapeHtml(it.match || it.title || it.event || '');
                         const ch = escapeHtml(it.channel || it.platform || '');
                         const league = escapeHtml(it.league || it.category || '');
-                        const spk = escapeHtml(it.announcer || it.spiker || it.spikers || it.commentator || it.commentators || '');
+                        const spk = escapeHtml(it.spiker || it.spikers || it.commentator || it.commentators || '');
                         return `
                           <div class="home-mini-item">
                             <div class="home-mini-date">${time}${league?` • ${league}`:''}${ch?` • ${ch}`:''}</div>
@@ -3864,6 +3805,71 @@ function renderHomePanels(){
                         `;
                     }).join('') + (todays.length>shown.length ? `<div style="color:#666;font-size:.9rem;margin-top:6px">+${todays.length-shown.length} maç daha…</div>` : '');
                 }
+
+async function loadHomeBlocks(){
+    if(!SCRIPT_URL) return {};
+    try{
+        const res = await fetch(SCRIPT_URL, {
+            method:'POST',
+            headers:{"Content-Type":"text/plain;charset=utf-8"},
+            body: JSON.stringify({ action:'getHomeBlocks', username: currentUser, token: getToken() })
+        });
+        const data = await res.json();
+        if(data.result !== 'success') throw new Error(data.message||'getHomeBlocks failed');
+        const blocks = data.blocks || {};
+
+        // local cache
+        if(blocks.quote && typeof blocks.quote.content !== 'undefined'){
+            localStorage.setItem('homeQuote', String(blocks.quote.content||''));
+        }
+        return blocks;
+    }catch(e){
+        console.warn('[HOME BLOCKS]', e);
+        return {};
+    }
+}
+
+async function editHomeBlock(kind){
+    if(!isAdminMode){
+        Swal.fire("Yetkisiz", "Bu işlem için admin yetkisi gerekli.", "warning");
+        return;
+    }
+    if(kind !== 'quote'){
+        Swal.fire("Bilgi", "Bu alan artık otomatik güncelleniyor.", "info");
+        return;
+    }
+    // önce sheet'ten çek (varsa)
+    await loadHomeBlocks();
+    const cur = (localStorage.getItem('homeQuote') || '').trim();
+    const res = await Swal.fire({
+        title: "Günün Sözü",
+        input: "textarea",
+        inputValue: cur,
+        inputPlaceholder: "Bugünün sözünü yaz…",
+        showCancelButton: true,
+        confirmButtonText: "Kaydet",
+        cancelButtonText: "Vazgeç",
+        preConfirm: (val)=> (val||'').trim()
+    });
+    if(!res.isConfirmed) return;
+    const newVal = (res.value||'').trim();
+    Swal.fire({ title:'Kaydediliyor...', didOpen:()=>Swal.showLoading(), showConfirmButton:false });
+    try{
+        const r = await fetch(SCRIPT_URL, {
+            method:'POST',
+            headers:{"Content-Type":"text/plain;charset=utf-8"},
+            body: JSON.stringify({ action:'updateHomeBlock', username: currentUser, token: getToken(), key:'quote', title:'Günün Sözü', content: newVal, visibleGroups:'' })
+        });
+        const d = await r.json();
+        if(d.result !== 'success') throw new Error(d.message||'updateHomeBlock failed');
+        localStorage.setItem('homeQuote', newVal);
+        renderHomePanels();
+        Swal.fire("Kaydedildi", "Günün sözü güncellendi.", "success");
+    }catch(e){
+        Swal.fire('Hata', 'Kaydedilemedi: ' + (e.message||'Sunucu hatası'), 'error');
+    }
+}
+
                 // kartı tıklayınca yayın akışına git
                 const card = todayEl.closest('.home-card');
                 if(card){
@@ -3898,8 +3904,25 @@ function renderHomePanels(){
         }
     }
 
-    // HomeBlocks (Günün Sözü vb.) render
-    try{ renderHomeBlocks(); }catch(e){}
+    // --- GÜNÜN SÖZÜ ---
+    const quoteEl = document.getElementById('home-quote');
+    if(quoteEl){
+        const q = (localStorage.getItem('homeQuote') || '').trim();
+        quoteEl.innerHTML = q ? escapeHtml(q) : '<span style="color:#999">Bugün için bir söz eklenmemiş.</span>';
+    }
+
+    // Admin: edit butonlarını aç
+    try{
+        const b1 = document.getElementById('home-edit-today');
+        const b2 = document.getElementById('home-edit-ann');
+        const b3 = document.getElementById('home-edit-quote');
+        if(b1) b1.style.display = 'none'; // artık dinamik
+        if(b2) b2.style.display = 'none'; // duyuru dinamik
+        if(b3){
+            b3.style.display = (isAdminMode && isEditingActive ? 'inline-flex' : 'none');
+            b3.onclick = (e)=>{ try{ e.stopPropagation(); }catch(_){ } editHomeBlock('quote'); };
+        }
+    }catch(e){}
 }
 
 // Kart detayını doğrudan açmak için küçük bir yardımcı
@@ -3918,11 +3941,12 @@ function safeGetToken(){
 }
 async function fetchSheetObjects(actionName){
     const payload = { action: actionName, username: (currentUser||''), token: safeGetToken() };
-    const d = await fetchJsonWithRetry(SCRIPT_URL, {
+    const r = await fetch(SCRIPT_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload)
-    }, 3);
+    });
+    const d = await r.json();
     if(!d || d.result !== "success") throw new Error((d && d.message) ? d.message : "Veri alınamadı.");
     // backend handleFetchData returns {data:[...]} ; other handlers may use {items:[...]}
     return d.data || d.items || [];
@@ -3943,13 +3967,6 @@ async function openTelesalesArea(){
     wrap.style.display = 'flex';
     document.body.classList.add('fs-open');
     document.body.style.overflow='hidden';
-
-    // İlk açılışta "geç geliyor" algısını azalt: kısa bir süre global veri bariyerini bekle
-    try{
-        if(window.__dataLoadedPromise){
-            await Promise.race([window.__dataLoadedPromise, _sleep(1200)]);
-        }
-    }catch(e){}
 
     // Sidebar profil
     const av = document.getElementById('t-side-avatar');
@@ -3986,9 +4003,6 @@ async function openTelesalesArea(){
     renderTelesalesDataOffers();
     renderTelesalesScripts();
     switchTelesalesTab('data');
-    // HomeBlocks render (quote edit buttons vb.)
-    renderHomeBlocks();
-
 }
 
 function closeFullTelesales(){
@@ -5005,13 +5019,25 @@ function __normalizeTechTab(tab){
 }
 function __normalizeTechCategory(cat){
   const c = (cat||"").toString().trim().toLowerCase();
-  if(['broadcast','access','app','activation','info'].includes(c)) return c;
+  // Yeni eklemelerde yanlışlıkla internal key yazılmışsa da tolere et
+  if(c === 'broadcast' || c === 'access' || c === 'app' || c === 'activation' || c === 'info') return c;
   if(c.startsWith("yay")) return "broadcast";
   if(c.startsWith("eri")) return "access";
   if(c.startsWith("app")) return "app";
   if(c.startsWith("akt")) return "activation";
   if(c.startsWith("bil")) return "info";
   return "";
+}
+
+function __techTabToSheetKategori(tabKey){
+  switch(String(tabKey||'').toLowerCase()){
+    case 'broadcast': return 'Yayın';
+    case 'access': return 'Erişim';
+    case 'app': return 'App Hataları';
+    case 'activation': return 'Aktivasyon';
+    case 'info': return 'Bilgi';
+    default: return String(tabKey||'');
+  }
 }
 
 async function __fetchTechDocs(){
@@ -5158,20 +5184,18 @@ async function filterTechDocList(tabKey){
 }
 
 // ---------------------------
-function __techTabToLabel(tabKey){
-  const k = (tabKey||'').toString().trim().toLowerCase();
-  if(k==='broadcast') return 'Yayın';
-  if(k==='access') return 'Erişim';
-  if(k==='app') return 'App Hataları';
-  if(k==='activation') return 'Aktivasyon';
-  if(k==='info') return 'Bilgi';
-  return tabKey;
-}
-
 // TECH DOCS (Sheet) - Admin CRUD
 // ---------------------------
 async function addTechDoc(tabKey){
   if(!isAdminMode) return;
+  const tabToSheet = (k)=>{
+    if(k==='broadcast') return 'Yayın';
+    if(k==='access') return 'Erişim';
+    if(k==='app') return 'App Hataları';
+    if(k==='activation') return 'Aktivasyon';
+    if(k==='info') return 'Bilgi';
+    return k;
+  };
   const { value: v } = await Swal.fire({
     title: 'Teknik Konu Ekle',
     html: `
@@ -5188,7 +5212,8 @@ async function addTechDoc(tabKey){
       const title = (document.getElementById('td-title').value||'').trim();
       if(!title) return Swal.showValidationMessage('Başlık zorunlu');
       return {
-        kategori: __techTabToLabel(tabKey),
+        // Sheet tarafında Kategori TR isimlerle tutuluyor
+        kategori: tabToSheet(tabKey),
         baslik: title,
         icerik: (document.getElementById('td-content').value||'').trim(),
         adim: (document.getElementById('td-step').value||'').trim(),
@@ -5222,6 +5247,14 @@ async function addTechDoc(tabKey){
 
 async function editTechDoc(tabKey, baslik){
   if(!isAdminMode) return;
+  const tabToSheet = (k)=>{
+    if(k==='broadcast') return 'Yayın';
+    if(k==='access') return 'Erişim';
+    if(k==='app') return 'App Hataları';
+    if(k==='activation') return 'Aktivasyon';
+    if(k==='info') return 'Bilgi';
+    return k;
+  };
   const all = await loadTechDocsIfNeeded(false);
   const it = all.find(x=>x.categoryKey===tabKey && (x.baslik||'')===baslik);
   if(!it) return;
@@ -5241,7 +5274,7 @@ async function editTechDoc(tabKey, baslik){
       const title = (document.getElementById('td-title').value||'').trim();
       if(!title) return Swal.showValidationMessage('Başlık zorunlu');
       return {
-        kategori: __techTabToLabel(tabKey),
+        kategori: tabToSheet(tabKey),
         baslik: title,
         icerik: (document.getElementById('td-content').value||'').trim(),
         adim: (document.getElementById('td-step').value||'').trim(),
@@ -5258,7 +5291,8 @@ async function editTechDoc(tabKey, baslik){
     const r = await fetch(SCRIPT_URL, {
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ action:'upsertTechDoc', username: currentUser, token: getToken(), keyKategori: __techTabToLabel(tabKey), keyBaslik: baslik, ...v })
+      // Anahtarlar sheet değerleriyle eşleşmeli
+      body: JSON.stringify({ action:'upsertTechDoc', username: currentUser, token: getToken(), keyKategori: tabToSheet(tabKey), keyBaslik: baslik, ...v })
     });
     const d = await r.json();
     if(d.result==='success'){
@@ -5275,6 +5309,14 @@ async function editTechDoc(tabKey, baslik){
 
 function deleteTechDoc(tabKey, baslik){
   if(!isAdminMode) return;
+  const tabToSheet = (k)=>{
+    if(k==='broadcast') return 'Yayın';
+    if(k==='access') return 'Erişim';
+    if(k==='app') return 'App Hataları';
+    if(k==='activation') return 'Aktivasyon';
+    if(k==='info') return 'Bilgi';
+    return k;
+  };
   Swal.fire({
     title:'Silinsin mi?',
     text:'Konu pasife alınacak.',
@@ -5288,7 +5330,7 @@ function deleteTechDoc(tabKey, baslik){
       const r = await fetch(SCRIPT_URL, {
         method:'POST',
         headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body: JSON.stringify({ action:'deleteTechDoc', username: currentUser, token: getToken(), keyKategori: __techTabToLabel(tabKey), keyBaslik: baslik })
+        body: JSON.stringify({ action:'deleteTechDoc', username: currentUser, token: getToken(), keyKategori: tabToSheet(tabKey), keyBaslik: baslik })
       });
       const d = await r.json();
       if(d.result==='success'){
