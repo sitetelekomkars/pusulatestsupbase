@@ -358,6 +358,13 @@ window.recalcTotalSliderScore = function() {
 };
 // --- YARDIMCI FONKSİYONLAR ---
 function getToken() { return localStorage.getItem("sSportToken"); }
+function setHomeWelcomeUser(name){
+  try{
+    const el = document.getElementById("home-welcome-user");
+    if(el) el.textContent = (name||"Misafir");
+  }catch(e){}
+}
+
 function getFavs() { return JSON.parse(localStorage.getItem('sSportFavs') || '[]'); }
 function toggleFavorite(title) {
     event.stopPropagation();
@@ -468,6 +475,7 @@ function checkSession() {
         currentUser = savedUser;
         document.getElementById("login-screen").style.display = "none";
         document.getElementById("user-display").innerText = currentUser;
+        setHomeWelcomeUser(currentUser);
 
         checkAdmin(savedRole);
 
@@ -544,6 +552,7 @@ function girisYap() {
             } else {
                 document.getElementById("login-screen").style.display = "none";
                 document.getElementById("user-display").innerText = currentUser;
+                setHomeWelcomeUser(currentUser);
                 const savedGroup = data.group || localStorage.getItem('sSportGroup') || '';
                 checkAdmin(savedRole);
                 startSessionTimer();
@@ -625,6 +634,8 @@ function checkAdmin(role) {
 }
 function logout() {
     currentUser = ""; isAdminMode = false; isEditingActive = false;
+    try{ document.getElementById("user-display").innerText = "Misafir"; }catch(e){}
+    setHomeWelcomeUser("Misafir");
     document.body.classList.remove('editing');
     localStorage.removeItem("sSportUser"); localStorage.removeItem("sSportToken"); localStorage.removeItem("sSportRole");
     if (sessionTimeout) clearTimeout(sessionTimeout);
@@ -916,6 +927,7 @@ function toggleEditMode() {
         btn.innerHTML = '<i class="fas fa-pen" style="color:var(--secondary);"></i> Düzenlemeyi Aç';
     }
     filterContent();
+    try{ if(currentCategory==='home') renderHomePanels(); }catch(e){}
     if(document.getElementById('guide-modal').style.display === 'flex') openGuide();
     if(document.getElementById('sales-modal').style.display === 'flex') openSales();
     if(document.getElementById('news-modal').style.display === 'flex') openNews();
@@ -3801,7 +3813,7 @@ function editHomeBlock(kind){
         const b3 = document.getElementById('home-edit-quote');
         if(b1) b1.style.display = 'none'; // artık dinamik
         if(b2) b2.style.display = 'none'; // duyuru dinamik
-        if(b3) b3.style.display = (isAdminMode ? 'inline-flex' : 'none');
+        if(b3) b3.style.display = (isAdminMode && isEditingActive ? 'inline-flex' : 'none');
     }catch(e){}
 }
 
