@@ -272,7 +272,7 @@ function getDisplayNameOf(u){
   u=String(u||'').trim();
   try{
     const found=(adminUserList||[]).find(x=>String(x.name||'').trim()===u);
-    return (found && (found.fullName||found.name)) ? String(found.fullName||found.name) : u;
+    return (found && (found.fullName||found.displayName||found.name)) ? String(found.fullName||found.displayName||found.name) : u;
   }catch(e){ return u; }
 }
 
@@ -845,7 +845,7 @@ function renderCards(data) {
         
         container.innerHTML += `<div class="card ${item.category}">${newBadge}
             <div class="icon-wrapper">${editIconHtml}<i class="${favClass} fav-icon" onclick="toggleFavorite('${safeTitle}')"></i></div>
-            <div class="card-header"><h3 class="card-title">${highlightText(item.title)}</h3><span class="badge">${item.category}</span></div>
+            <div class="card-header"><h3 class="card-title">${highlightText(item.title)}</h3><span class="badge">${getDisplayNameOf(item.category)}</span></div>
             <div class="card-content" onclick="showCardDetail('${safeTitle}', '${escapeForJsString(item.text)}')">
                 <div class="card-text-truncate">${highlightText(formattedText)}</div>
                 <div style="font-size:0.8rem; color:#999; margin-top:5px; text-align:right;">(Tamamını oku)</div>
@@ -1283,7 +1283,7 @@ function openNews() {
         let passiveStyle = i.status === 'Pasif' ? 'opacity:0.5; background:#eee;' : '';
         let passiveBadge = i.status === 'Pasif' ? '<span class="news-tag" style="background:#555; color:white;">PASİF</span>' : '';
         let editBtn = (isAdminMode && isEditingActive) ? `<i class="fas fa-pencil-alt edit-icon" style="top:0; right:0; font-size:0.9rem; padding:4px;" onclick="event.stopPropagation(); editNews(${index})"></i>` : '';
-        c.innerHTML += `<div class="news-item" style="${passiveStyle}">${editBtn}<span class="news-date">${i.date}</span><span class="news-title">${i.title} ${passiveBadge}</span><div class="news-desc">${i.desc}</div><span class="news-tag ${cl}">${tx}</span></div>`;
+        c.innerHTML += `<div class="news-item" style="${passiveStyle}">${editBtn}<span class="news-date">${i.date}</span><span class="news-title">${i.title} ${passiveBadge}</span><div class="news-desc">${i.desc}</div><span class="news-tag ${cl}">${getDisplayNameOf(tx)}</span></div>`;
     });
 }
 
@@ -1898,7 +1898,7 @@ function fetchLeaderboard() {
             html = '<tr><td colspan="4" style="text-align:center;">Henüz maç yapılmadı.</td></tr>';
         } else {
             data.leaderboard.forEach((u, i) => {
-                const medal = i===0 ? '🥇' : (i===1 ? '🥈' : (i===2 ? '🥉' : `<span class="rank-badge">${i+1}</span>`));
+                const medal = i===0 ? '🥇' : (i===1 ? '🥈' : (i===2 ? '🥉' : `<span class="rank-badge">${getDisplayNameOf(i+1)}</span>`));
                 const bgStyle = (u.username === currentUser) ? 'background:rgba(250, 187, 0, 0.1);' : '';
                 html += `<tr style="${bgStyle}"><td>${medal}</td><td>${u.username}</td><td>${u.games}</td><td>${u.average}</td></tr>`;
             });
@@ -2360,7 +2360,7 @@ function updateDashAgentList() {
     filteredUsers.forEach(u => {
         const opt = document.createElement('option');
         opt.value = u.name; 
-        opt.innerText = (u.fullName || u.name);
+        opt.innerText = (u.fullName || u.displayName || u.name);
         agentSelect.appendChild(opt);
     });
     
@@ -2951,7 +2951,7 @@ async function assignTrainingPopup() {
                 const agentSelect = document.getElementById('swal-t-agent');
                 agentSelect.style.display = val === 'Individual' ? 'block' : 'none';
                 if (val === 'Individual') {
-                    agentSelect.innerHTML = adminUserList.map(u => `<option value="${u.name}">${(u.fullName||u.name)}</option>`).join('');
+                    agentSelect.innerHTML = adminUserList.map(u => `<option value="${getDisplayNameOf(u.name)}">${getDisplayNameOf(u.name)}</option>`).join('');
                 }
             };
             updateTrainingTarget('Genel');
@@ -3091,7 +3091,7 @@ function loadFeedbackList() {
         listEl.innerHTML += `
             <div class="feedback-card" style="border-left-color: ${feedbackClass};">
                 <div class="feedback-header">
-                    <div style="font-weight:bold; color:#0e1b42; font-size:1.1rem;">${e.agent}</div>
+                    <div style="font-weight:bold; color:#0e1b42; font-size:1.1rem;">${getDisplayNameOf(e.agent)}</div>
                     <div class="feedback-info-right">
                         <span><i class="fas fa-user-check"></i> Değerleyen: ${e.evaluator}</span>
                         <span><i class="fas fa-id-badge"></i> Çağrı ID: ${cleanCallId}</span>
@@ -3254,7 +3254,7 @@ async function addManualFeedbackPopup() {
         confirmButtonText: '<i class="fas fa-save"></i> Kaydet',
         didOpen: () => {
             const sel = document.getElementById('manual-q-agent');
-            adminUserList.forEach(u => sel.innerHTML += `<option value="${u.name}">${(u.fullName||u.name)}</option>`);
+            adminUserList.forEach(u => sel.innerHTML += `<option value="${getDisplayNameOf(u.name)}">${getDisplayNameOf(u.name)}</option>`);
         },
         preConfirm: () => {
             const agentName = document.getElementById('manual-q-agent').value;
@@ -3473,7 +3473,7 @@ function updateAgentListBasedOnGroup() {
     } else {
         agentSelect.innerHTML = `<option value="all">-- Tüm Temsilciler --</option>`;
     }
-    filteredUsers.forEach(u => { const label = (u.fullName || u.name); agentSelect.innerHTML += `<option value="${u.name}">${label}</option>`; });
+    filteredUsers.forEach(u => { const label = (u.fullName || u.displayName || u.name); agentSelect.innerHTML += `<option value="${getDisplayNameOf(u.name)}">${label}</option>`; });
     fetchEvaluationsForAgent();
 }
 function fetchUserListForAdmin() {
@@ -3562,9 +3562,9 @@ async function logEvaluationPopup() {
             const fullText = escapeForJsString(c.text); 
             if (isChat) {
                 let mPts = parseInt(c.mediumScore) || 0; let bPts = parseInt(c.badScore) || 0;
-                criteriaFieldsHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span style="font-size:0.8rem;">Max: ${pts}</span></div><div class="criteria-controls"><div class="eval-button-group"><button class="eval-button eval-good active" data-score="${pts}" onclick="setButtonScore(${i}, ${pts}, ${pts})">İyi (${pts})</button>${mPts > 0 ? `<button class="eval-button eval-medium" data-score="${mPts}" onclick="setButtonScore(${i}, ${mPts}, ${pts})">Orta (${mPts})</button>` : ''}${bPts > 0 ? `<button class="eval-button eval-bad" data-score="${bPts}" onclick="setButtonScore(${i}, ${bPts}, ${pts})">Kötü (${bPts})</button>` : ''}</div><span class="score-badge" id="badge-${i}" style="margin-top:8px; display:block; background:#2e7d32;">${pts}</span></div><input type="text" id="note-${i}" class="note-input" placeholder="Not..." style="display:none;"></div>`;
+                criteriaFieldsHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span style="font-size:0.8rem;">Max: ${pts}</span></div><div class="criteria-controls"><div class="eval-button-group"><button class="eval-button eval-good active" data-score="${pts}" onclick="setButtonScore(${i}, ${pts}, ${pts})">İyi (${pts})</button>${mPts > 0 ? `<button class="eval-button eval-medium" data-score="${mPts}" onclick="setButtonScore(${i}, ${mPts}, ${pts})">Orta (${mPts})</button>` : ''}${bPts > 0 ? `<button class="eval-button eval-bad" data-score="${bPts}" onclick="setButtonScore(${i}, ${bPts}, ${pts})">Kötü (${bPts})</button>` : ''}</div><span class="score-badge" id="badge-${i}" style="margin-top:8px; display:block; background:#2e7d32;">${getDisplayNameOf(pts)}</span></div><input type="text" id="note-${i}" class="note-input" placeholder="Not..." style="display:none;"></div>`;
             } else if (isTelesatis) {
-                 criteriaFieldsHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span>Max: ${pts}</span></div><div class="criteria-controls" style="display:flex; align-items:center; gap:15px; background:#f9f9f9;"><input type="range" class="custom-range slider-input" id="slider-${i}" min="0" max="${pts}" value="${pts}" data-index="${i}" oninput="updateRowSliderScore(${i}, ${pts})" style="flex-grow:1;"><span class="score-badge" id="badge-${i}" style="background:#2e7d32;">${pts}</span></div><input type="text" id="note-${i}" class="note-input" placeholder="Not..." style="display:none;"></div>`;
+                 criteriaFieldsHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span>Max: ${pts}</span></div><div class="criteria-controls" style="display:flex; align-items:center; gap:15px; background:#f9f9f9;"><input type="range" class="custom-range slider-input" id="slider-${i}" min="0" max="${pts}" value="${pts}" data-index="${i}" oninput="updateRowSliderScore(${i}, ${pts})" style="flex-grow:1;"><span class="score-badge" id="badge-${i}" style="background:#2e7d32;">${getDisplayNameOf(pts)}</span></div><input type="text" id="note-${i}" class="note-input" placeholder="Not..." style="display:none;"></div>`;
             }
         });
         criteriaFieldsHtml += `</div>`;
@@ -3672,9 +3672,9 @@ async function editEvaluation(targetCallId) {
             if (isChat) {
                 let gAct = cVal === pts ? 'active' : ''; let mAct = (cVal===mPts && mPts!==0) ? 'active' : ''; let bAct = (cVal===bPts && bPts!==0) ? 'active' : '';
                 if(cVal===0 && bPts===0) bAct = 'active'; else if (cVal===0 && bPts>0) { gAct=''; mAct=''; bAct=''; }
-                contentHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span>Max: ${pts}</span></div><div class="criteria-controls"><div class="eval-button-group"><button class="eval-button eval-good ${gAct}" data-score="${pts}" onclick="setButtonScore(${i}, ${pts}, ${pts})">İyi</button>${mPts>0?`<button class="eval-button eval-medium ${mAct}" data-score="${mPts}" onclick="setButtonScore(${i}, ${mPts}, ${pts})">Orta</button>`:''}${bPts>0?`<button class="eval-button eval-bad ${bAct}" data-score="${bPts}" onclick="setButtonScore(${i}, ${bPts}, ${pts})">Kötü</button>`:''}</div><span class="score-badge" id="badge-${i}">${cVal}</span></div><input type="text" id="note-${i}" class="note-input" value="${cNote}" style="display:${cVal<pts?'block':'none'}"></div>`;
+                contentHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span>Max: ${pts}</span></div><div class="criteria-controls"><div class="eval-button-group"><button class="eval-button eval-good ${gAct}" data-score="${pts}" onclick="setButtonScore(${i}, ${pts}, ${pts})">İyi</button>${mPts>0?`<button class="eval-button eval-medium ${mAct}" data-score="${mPts}" onclick="setButtonScore(${i}, ${mPts}, ${pts})">Orta</button>`:''}${bPts>0?`<button class="eval-button eval-bad ${bAct}" data-score="${bPts}" onclick="setButtonScore(${i}, ${bPts}, ${pts})">Kötü</button>`:''}</div><span class="score-badge" id="badge-${i}">${getDisplayNameOf(cVal)}</span></div><input type="text" id="note-${i}" class="note-input" value="${cNote}" style="display:${cVal<pts?'block':'none'}"></div>`;
             } else if (isTelesatis) {
-                contentHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span>Max: ${pts}</span></div><div class="criteria-controls" style="display:flex; background:#f9f9f9;"><input type="range" class="custom-range slider-input" id="slider-${i}" min="0" max="${pts}" value="${cVal}" data-index="${i}" oninput="updateRowSliderScore(${i}, ${pts})" style="flex-grow:1;"><span class="score-badge" id="badge-${i}">${cVal}</span></div><input type="text" id="note-${i}" class="note-input" value="${cNote}" style="display:${cVal<pts?'block':'none'}"></div>`;
+                contentHtml += `<div class="criteria-row" id="row-${i}" data-max-score="${pts}"><div class="criteria-header"><span title="${fullText}">${i+1}. ${c.text}</span><span>Max: ${pts}</span></div><div class="criteria-controls" style="display:flex; background:#f9f9f9;"><input type="range" class="custom-range slider-input" id="slider-${i}" min="0" max="${pts}" value="${cVal}" data-index="${i}" oninput="updateRowSliderScore(${i}, ${pts})" style="flex-grow:1;"><span class="score-badge" id="badge-${i}">${getDisplayNameOf(cVal)}</span></div><input type="text" id="note-${i}" class="note-input" value="${cNote}" style="display:${cVal<pts?'block':'none'}"></div>`;
             }
         });
         contentHtml += `</div>`;
@@ -4671,7 +4671,7 @@ function renderTechList(targetId, list, showCategory=false){
     el.innerHTML = list.map((c)=>`
       <div class="news-item" style="cursor:pointer" onclick="showCardDetail(${JSON.stringify(c).replace(/</g,'\u003c')})">
         <span class="news-title">${escapeHtml(c.title||'')}</span>
-        ${showCategory ? `<span class="news-tag" style="background:#eef2ff;color:#2b3a8a;border:1px solid #dde3ff">${escapeHtml(c.category||'')}</span>`:''}
+        ${showCategory ? `<span class="news-tag" style="background:#eef2ff;color:#2b3a8a;border:1px solid #dde3ff">${getDisplayNameOf(escapeHtml(c.category||''))}</span>`:''}
         <div class="news-desc" style="white-space:pre-line">${escapeHtml(c.text||'')}</div>
         ${c.script ? `<div class="script-box" style="margin-top:10px"><b>Script:</b><div style="margin-top:6px;white-space:pre-line">${escapeHtml(c.script||'')}</div><div style="text-align:right;margin-top:10px"><button class="btn btn-copy" onclick="event.stopPropagation(); copyText('${escapeForJsString(c.script||'')}')">Kopyala</button></div></div>`:''}
       </div>
