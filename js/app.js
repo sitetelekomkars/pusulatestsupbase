@@ -2598,67 +2598,265 @@ async function fetchEvaluationsForDashboard() {
         allEvaluationsData = [];
     }
 }
+
 function loadQualityDashboard() {
     // Verileri çek (silent mode), veri gelince grafikleri çiz
     fetchEvaluationsForDashboard().then(() => {
         const monthSelect = document.getElementById('q-dash-month');
         const groupSelect = document.getElementById('q-dash-group');
         const agentSelect = document.getElementById('q-dash-agent');
+        const compareWrap = document.getElementById('q-dash-compare-wrap');
+        const compareCheckbox = document.getElementById('q-dash-compare');
+        const comparePanel = document.getElementById('q-compare-panel');
+
         const selectedMonth = monthSelect ? monthSelect.value : '';
         const selectedGroup = groupSelect ? groupSelect.value : 'all';
         const selectedAgent = agentSelect ? agentSelect.value : 'all';
-        
-        let filtered = allEvaluationsData.filter(e => {
-            const eDate = e.date.substring(3); // dd.MM.yyyy -> MM.yyyy
-            const matchMonth = (eDate === selectedMonth);
-            
-            let matchGroup = true;
-            let matchAgent = true;
-            // Admin filtreleme mantığı
-            if (isAdminMode) {
-                // Eğer veri içinde grup bilgisi varsa onu kullan, yoksa adminUserList'ten bakmak gerekir.
-                if (selectedGroup !== 'all') {
-                    if (e.group) {
-                        matchGroup = (e.group === selectedGroup);
-                    } else {
-                        const user = adminUserList.find(u => u.name === e.agent);
-                        matchGroup = (user && user.group === selectedGroup);
-                    }
-                }
-                
-                if (selectedAgent !== 'all' && e.agent !== selectedAgent) matchAgent = false;
-            } else {
-                // Admin değilse sadece kendi verisi
-                if(e.agent !== currentUser) matchAgent = false;
+
+        // Admin'e "Karşılaştır" toggle'ını göster
+        if (compareWrap) compareWrap.style.display = isAdminMode ? 'flex' : 'none';
+
+        // --- helpers ---
+        const isManualEval = (e) => !!(e && e.callId && String(e.callId).toUpperCase().startsWith('MANUEL-'));
+        const evalMonth = (e) => {
+            try { return String(e.date || '').substring(3); } catch (_) { return ''; }
+        };
+        const evalGroup = (e) => {
+            try {
+                if (e && e.group) return normalizeGroup(e.group);
+                const u = adminUserList.find(x => x.name === (e ? e.agent : ''));
+                return u ? normalizeGroup(u.group) : '';
+            } catch (_) { return ''; }
+        };
+
+        // --- Base filter: month + not manual ---
+        const base = allEvaluationsData.filter(e => evalMonth(e) === selectedMonth && !isManualEval(e));
+
+        // Admin compare mode: only when group=all & agent=all
+        const compareEnabled = !!(isAdminMode && selectedGroup === 'all' && selectedAgent === 'all' && compareCheckbox && compareCheckbox.checked);
+        if (comparePanel) comparePanel.style.display = compareEnabled ? 'grid' : 'none';
+
+        // --- dashboard main stats ---
+        let filtered = base;
+        if (isAdminMode && !compareEnabled) {
+            // Normal admin filters
+            if (selectedGroup !== 'all') {
+                filtered = filtered.filter(e => evalGroup(e) === normalizeGroup(selectedGroup));
             }
-            // MANUEL kayıtları dashboard'da gösterme
-            const isManual = e.callId && String(e.callId).toUpperCase().startsWith('MANUEL-');
-            return matchMonth && matchGroup && matchAgent && !isManual;
-        });
-        const total = filtered.reduce((acc, curr) => acc + (parseInt(curr.score)||0), 0);
+            if (selectedAgent !== 'all') {
+                filtered = filtered.filter(e => (e.agent === selectedAgent));
+            }
+        } else if (!isAdminMode) {
+            // Non-admin: only own
+            filtered = filtered.filter(e => e.agent === currentUser);
+        }
+
+        const total = filtered.reduce((acc, curr) => acc + (parseInt(curr.score) || 0), 0);
         const count = filtered.length;
         const avg = count > 0 ? (total / count).toFixed(1) : 0;
-        const targetHit = filtered.filter(e => e.score >= 90).length;
+        const targetHit = filtered.filter(e => (parseFloat(e.score) || 0) >= 90).length;
         const rate = count > 0 ? Math.round((targetHit / count) * 100) : 0;
+
         // UI Güncelle
-        document.getElementById('q-dash-score').innerText = avg;
-        document.getElementById('q-dash-count').innerText = count;
-        document.getElementById('q-dash-target').innerText = `%${rate}`;
-        
+        const elScore = document.getElementById('q-dash-score');
+        const elCount = document.getElementById('q-dash-count');
+        const elTarget = document.getElementById('q-dash-target');
+        if (elScore) elScore.innerText = avg;
+        if (elCount) elCount.innerText = count;
+        if (elTarget) elTarget.innerText = `%${rate}`;
+
         // Ring Chart Rengi
         const ring = document.getElementById('q-dash-ring');
         let color = '#2e7d32';
-        if(avg < 70) color = '#d32f2f'; else if(avg < 85) color = '#ed6c02';
+        if (avg < 70) color = '#d32f2f';
+        else if (avg < 85) color = '#ed6c02';
         const ratio = (avg / 100) * 100;
-        if(ring) ring.style.background = `conic-gradient(${color} ${ratio}%, #eee ${ratio}%)`;
-        if(document.getElementById('q-dash-ring-text')) document.getElementById('q-dash-ring-text').innerText = Math.round(avg);
+        if (ring) ring.style.background = `conic-gradient(${color} ${ratio}%, #eee ${ratio}%)`;
+        const ringText = document.getElementById('q-dash-ring-text');
+        if (ringText) ringText.innerText = Math.round(avg);
         updateDashRingTitle();
-        // Admin için: temsilci ortalamaları
-        renderDashAgentScores(filtered);
-        // Grafik Çizdir
-        renderDashboardChart(filtered);
+
+        // Admin için: temsilci ortalamaları (compare modda da gösterelim; fakat kalabalık olmasın diye gizle)
+        if (compareEnabled) {
+            try {
+                const scoresEl = document.getElementById('q-dash-agent-scores');
+                if (scoresEl) scoresEl.style.display = 'none';
+            } catch (e) {}
+        } else {
+            renderDashAgentScores(filtered);
+        }
+
+        // Compare panel stats + compare chart
+        if (compareEnabled) {
+            const chatData = base.filter(e => evalGroup(e) === 'Chat');
+            const telData = base.filter(e => evalGroup(e) === 'Telesatış');
+
+            // update compare cards
+            setCompareCard('chat', chatData);
+            setCompareCard('tel', telData);
+
+            // Chart: criteria breakdown, Chat vs TeleSatış
+            renderDashboardChartCompare(chatData, telData);
+        } else {
+            // Grafik Çizdir
+            renderDashboardChart(filtered);
+        }
     });
 }
+
+function setCompareCard(prefix, data) {
+    const total = data.reduce((acc, curr) => acc + (parseInt(curr.score) || 0), 0);
+    const count = data.length;
+    const avg = count > 0 ? (total / count) : 0;
+    const hit = data.filter(e => (parseFloat(e.score) || 0) >= 90).length;
+    const rate = count > 0 ? Math.round((hit / count) * 100) : 0;
+
+    const idScore = document.getElementById(`q-cmp-${prefix}-score`);
+    const idCount = document.getElementById(`q-cmp-${prefix}-count`);
+    const idTarget = document.getElementById(`q-cmp-${prefix}-target`);
+    if (idScore) idScore.innerText = count ? avg.toFixed(1) : '0.0';
+    if (idCount) idCount.innerText = String(count);
+    if (idTarget) idTarget.innerText = `%${rate}`;
+
+    const ring = document.getElementById(`q-cmp-${prefix}-ring`);
+    const ringText = document.getElementById(`q-cmp-${prefix}-ring-text`);
+    let color = '#2e7d32';
+    if (avg < 70) color = '#d32f2f';
+    else if (avg < 85) color = '#ed6c02';
+    const ratio = Math.max(0, Math.min(100, avg));
+    if (ring) ring.style.background = `conic-gradient(${color} ${ratio}%, #eee ${ratio}%)`;
+    if (ringText) ringText.innerText = Math.round(avg || 0);
+}
+
+function renderDashboardChartCompare(chatData, telData) {
+    const ctx = document.getElementById('q-breakdown-chart');
+    if (!ctx) return;
+    if (dashboardChart) dashboardChart.destroy();
+
+    // Build question stats per dataset
+    const buildStats = (data) => {
+        const questionStats = {};
+        (data || []).forEach(item => {
+            try {
+                const details = safeParseDetails(item.details);
+                if (Array.isArray(details)) {
+                    details.forEach(d => {
+                        const qFullText = d.q || '';
+                        const qShortText = qFullText.length > 25 ? qFullText.substring(0, 25) + '...' : qFullText;
+                        if (!questionStats[qShortText]) {
+                            questionStats[qShortText] = { earned: 0, max: 0, fullText: qFullText };
+                        }
+                        questionStats[qShortText].earned += parseInt(d.score || 0);
+                        questionStats[qShortText].max += parseInt(d.max || 0);
+                    });
+                }
+            } catch (e) {}
+        });
+
+        const arr = Object.keys(questionStats).map(k => {
+            const s = questionStats[k];
+            const pct = s.max > 0 ? (s.earned / s.max) * 100 : 0;
+            return { label: k, fullLabel: s.fullText, value: pct };
+        });
+        // If no details, fallback to average score by agent (not great for compare) => just empty
+        return arr;
+    };
+
+    const chatStats = buildStats(chatData);
+    const telStats = buildStats(telData);
+
+    // Union labels
+    const byKey = {};
+    for (const it of chatStats) {
+        byKey[it.label] = { label: it.label, fullLabel: it.fullLabel, chat: it.value, tel: null };
+    }
+    for (const it of telStats) {
+        if (!byKey[it.label]) byKey[it.label] = { label: it.label, fullLabel: it.fullLabel, chat: null, tel: it.value };
+        else { byKey[it.label].tel = it.value; if (!byKey[it.label].fullLabel) byKey[it.label].fullLabel = it.fullLabel; }
+    }
+
+    // If still empty, fallback: show two average-score bars (by agent averages) to still be useful
+    const keys = Object.keys(byKey);
+    if (keys.length === 0) {
+        const chatAvg = (chatData.length ? (chatData.reduce((a,c)=>a+(parseFloat(c.score)||0),0)/chatData.length) : 0);
+        const telAvg = (telData.length ? (telData.reduce((a,c)=>a+(parseFloat(c.score)||0),0)/telData.length) : 0);
+        dashboardChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Chat', 'TeleSatış'],
+                datasets: [{
+                    label: 'Ortalama Puan',
+                    data: [chatAvg.toFixed(1), telAvg.toFixed(1)],
+                    backgroundColor: ['rgba(54, 162, 235, 0.6)', 'rgba(255, 159, 64, 0.6)'],
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: {
+                    x: { beginAtZero: true, max: 100, grid: { color: '#f0f0f0' } },
+                    y: { grid: { display: false } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+        return;
+    }
+
+    // Score (lower is worse): use average of available values to rank
+    const merged = keys.map(k => {
+        const v = byKey[k];
+        const vals = [v.chat, v.tel].filter(x => typeof x === 'number');
+        const mean = vals.length ? (vals.reduce((a,c)=>a+c,0)/vals.length) : 0;
+        return { ...v, mean };
+    }).sort((a,b)=>a.mean - b.mean);
+
+    const topIssues = merged.slice(0, 6);
+    const chartLabels = topIssues.map(i => i.label);
+    const chatVals = topIssues.map(i => (typeof i.chat === 'number' ? i.chat.toFixed(1) : 0));
+    const telVals = topIssues.map(i => (typeof i.tel === 'number' ? i.tel.toFixed(1) : 0));
+
+    dashboardChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: chartLabels,
+            datasets: [
+                { label: 'Chat', data: chatVals, backgroundColor: 'rgba(54, 162, 235, 0.6)', borderRadius: 4 },
+                { label: 'TeleSatış', data: telVals, backgroundColor: 'rgba(255, 159, 64, 0.6)', borderRadius: 4 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: { beginAtZero: true, max: 100, grid: { color: '#f0f0f0' } },
+                y: { grid: { display: false } }
+            },
+            plugins: {
+                legend: { display: true, position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            if (context.length > 0) {
+                                const dataIndex = context[0].dataIndex;
+                                return topIssues[dataIndex].fullLabel || topIssues[dataIndex].label;
+                            }
+                            return '';
+                        },
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.parsed.x}%`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
 function renderDashboardChart(data) {
     const ctx = document.getElementById('q-breakdown-chart');
     if (!ctx) return;
