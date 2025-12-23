@@ -13,8 +13,7 @@ function showGlobalError(message){
 }
 
 // Apps Script URL'si
-const SELF_EXEC_URL = location.href.split("?")[0];
-let SCRIPT_URL = localStorage.getItem("PUSULA_SCRIPT_URL") || SELF_EXEC_URL; // Apps Script Web App URL
+let SCRIPT_URL = localStorage.getItem("PUSULA_SCRIPT_URL") || "https://script.google.com/macros/s/AKfycbx9LV5bCnRRu4sBx9z6mZqUiDCqRI3yJeh4td4ba1n8Zx4ebSRQ2FvtwSVEg4zsbVeZ/exec"; // Apps Script Web App URL
 
 // ---- API CALL helper (Menu/Yetki vs için gerekli) ----
 async function apiCall(action, payload = {}) {
@@ -2146,7 +2145,7 @@ function finishPenaltyGame() {
     fetch(SCRIPT_URL, {
         method: 'POST',
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "logQuiz", username: currentUser, token: getToken(), score: pScore * 10, total: 100 })
+        body: JSON.stringify({ action: "logQuiz", actorName: getMyDisplayName(), username: currentUser, token: getToken(), score: pScore * 10, total: 100 })
     }).finally(() => {
         // lobby tablosunu güncel tut
         setTimeout(fetchLeaderboard, 600);
@@ -2884,7 +2883,7 @@ function startTraining(id){
     fetch(SCRIPT_URL, {
         method:'POST',
         headers:{"Content-Type":"text/plain;charset=utf-8"},
-        body: JSON.stringify({ action: "startTraining", trainingId: id, username: currentUser, token: getToken() })
+        body: JSON.stringify({ action: "startTraining", actorName: getMyDisplayName(), trainingId: id, username: currentUser, token: getToken() })
     }).then(r=>r.json()).catch(()=>{});
 }
 
@@ -2914,7 +2913,7 @@ function completeTraining(id) {
     fetch(SCRIPT_URL, {
         method: 'POST',
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "completeTraining", trainingId: id, username: currentUser, token: getToken() })
+        body: JSON.stringify({ action: "completeTraining", actorName: getMyDisplayName(), trainingId: id, username: currentUser, token: getToken() })
     }).then(r => r.json()).then(d => {
         if(d.result === 'success') {
             Swal.fire('Harika!', 'Eğitim tamamlandı olarak işaretlendi.', 'success');
@@ -2972,7 +2971,7 @@ async function assignTrainingPopup() {
                 docLink: document.getElementById('swal-t-doc').value || 'N/A',
                 target: target,
                 targetAgent: agent, // Kişiye özel atama için
-                creator: currentUser,
+                creator: getMyDisplayName(),
                 startDate: formatDateToDDMMYYYY(document.getElementById('swal-t-start').value), 
                 endDate: formatDateToDDMMYYYY(document.getElementById('swal-t-end').value), 
                 duration: document.getElementById('swal-t-duration').value 
@@ -2984,7 +2983,7 @@ async function assignTrainingPopup() {
         fetch(SCRIPT_URL, {
             method: 'POST',
             headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({ action: "assignTraining", username: currentUser, token: getToken(), ...formValues })
+            body: JSON.stringify({ action: "assignTraining", actorName: getMyDisplayName(), username: currentUser, token: getToken(), ...formValues })
         }).then(r=>r.json()).then(d=>{
             Swal.fire('Başarılı', 'Eğitim atandı.', 'success');
             loadTrainingData();
@@ -3327,7 +3326,7 @@ async function addManualFeedbackPopup() {
         fetch(SCRIPT_URL, { 
             method: 'POST', 
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: "logEvaluation", username: currentUser, token: getToken(), ...formValues }) 
+            body: JSON.stringify({ action: "logEvaluation", actorName: getMyDisplayName(), username: currentUser, token: getToken(), ...formValues }) 
         })
         .then(r => r.json()).then(async d => {
             if (d.result === "success") { 
@@ -3353,7 +3352,7 @@ async function addManualFeedbackPopup() {
                     fetch(SCRIPT_URL, { 
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                        body: JSON.stringify({ action: "logEvaluation", username: currentUser, token: getToken(), force: true, ...formValues })
+                        body: JSON.stringify({ action: "logEvaluation", actorName: getMyDisplayName(), username: currentUser, token: getToken(), force: true, ...formValues })
                     }).then(r2 => r2.json()).then(d2 => {
                         if (d2.result === "success") {
                             Swal.fire({ icon: 'success', title: 'Kaydedildi', timer: 1500, showConfirmButton: false });
@@ -3403,7 +3402,7 @@ async function fetchEvaluationsForAgent(forcedName, silent=false) {
             normalEvaluations.forEach((evalItem, index) => {
                 const scoreColor = evalItem.score >= 90 ? '#2e7d32' : (evalItem.score >= 70 ? '#ed6c02' : '#d32f2f');
                 let editBtn = isAdminMode ? `<i class="fas fa-pen" style="font-size:1rem; color:#fabb00; cursor:pointer; margin-right:5px;" onclick="event.stopPropagation(); editEvaluation('${evalItem.callId}')"></i>` : '';
-                let agentNameDisplay = (targetAgent === 'all' || targetAgent === targetGroup) ? `<span style="font-size:0.8rem; font-weight:bold; color:#555; background:#eee; padding:2px 6px; border-radius:4px; margin-left:10px;">${evalItem.agent}</span>` : '';
+                let agentNameDisplay = (targetAgent === 'all' || targetAgent === targetGroup) ? `<span style="font-size:0.8rem; font-weight:bold; color:#555; background:#eee; padding:2px 6px; border-radius:4px; margin-left:10px;">${escapeHtml(resolveUserDisplay(evalItem.agent))}</span>` : '';
                 
                 // Detay HTML oluşturma
                 let detailHtml = '';
@@ -3523,7 +3522,7 @@ async function exportEvaluations() {
     fetch(SCRIPT_URL, {
         method: 'POST', headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({
-            action: "exportEvaluations",
+            action: "exportEvaluations", actorName: getMyDisplayName(),
             targetAgent: agentSelect ? agentSelect.value : 'all',
             targetGroup: groupSelect ? groupSelect.value : 'all',
             username: currentUser, token: getToken()
@@ -3582,7 +3581,7 @@ async function logEvaluationPopup() {
     // GÜNCELLENMİŞ MODAL: Call ID zorunlu yapıldı
     const contentHtml = `
         <div class="eval-modal-wrapper">
-            <div class="score-dashboard"><div><div style="font-size:0.9rem;">Değerlendirilen</div><div style="font-size:1.2rem; font-weight:bold; color:#fabb00;">${agentName}</div></div><div class="score-circle-outer" id="score-ring"><div class="score-circle-inner" id="live-score">${isCriteriaBased ? '100' : '100'}</div></div></div>
+            <div class="score-dashboard"><div><div style="font-size:0.9rem;">Değerlendirilen</div><div style="font-size:1.2rem; font-weight:bold; color:#fabb00;">${resolveUserDisplay(agentName)}</div></div><div class="score-circle-outer" id="score-ring"><div class="score-circle-inner" id="live-score">${isCriteriaBased ? '100' : '100'}</div></div></div>
             <div class="eval-header-card"><div><label>Call ID <span style="color:red;">*</span></label><input id="eval-callid" class="swal2-input" style="height:35px; margin:0; width:100%;" placeholder="Call ID"></div><div><label>Tarih</label><input type="date" id="eval-calldate" class="swal2-input" style="height:35px; margin:0; width:100%;" value="${new Date().toISOString().substring(0, 10)}"></div></div>
             ${isCriteriaBased ? criteriaFieldsHtml : `<div style="padding:15px; border:1px dashed #ccc; text-align:center;"><label>Manuel Puan</label><br><input id="eval-manual-score" type="number" class="swal2-input" value="100" min="0" max="100" style="width:100px; text-align:center;"></div><textarea id="eval-details" class="swal2-textarea" placeholder="Detaylar..."></textarea>`}
             <div style="margin-top:15px; padding:10px; background:#fafafa; border:1px solid #eee;"><label>Geri Bildirim Tipi</label><select id="feedback-type" class="swal2-input" style="width:100%; height:40px; margin:0;"><option value="Yok" selected>Yok</option><option value="Sözlü">Sözlü</option><option value="Mail">Mail</option></select></div>
@@ -3631,7 +3630,7 @@ async function logEvaluationPopup() {
         fetch(SCRIPT_URL, { 
             method: 'POST', 
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: "logEvaluation", username: currentUser, token: getToken(), ...formValues }) 
+            body: JSON.stringify({ action: "logEvaluation", actorName: getMyDisplayName(), username: currentUser, token: getToken(), ...formValues }) 
         })
         .then(r => r.json()).then(d => {
             if (d.result === "success") { 
@@ -3666,7 +3665,7 @@ async function editEvaluation(targetCallId) {
     let oldDetails = []; try { oldDetails = JSON.parse(evalData.details || "[]"); } catch(e) { oldDetails = []; }
     
     // GÜNCELLENMİŞ MODAL: Call ID gösteriliyor
-    let contentHtml = `<div class="eval-modal-wrapper" style="border-top:5px solid #1976d2;"><div class="score-dashboard"><div><div style="font-size:0.9rem;">DÜZENLENEN</div><div style="font-size:1.2rem; font-weight:bold; color:#1976d2;">${agentName}</div></div><div class="score-circle-outer" id="score-ring"><div class="score-circle-inner" id="live-score">${evalData.score}</div></div></div><div class="eval-header-card"><div><label>Call ID</label><input id="eval-callid" class="swal2-input" value="${evalData.callId}" readonly style="background:#eee; height:35px; width:100%;"></div></div>`;
+    let contentHtml = `<div class="eval-modal-wrapper" style="border-top:5px solid #1976d2;"><div class="score-dashboard"><div><div style="font-size:0.9rem;">DÜZENLENEN</div><div style="font-size:1.2rem; font-weight:bold; color:#1976d2;">${resolveUserDisplay(agentName)}</div></div><div class="score-circle-outer" id="score-ring"><div class="score-circle-inner" id="live-score">${evalData.score}</div></div></div><div class="eval-header-card"><div><label>Call ID</label><input id="eval-callid" class="swal2-input" value="${evalData.callId}" readonly style="background:#eee; height:35px; width:100%;"></div></div>`;
     
     if (isCriteriaBased) {
         contentHtml += `<div class="criteria-container">`;
