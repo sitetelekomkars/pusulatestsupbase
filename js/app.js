@@ -273,8 +273,6 @@ let wizardStepsData = {};
 let trainingData = [];
 // YENİ: Chart instance'ı tutmak için
 let dashboardChart = null;
-let dashboardChartChat = null;
-let dashboardChartTele = null;
 // YENİ: Feedback Log Verisi (Manuel kayıt detayları için)
 let feedbackLogsData = [];
 // ==========================================================
@@ -634,7 +632,6 @@ function girisYap() {
         errorMsg.innerText = "Sunucu hatası! Lütfen sayfayı yenileyin.";
         errorMsg.style.display = "block";
     });
-    if (key === "chat") dashboardChartChat = chartRef; else if (key === "tele") dashboardChartTele = chartRef; else dashboardChart = chartRef;
 }
 function checkAdmin(role) {
     const addCardDropdown = document.getElementById('dropdownAddCard');
@@ -2648,86 +2645,26 @@ function loadQualityDashboard() {
         document.getElementById('q-dash-count').innerText = count;
         document.getElementById('q-dash-target').innerText = `%${rate}`;
         
-        // Kanal bazli dashboard (Chat + TeleSat)
+        // Ring Chart Rengi
+        const ring = document.getElementById('q-dash-ring');
+        let color = '#2e7d32';
+        if(avg < 70) color = '#d32f2f'; else if(avg < 85) color = '#ed6c02';
+        const ratio = (avg / 100) * 100;
+        if(ring) ring.style.background = `conic-gradient(${color} ${ratio}%, #eee ${ratio}%)`;
+        if(document.getElementById('q-dash-ring-text')) document.getElementById('q-dash-ring-text').innerText = Math.round(avg);
+        updateDashRingTitle();
+        // Admin için: temsilci ortalamaları
         renderDashAgentScores(filtered);
-        renderChannelDashboard(filtered, "chat");
-        renderChannelDashboard(filtered, "tele");
+        // Grafik Çizdir
+        renderDashboardChart(filtered);
     });
 }
-
-function normalizeQualityChannel(ch) {
-    const v = (ch || '').toString().toLowerCase().replace(/\s+/g, ' ').trim();
-    if (!v) return '';
-    // Trke karakterleri sadeletir
-    const norm = v
-        .replace(/ı/g, 'i')
-        .replace(/ş/g, 's')
-        .replace(/ğ/g, 'g')
-        .replace(/ü/g, 'u')
-        .replace(/ö/g, 'o')
-        .replace(/ç/g, 'c');
-    if (norm.includes('chat')) return 'chat';
-    if (norm.includes('telesatis') || norm.includes('tele satis') || norm.includes('telesales') || norm.includes('tele')) return 'tele';
-    return norm;
-}
-
-function renderChannelDashboard(allData, key) {
-    const data = (allData || []).filter(e => normalizeQualityChannel(e.channel || e.platform) === key);
-
-    const total = data.reduce((acc, curr) => acc + (parseInt(curr.score) || 0), 0);
-    const count = data.length;
-    const avg = count > 0 ? (total / count) : 0;
-    const targetHit = data.filter(e => (parseFloat(e.score) || 0) >= 90).length;
-    const rate = count > 0 ? Math.round((targetHit / count) * 100) : 0;
-
-    const prefix = (key === 'chat') ? 'q-chat' : 'q-tele';
-    const avgEl = document.getElementById(prefix + '-avg');
-    const countEl = document.getElementById(prefix + '-count');
-    const targetEl = document.getElementById(prefix + '-target');
-
-    if (avgEl) avgEl.innerText = count > 0 ? avg.toFixed(1) : '-';
-    if (countEl) countEl.innerText = count > 0 ? count : '-';
-    if (targetEl) targetEl.innerText = count > 0 ? `%${rate}` : '-%';
-
-    // Ring
-    const ring = document.getElementById(prefix + '-ring');
-    const ringText = document.getElementById(prefix + '-ring-text');
-    let color = '#2e7d32';
-    if (avg < 70) color = '#d32f2f';
-    else if (avg < 85) color = '#ed6c02';
-    const ratio = Math.max(0, Math.min(100, avg));
-    if (ring) ring.style.background = `conic-gradient(${color} ${ratio}%, #eee ${ratio}%)`;
-    if (ringText) ringText.innerText = count > 0 ? Math.round(avg) : '-';
-
-    // Breakdown chart
-    const canvasId = (key === 'chat') ? 'q-breakdown-chart-chat' : 'q-breakdown-chart-tele';
-    renderDashboardChart(data, canvasId, key);
-}
-
-function renderDashboardChart(data, ctxId = "q-breakdown-chart", key = "main") {
-    const ctx = document.getElementById(ctxId);
+function renderDashboardChart(data) {
+    const ctx = document.getElementById('q-breakdown-chart');
     if (!ctx) return;
-    let chartRef = (key === "chat") ? dashboardChartChat : (key === "tele" ? dashboardChartTele : dashboardChart);
-    if (chartRef) {
-        chartRef.destroy();
+    if (dashboardChart) {
+        dashboardChart.destroy();
     }
-    const wrapTooltipTitle = (text, maxLen = 52) => {
-        if (!text) return '';
-        const words = String(text).split(/\s+/);
-        const lines = [];
-        let line = '';
-        for (const w of words) {
-            const next = line ? (line + ' ' + w) : w;
-            if (next.length > maxLen && line) {
-                lines.push(line);
-                line = w;
-            } else {
-                line = next;
-            }
-        }
-        if (line) lines.push(line);
-        return lines;
-    };
     // --- KRİTER BAZLI ANALİZ ---
     let questionStats = {};
     if (data.length > 0) {
@@ -2787,7 +2724,7 @@ function renderDashboardChart(data, ctxId = "q-breakdown-chart", key = "main") {
         let chartLabels = topIssues.map(i => i.label);
         let chartData = topIssues.map(i => i.value.toFixed(1));
 
-        	chartRef = new Chart(ctx, {
+        dashboardChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: chartLabels,
@@ -2813,7 +2750,7 @@ function renderDashboardChart(data, ctxId = "q-breakdown-chart", key = "main") {
                     tooltip: {
                         callbacks: {
                             title: function(context) {
-                                if (context.length > 0) return wrapTooltipTitle(topIssues[context[0].dataIndex].fullLabel);
+                                if (context.length > 0) return topIssues[context[0].dataIndex].fullLabel;
                                 return '';
                             },
                             label: function(context) {
@@ -2824,7 +2761,6 @@ function renderDashboardChart(data, ctxId = "q-breakdown-chart", key = "main") {
                 }
             }
         });
-        if (key === "chat") dashboardChartChat = chartRef; else if (key === "tele") dashboardChartTele = chartRef; else dashboardChart = chartRef;
         return;
     }
 
@@ -2833,7 +2769,7 @@ function renderDashboardChart(data, ctxId = "q-breakdown-chart", key = "main") {
  
     let chartLabels = topIssues.map(i => i.label);
     let chartData = topIssues.map(i => i.value.toFixed(1));
-    	chartRef = new Chart(ctx, {
+    dashboardChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: chartLabels,
@@ -2870,7 +2806,7 @@ function renderDashboardChart(data, ctxId = "q-breakdown-chart", key = "main") {
                             if (context.length > 0) {
                                 const dataIndex = context[0].dataIndex;
                                 // fullLabel'i kullanarak tam metni döndür
-                                return wrapTooltipTitle(topIssues[dataIndex].fullLabel);
+                                return topIssues[dataIndex].fullLabel; 
                             }
                             return '';
                         },
@@ -4426,7 +4362,7 @@ async function openTechArea(tab){
     }catch(e){}
 
     // İçerikler switchTechTab içinde yükleniyor
-    switchTechTab(tab || 'broadcast');
+    switchTechTab(tab || 'wizard');
 }
 
 function closeFullTech(){
@@ -5000,22 +4936,36 @@ function renderTechCardsTab(q=''){
       return;
     }
 
-    box.innerHTML = bar + filtered.map(c=>{
-      const edit = (isAdminMode && isEditingActive)
-        ? `<div style="display:flex;gap:8px;margin-top:10px">
-             <button class="x-btn x-btn-admin" onclick="editTechCardSheet(${c.__dbIndex})"><i class="fas fa-pen"></i> Düzenle</button>
-             <button class="x-btn x-btn-admin" onclick="deleteTechCardSheet(${c.__dbIndex})"><i class="fas fa-trash"></i> Sil</button>
-           </div>`
-        : ``;
-      return `
-        <div class="news-item" style="cursor:pointer" onclick="showCardDetail(${JSON.stringify({title:c.title,text:c.text||'',script:c.script||'',link:c.link||''}).replace(/</g,'\\u003c')})">
-          <span class="news-title">${escapeHtml(c.title||'')}</span>
-          <div class="news-desc" style="white-space:pre-line">${escapeHtml((c.text||'').slice(0,220))}${(c.text||'').length>220?'...':''}</div>
-          ${(c.script||'') ? `<div class="script-box" style="margin-top:10px"><b>Script:</b><div style="margin-top:6px;white-space:pre-line">${escapeHtml((c.script||'').slice(0,220))}${(c.script||'').length>220?'...':''}</div><div style="text-align:right;margin-top:10px"><button class="btn btn-copy" onclick="event.stopPropagation(); copyText('${escapeForJsString(c.script||'')}')">Kopyala</button></div></div>`:''}
-          ${edit}
-        </div>
-      `;
-    }).join('');
+    box.innerHTML = bar + `
+      <div class="x-card-grid">
+        ${filtered.map(c=>{
+          const hasDetail = ((c.text||'').length > 180) || ((c.script||'').length > 120) || !!(c.link||'');
+          const detailObj = { title:c.title, text:c.text||'', script:c.script||'', link:c.link||'' };
+          const edit = (isAdminMode && isEditingActive)
+            ? `
+              <button class="x-btn x-btn-admin" onclick="event.stopPropagation();editTechCardSheet(${c.__dbIndex})"><i class="fas fa-pen"></i> Düzenle</button>
+              <button class="x-btn x-btn-admin" onclick="event.stopPropagation();deleteTechCardSheet(${c.__dbIndex})"><i class="fas fa-trash"></i> Sil</button>
+            `
+            : ``;
+          return `
+            <div class="x-card" style="cursor:pointer" onclick="showCardDetail(${JSON.stringify(detailObj).replace(/</g,'\\u003c')})">
+              <div class="x-card-head">
+                <div class="x-card-title">${escapeHtml(c.title||'')}</div>
+                <div class="x-card-badge">TEKNİK</div>
+              </div>
+              <div class="x-card-body">
+                ${(c.text||'') ? `<div class="x-card-text x-card-text-truncate">${escapeHtml(c.text||'')}</div>` : `<div style="opacity:.7">İçerik yok</div>`}
+                ${hasDetail ? `<button class="x-readmore" onclick="event.stopPropagation();showCardDetail(${JSON.stringify(detailObj).replace(/</g,'\\u003c')})">Devam oku</button>` : ``}
+              </div>
+              <div class="x-card-actions" onclick="event.stopPropagation();">
+                ${(c.script||'') ? `<button class="x-btn x-btn-copy" onclick="copyText(${JSON.stringify(c.script||'')})"><i class="fas fa-copy"></i> Kopyala</button>` : ``}
+                ${edit}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
 }
 
 function filterTechCards(){
@@ -5057,11 +5007,11 @@ let __techCatsCache = null;
 let __techCatsLoadedAt = 0;
 
 const TECH_TAB_LABELS = {
-  broadcast: 'Yayın',
+  broadcast: 'Yayın Sorunları',
   access: 'Erişim Sorunları',
   app: 'App Hataları',
-  activation: 'Aktivasyon',
-  info: 'Bilgi',
+  activation: 'Aktivasyon Sorunları',
+  info: 'Sık Sorulan Sorular',
   payment: 'Ödeme Sorunları'
 };
 
@@ -5243,8 +5193,8 @@ async function loadTechCategoryOptions(){
 }
 
 function techTabLabel(tabKey){
-  const m = { broadcast:'Yayın', access:'Erişim Sorunları', app:'App Hataları', activation:'Aktivasyon', info:'Bilgi', payment:'Ödeme Sorunları' };
-  return m[tabKey] || 'Yayın';
+  const m = { broadcast:'Yayın Sorunları', access:'Erişim Sorunları', app:'App Hataları', activation:'Aktivasyon Sorunları', info:'Sık Sorulan Sorular', payment:'Ödeme Sorunları' };
+  return m[tabKey] || 'Yayın Sorunları';
 }
 
 // ---------------------------
