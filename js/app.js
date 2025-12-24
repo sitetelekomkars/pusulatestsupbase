@@ -4373,14 +4373,19 @@ function closeFullTech(){
 }
 
 function switchTechTab(tab){
-    // Sidebar aktif öğeyi doğru belirle (onclick tek/çift tırnaklı olabilir)
+    // Sidebar aktif öğeyi doğru belirle
+    // (önce data-tech-tab kullan, yoksa onclick içeriği ile fallback yap)
     document.querySelectorAll('#tech-fullscreen .q-nav-item').forEach(i=>i.classList.remove('active'));
-    document.querySelectorAll('#tech-fullscreen .q-nav-item').forEach(i=>{
-        const oc = (i.getAttribute('onclick') || '');
-        if(oc.includes(`'${tab}'`) || oc.includes(`\"${tab}\"`)){
-            i.classList.add('active');
-        }
-    });
+
+    const byData = document.querySelector(`#tech-fullscreen .q-nav-item[data-tech-tab="${tab}"]`);
+    if(byData){
+        byData.classList.add('active');
+    }else{
+        document.querySelectorAll('#tech-fullscreen .q-nav-item').forEach(i=>{
+            const oc = (i.getAttribute('onclick') || '');
+            if(oc.includes(`'${tab}'`) || oc.includes(`\"${tab}\"`)) i.classList.add('active');
+        });
+    }
 
     document.querySelectorAll('#tech-fullscreen .q-view-section').forEach(s=>s.classList.remove('active'));
     const el = document.getElementById(`x-view-${tab}`);
