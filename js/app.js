@@ -861,7 +861,7 @@ function renderCards(data) {
         } catch (_) {}
         if (typeof console !== 'undefined') console.error('[renderCards]', e);
     }
-}}
+}
 function highlightText(htmlContent) {
     if (!htmlContent) return "";
     const searchTerm = document.getElementById('searchInput').value.toLocaleLowerCase('tr-TR').trim();
