@@ -273,6 +273,10 @@ let wizardStepsData = {};
 let trainingData = [];
 // YENİ: Chart instance'ı tutmak için
 let dashboardChart = null;
+let dashTrendChart = null;
+let dashChannelChart = null;
+let dashScoreDistChart = null;
+let dashGroupAvgChart = null;
 // YENİ: Feedback Log Verisi (Manuel kayıt detayları için)
 let feedbackLogsData = [];
 // ==========================================================
@@ -2386,13 +2390,16 @@ function populateMonthFilterFull() {
 function populateDashboardFilters() {
     const groupSelect = document.getElementById('q-dash-group');
     const agentSelect = document.getElementById('q-dash-agent');
+    const channelSelect = document.getElementById('q-dash-channel');
     if(!isAdminMode) {
         if(groupSelect) groupSelect.style.display = 'none';
         if(agentSelect) agentSelect.style.display = 'none';
+        if(channelSelect) channelSelect.style.display = 'none';
         return;
     } else {
         if(groupSelect) groupSelect.style.display = 'block';
         if(agentSelect) agentSelect.style.display = 'block';
+        if(channelSelect) channelSelect.style.display = 'block';
     }
     
     if(!groupSelect) return;
@@ -2514,6 +2521,14 @@ function renderDashAgentScores(evals) {
 }
 
 // Detay alanını toleranslı parse et
+function deriveChannelFromGroup(group){
+    const g = String(group||'').toLowerCase();
+    if(!g) return 'other';
+    if(g.includes('telesat') || g.includes('telesatış') || g === 'telesales') return 'sales';
+    if(g.includes('chat')) return 'chat';
+    return 'other';
+}
+
 function safeParseDetails(details) {
     if(!details) return null;
     if(Array.isArray(details)) return details;
@@ -2681,6 +2696,8 @@ function loadQualityDashboard() {
         const selectedMonth = monthSelect ? monthSelect.value : '';
         const selectedGroup = groupSelect ? groupSelect.value : 'all';
         const selectedAgent = agentSelect ? agentSelect.value : 'all';
+        const channelSelect = document.getElementById('q-dash-channel');
+        const selectedChannel = channelSelect ? channelSelect.value : 'all';
         
         let filtered = allEvaluationsData.filter(e => {
             const eDate = e.date.substring(3); // dd.MM.yyyy -> MM.yyyy
@@ -2688,6 +2705,7 @@ function loadQualityDashboard() {
             
             let matchGroup = true;
             let matchAgent = true;
+            let matchChannel = true;
             // Admin filtreleme mantığı
             if (isAdminMode) {
                 // Eğer veri içinde grup bilgisi varsa onu kullan, yoksa adminUserList'ten bakmak gerekir.
@@ -2707,13 +2725,47 @@ function loadQualityDashboard() {
             }
             // MANUEL kayıtları dashboard'da gösterme
             const isManual = e.callId && String(e.callId).toUpperCase().startsWith('MANUEL-');
-            return matchMonth && matchGroup && matchAgent && !isManual;
+            if (selectedChannel && selectedChannel !== 'all') {
+                const ch = deriveChannelFromGroup(e.group);
+                matchChannel = (ch === selectedChannel);
+            }
+            return matchMonth && matchGroup && matchAgent && matchChannel && !isManual;
         });
         const total = filtered.reduce((acc, curr) => acc + (parseInt(curr.score)||0), 0);
         const count = filtered.length;
         const avg = count > 0 ? (total / count).toFixed(1) : 0;
         const targetHit = filtered.filter(e => e.score >= 90).length;
         const rate = count > 0 ? Math.round((targetHit / count) * 100) : 0;
+        // En zayıf kriter (detay varsa)
+        let worstLabel = '-';
+        try {
+            const qs = {};
+            filtered.forEach(item => {
+                const details = safeParseDetails(item.details);
+                if (!Array.isArray(details)) return;
+                details.forEach(d => {
+                    const key = String(d.q||'').trim();
+                    if(!key) return;
+                    const earned = parseFloat(d.score||0) || 0;
+                    const maxv = parseFloat(d.max||0) || 0;
+                    if(!qs[key]) qs[key] = { earned:0, max:0 };
+                    qs[key].earned += earned;
+                    qs[key].max += maxv;
+                });
+            });
+            const arr = Object.keys(qs).map(k => {
+                const o = qs[k];
+                const pct = o.max > 0 ? (o.earned/o.max)*100 : 100;
+                return { k, pct };
+            }).sort((a,b)=> a.pct - b.pct);
+            if(arr.length){
+                const k = arr[0].k;
+                worstLabel = k.length > 28 ? (k.substring(0,28)+'…') : k;
+            }
+        } catch(e){}
+        const worstEl = document.getElementById('q-dash-worst');
+        if(worstEl) worstEl.innerText = worstLabel;
+
         // UI Güncelle
         document.getElementById('q-dash-score').innerText = avg;
         document.getElementById('q-dash-count').innerText = count;
@@ -2730,7 +2782,7 @@ function loadQualityDashboard() {
         // Admin için: temsilci ortalamaları
         renderDashAgentScores(filtered);
         // Grafik Çizdir
-        renderDashboardChart(filtered);
+        renderDashboardCharts(filtered);
     });
 }
 function renderDashboardChart(data) {
@@ -2887,6 +2939,226 @@ function renderDashboardChart(data) {
                         label: function(context) {
                             return context.parsed.x + '% Başarı';
                         }
+                    }
+                }
+            }
+        }
+    });
+}
+
+
+function destroyIfExists(chart){
+    try{ if(chart) chart.destroy(); }catch(e){}
+}
+
+function renderDashboardCharts(filtered){
+    renderDashboardChart(filtered); // mevcut: kriter bazlı bar
+    renderDashboardTrendChart(filtered);
+    renderDashboardChannelChart(filtered);
+    renderDashboardScoreDistributionChart(filtered);
+    renderDashboardGroupAvgChart(filtered);
+}
+
+function renderDashboardTrendChart(data){
+    const canvas = document.getElementById('q-trend-chart');
+    if(!canvas) return;
+    destroyIfExists(dashTrendChart);
+
+    // Günlük ortalama (dd.MM.yyyy)
+    const byDay = {};
+    (data||[]).forEach(e=>{
+        const day = String(e.date||'').trim();
+        if(!day) return;
+        const s = parseFloat(e.score)||0;
+        if(!byDay[day]) byDay[day] = { total:0, count:0 };
+        byDay[day].total += s;
+        byDay[day].count += 1;
+    });
+
+    const days = Object.keys(byDay).sort((a,b)=>{
+        // dd.MM.yyyy
+        const pa=a.split('.'); const pb=b.split('.');
+        const da=new Date(Number(pa[2]), Number(pa[1])-1, Number(pa[0]));
+        const db=new Date(Number(pb[2]), Number(pb[1])-1, Number(pb[0]));
+        return da - db;
+    });
+
+    const labels = days.map(d=>d.substring(0,5)); // dd.MM
+    const values = days.map(d=> (byDay[d].count ? (byDay[d].total/byDay[d].count) : 0).toFixed(1));
+
+    const sub = document.getElementById('q-trend-sub');
+    if(sub){
+        sub.textContent = days.length ? `${days.length} gün • günlük ortalama` : 'Veri yok';
+    }
+
+    dashTrendChart = new Chart(canvas, {
+        type:'line',
+        data:{
+            labels,
+            datasets:[{
+                label:'Günlük Ortalama',
+                data: values,
+                tension: 0.25,
+                fill: false,
+                pointRadius: 3,
+                pointHoverRadius: 4,
+                borderWidth: 2
+            }]
+        },
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            scales:{
+                y:{ beginAtZero:true, max:100, grid:{ color:'#f0f0f0'} },
+                x:{ grid:{ display:false } }
+            },
+            plugins:{
+                legend:{ display:false },
+                tooltip:{ callbacks:{ label:(ctx)=> `${ctx.parsed.y} Ortalama` } }
+            }
+        }
+    });
+}
+
+function renderDashboardChannelChart(data){
+    const canvas = document.getElementById('q-channel-chart');
+    if(!canvas) return;
+    destroyIfExists(dashChannelChart);
+
+    const gSel = document.getElementById('q-dash-group');
+    const aSel = document.getElementById('q-dash-agent');
+    const chSel = document.getElementById('q-dash-channel');
+    const g = gSel ? gSel.value : 'all';
+    const a = aSel ? aSel.value : 'all';
+    const ch = chSel ? chSel.value : 'all';
+
+    let mode = 'channel';
+    // Daraltılmış görünümde kanal dağılımı anlamlı değilse, feedbackType dağılımına dön
+    if(ch !== 'all' || (a && a !== 'all')) mode = 'feedbackType';
+
+    const buckets = {};
+    (data||[]).forEach(e=>{
+        const key = mode==='channel' ? deriveChannelFromGroup(e.group) : String(e.feedbackType||'Yok');
+        if(!buckets[key]) buckets[key] = 0;
+        buckets[key] += 1;
+    });
+
+    const labels = Object.keys(buckets);
+    const values = labels.map(k=>buckets[k]);
+
+    const sub = document.getElementById('q-channel-sub');
+    if(sub){
+        if(mode==='channel') sub.textContent = 'Satış / Chat / Diğer';
+        else sub.textContent = 'Feedback Type dağılımı';
+    }
+
+    dashChannelChart = new Chart(canvas, {
+        type:'doughnut',
+        data:{
+            labels,
+            datasets:[{ data: values, borderWidth: 1 }]
+        },
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins:{
+                legend:{ position:'bottom' },
+                tooltip:{ callbacks:{ label:(ctx)=> `${ctx.label}: ${ctx.formattedValue}` } }
+            }
+        }
+    });
+}
+
+function renderDashboardScoreDistributionChart(data){
+    const canvas = document.getElementById('q-score-dist-chart');
+    if(!canvas) return;
+    destroyIfExists(dashScoreDistChart);
+
+    const ranges = [
+        { label:'0-59', min:0, max:59 },
+        { label:'60-69', min:60, max:69 },
+        { label:'70-79', min:70, max:79 },
+        { label:'80-89', min:80, max:89 },
+        { label:'90-100', min:90, max:100 },
+    ];
+    const counts = ranges.map(()=>0);
+    (data||[]).forEach(e=>{
+        const s = Math.round(parseFloat(e.score)||0);
+        for(let i=0;i<ranges.length;i++){
+            if(s>=ranges[i].min && s<=ranges[i].max){ counts[i]++; break; }
+        }
+    });
+
+    dashScoreDistChart = new Chart(canvas, {
+        type:'bar',
+        data:{
+            labels: ranges.map(r=>r.label),
+            datasets:[{ label:'Adet', data: counts, borderWidth: 1, borderRadius: 6 }]
+        },
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            scales:{
+                y:{ beginAtZero:true, grid:{ color:'#f0f0f0'} },
+                x:{ grid:{ display:false } }
+            },
+            plugins:{
+                legend:{ display:false },
+                tooltip:{ callbacks:{ label:(ctx)=> `${ctx.parsed.y} kayıt` } }
+            }
+        }
+    });
+}
+
+function renderDashboardGroupAvgChart(data){
+    const canvas = document.getElementById('q-group-avg-chart');
+    if(!canvas) return;
+    destroyIfExists(dashGroupAvgChart);
+
+    // Grup ortalamaları (admin için anlamlı)
+    const byGroup = {};
+    (data||[]).forEach(e=>{
+        const g = String(e.group||'Genel');
+        const s = parseFloat(e.score)||0;
+        if(!byGroup[g]) byGroup[g] = { total:0, count:0 };
+        byGroup[g].total += s;
+        byGroup[g].count += 1;
+    });
+
+    const rows = Object.keys(byGroup).map(g=>({
+        g,
+        avg: byGroup[g].count ? (byGroup[g].total/byGroup[g].count) : 0,
+        count: byGroup[g].count
+    })).sort((a,b)=> a.avg - b.avg);
+
+    const labels = rows.map(r=> r.g.length>22 ? (r.g.substring(0,22)+'…') : r.g);
+    const values = rows.map(r=> r.avg.toFixed(1));
+
+    const sub = document.getElementById('q-group-sub');
+    if(sub){
+        sub.textContent = rows.length ? `${rows.length} takım • en düşükten en yükseğe` : 'Veri yok';
+    }
+
+    dashGroupAvgChart = new Chart(canvas, {
+        type:'bar',
+        data:{
+            labels,
+            datasets:[{ label:'Ortalama', data: values, borderWidth:1, borderRadius:6 }]
+        },
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            indexAxis:'y',
+            scales:{
+                x:{ beginAtZero:true, max:100, grid:{ color:'#f0f0f0'} },
+                y:{ grid:{ display:false } }
+            },
+            plugins:{
+                legend:{ display:false },
+                tooltip:{
+                    callbacks:{
+                        title:(ctx)=> rows[ctx[0].dataIndex].g,
+                        label:(ctx)=> `${ctx.parsed.x} Ortalama (${rows[ctx.dataIndex].count} kayıt)`
                     }
                 }
             }
