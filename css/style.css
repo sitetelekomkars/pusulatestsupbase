@@ -931,12 +931,16 @@ body.editing .edit-icon { display: block !important; }
 }
 .q-dash-agent-scores .das-name{
   font-weight:700;
-  color:#ffffff !important; /* Düzeltme: Hoşgeldin alanına uyum için beyaz yapıldı */
+  /* Dashboard kartı açık zemin: isimler koyu olmalı */
+  color: var(--primary) !important;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
   max-width: 220px;
 }
+
+/* Üst bardaki "X sonuç / Y" sayacı kaldır */
+#searchResultCount{ display:none !important; }
 .q-dash-agent-scores .das-group{
   font-size:0.78rem;
   padding:2px 8px;
