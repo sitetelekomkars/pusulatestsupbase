@@ -2696,7 +2696,9 @@ function loadQualityDashboard() {
         const selectedAgent = agentSelect ? agentSelect.value : 'all';
         const selectedChannel = "all";
 let filtered = allEvaluationsData.filter(e => {
-            const eDate = e.date.substring(3); // dd.MM.yyyy -> MM.yyyy
+            const rawDate = (e.callDate && e.callDate !== 'N/A') ? e.callDate : e.date;
+            if (!rawDate || typeof rawDate !== 'string') return false;
+            const eDate = rawDate.substring(3); // dd.MM.yyyy -> MM.yyyy
             const matchMonth = (eDate === selectedMonth);
             
             let matchGroup = true;
@@ -3015,13 +3017,10 @@ function renderDashboardTrendChart(data){
     if(!canvas) return;
     destroyIfExists(dashTrendChart);
 
-    // Günlük ortalama (dd.MM.yyyy) - tarih kaynağı: öncelik çağrı tarihi, yoksa dinlenme tarihi
+    // Günlük ortalama (dd.MM.yyyy)
     const byDay = {};
     (data||[]).forEach(e=>{
-        // e.callDate: Çağrı tarihi (dd.MM.yyyy), e.date: dinlenme tarihi
-        const callDay = String(e.callDate || '').trim();
-        const listenDay = String(e.date || '').trim();
-        const day = callDay || listenDay; // Önce çağrı tarihi, yoksa eski kayıtlar için dinlenme tarihi
+        const day = String(e.callDate || e.date || '').trim();
         if(!day) return;
         const s = parseFloat(e.score)||0;
         if(!byDay[day]) byDay[day] = { total:0, count:0 };
@@ -3873,7 +3872,9 @@ async function fetchEvaluationsForAgent(forcedName, silent=false) {
                                 <span><i class="fas fa-phone"></i> Çağrı: ${callDateDisplay}</span>
                                 <span><i class="fas fa-headphones"></i> Dinlenme: ${listenDateDisplay}</span>
                             </div>
-                            <div style="font-size:0.75rem; color:#999; margin-top:2px;">ID: <span class="eval-id-copy" data-eval-id="${escapeHtml(evalItem.callId || '')}">${escapeHtml(evalItem.callId || '')}</span></div>
+                            <div style="font-size:0.75rem; color:#999; margin-top:2px;">
+                        ID: <span class="eval-id" ondblclick="copyText('${escapeHtml(evalItem.callId || '')}')">${escapeHtml(evalItem.callId || '')}</span>
+                    </div
                         </div>
                         <div style="text-align:right;">
                              ${editBtn} <span style="font-weight:800; font-size:1.6rem; color:${scoreColor};">${evalItem.score}</span>
@@ -3890,54 +3891,6 @@ async function fetchEvaluationsForAgent(forcedName, silent=false) {
         }
     } catch(err) { if(!silent) listEl.innerHTML = `<p style="color:red; text-align:center;">Hata oluştu.</p>`; }
 }
-
-// Değerlendirme listesindeki ID alanına çift tıklayınca ID'yi panoya kopyala
-(function setupEvaluationIdCopy(){
-    const root = document.getElementById('evaluations-list');
-    if (!root) return;
-    if (root.__evalIdCopyBound) return;
-    root.__evalIdCopyBound = true;
-
-    root.addEventListener('dblclick', function(e){
-        const span = e.target.closest('.eval-id-copy');
-        if (!span) return;
-        const id = span.getAttribute('data-eval-id') || span.textContent.replace(/^ID\s*:/i, '').trim();
-        if (!id) return;
-
-        const doToast = (msg, icon='success') => {
-            try{
-                if (typeof Swal !== 'undefined' && Swal.fire){
-                    Swal.fire({
-                        toast:true,
-                        position:'top-end',
-                        icon,
-                        title: msg,
-                        showConfirmButton:false,
-                        timer:1200
-                    });
-                }
-            }catch(_){}
-        };
-
-        if (navigator.clipboard && navigator.clipboard.writeText){
-            navigator.clipboard.writeText(id).then(()=>{
-                doToast('ID kopyalandı');
-            }).catch(()=>{
-                doToast('ID kopyalanamadı', 'error');
-            });
-        } else {
-            const ta = document.createElement('textarea');
-            ta.value = id;
-            ta.style.position = 'fixed';
-            ta.style.opacity = '0';
-            document.body.appendChild(ta);
-            ta.select();
-            try { document.execCommand('copy'); doToast('ID kopyalandı'); }
-            catch(_){ doToast('ID kopyalanamadı', 'error'); }
-            document.body.removeChild(ta);
-        }
-    });
-})();
 function updateAgentListBasedOnGroup() {
     const groupSelect = document.getElementById('q-admin-group');
     const agentSelect = document.getElementById('q-admin-agent');
@@ -4356,57 +4309,6 @@ const todayISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
 
 
 // Ana Sayfa - Günün Sözü düzenleme (sadece admin mod + düzenleme açıkken)
-
-
-function openShiftRequestPopup(){
-    const now = new Date();
-    // Haftanın Perşembesi 20:00 kontrolü: talepler bir önceki haftanın Perşembe 20:00'ine kadar
-    // Burada sadece bilgilendirme yapıyoruz, asıl kural Google Sheet tarafında da kontrol edilebilir.
-    Swal.fire({
-        title: 'Vardiya Talebi',
-        html: `
-          <div style="display:flex; flex-direction:column; gap:8px; text-align:left;">
-            <div style="font-size:0.8rem; color:#6b7280;">
-              Vardiya talepleri bir önceki haftanın <b>Perşembe</b> günü saat <b>20:00</b>'ye kadar iletilmelidir.
-            </div>
-            <input id="swal-shift-date" type="date" class="swal2-input" placeholder="Tarih">
-            <input id="swal-shift-type" class="swal2-input" placeholder="Talep Türü (örn: izin, vardiya değişimi)">
-            <textarea id="swal-shift-note" class="swal2-textarea" placeholder="Talebini detaylı yaz" style="height:120px;"></textarea>
-          </div>
-        `,
-        confirmButtonText: 'Talebi Gönder',
-        cancelButtonText: 'Vazgeç',
-        showCancelButton: true,
-        focusConfirm: false,
-        preConfirm: () => {
-            const date = (document.getElementById('swal-shift-date')||{}).value || '';
-            const type = (document.getElementById('swal-shift-type')||{}).value || '';
-            const note = (document.getElementById('swal-shift-note')||{}).value || '';
-            if(!date || !type){
-                Swal.showValidationMessage('Tarih ve talep türü zorunludur.');
-                return false;
-            }
-            return { date, type, note };
-        }
-    }).then(res => {
-        if(!res.isConfirmed || !res.value) return;
-        const payload = res.value;
-        apiCall('submitShiftRequest', {
-            date: payload.date,
-            type: payload.type,
-            note: payload.note || '',
-            username: currentUser
-        }).then(r => {
-            if(r && r.result === 'success'){
-                Swal.fire('Gönderildi', 'Vardiya talebin kaydedildi.', 'success');
-            }else{
-                Swal.fire('Hata', (r && r.message) || 'Talep kaydedilemedi.', 'error');
-            }
-        }).catch(()=>{
-            Swal.fire('Hata', 'Talep kaydedilemedi.', 'error');
-        });
-    });
-}
 function editHomeBlock(kind){
     if(!isAdminMode){
         Swal.fire("Yetkisiz", "Bu işlem için admin yetkisi gerekli.", "warning");
@@ -4980,6 +4882,190 @@ function switchTechTab(tab){
     document.querySelectorAll('#tech-fullscreen .q-view-section').forEach(s=>s.classList.remove('active'));
     const el = document.getElementById(`x-view-${tab}`);
     if(el) el.classList.add('active');
+}
+
+
+// --------------    VARDİYA FULLSCREEN ---------------------
+async function openShiftArea(tab){
+    const wrap = document.getElementById('shift-fullscreen');
+    if(!wrap) return;
+    wrap.style.display = 'flex';
+    document.body.classList.add('fs-open');
+    document.body.style.overflow = 'hidden';
+
+    const av = document.getElementById('shift-side-avatar');
+    const nm = document.getElementById('shift-side-name');
+    const rl = document.getElementById('shift-side-role');
+    if(av) av.innerText = (currentUser || 'U').trim().slice(0,1).toUpperCase();
+    if(nm) nm.innerText = currentUser || 'Kullanıcı';
+    if(rl) rl.innerText = isAdminMode ? 'Yönetici' : 'Temsilci';
+
+    await loadShiftData();
+    switchShiftTab(tab || 'plan');
+}
+
+function closeFullShift(){
+    const wrap = document.getElementById('shift-fullscreen');
+    if(wrap) wrap.style.display = 'none';
+    document.body.classList.remove('fs-open');
+    document.body.style.overflow = '';
+}
+
+function switchShiftTab(tab){
+    document.querySelectorAll('#shift-fullscreen .q-nav-item').forEach(i=>i.classList.remove('active'));
+    const nav = document.querySelector(`#shift-fullscreen .q-nav-item[data-shift-tab="${tab}"]`);
+    if(nav) nav.classList.add('active');
+
+    document.querySelectorAll('#shift-fullscreen .q-view-section').forEach(s=>s.classList.remove('active'));
+    const view = document.getElementById(`shift-view-${tab}`);
+    if(view) view.classList.add('active');
+}
+
+async function loadShiftData(){
+    try{
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({
+                action: "getShiftData",
+                username: currentUser,
+                token: getToken()
+            })
+        });
+        const data = await response.json();
+        if(data.result !== "success"){
+            Swal.fire('Hata', data.message || 'Vardiya verileri alınamadı.', 'error');
+            return;
+        }
+        renderShiftData(data.shifts || {});
+    }catch(e){
+        console.error(e);
+        Swal.fire('Hata', 'Vardiya verileri alınırken bir hata oluştu.', 'error');
+    }
+}
+
+function renderShiftData(shifts){
+    const weekLabelEl = document.getElementById('shift-week-label');
+    if(weekLabelEl){
+        weekLabelEl.textContent = shifts.weekLabel || '';
+    }
+
+    const myPlanEl = document.getElementById('shift-plan-my');
+    if(myPlanEl){
+        const myRow = shifts.myRow;
+        const headers = shifts.headers || [];
+        if(myRow && headers.length){
+            const cellsHtml = headers.map((h,idx)=>{
+                const v = (myRow.cells || [])[idx] || '';
+                return `<div class="shift-day"><div class="shift-day-date">${escapeHtml(h)}</div><div class="shift-day-slot">${escapeHtml(v)}</div></div>`;
+            }).join('');
+            myPlanEl.innerHTML = `
+                <div class="shift-card-header">Benim Vardiyam</div>
+                <div class="shift-card-body">${cellsHtml}</div>
+            `;
+        }else{
+            myPlanEl.innerHTML = '<p style="color:#666;">Vardiya tablosunda adınız bulunamadı.</p>';
+        }
+    }
+
+    const tableWrap = document.getElementById('shift-plan-table');
+    if(tableWrap){
+        const headers = shifts.headers || [];
+        const rows = shifts.rows || [];
+        if(!headers.length || !rows.length){
+            tableWrap.innerHTML = '<p style="color:#666;">Vardiya tablosu henüz hazırlanmadı.</p>';
+        }else{
+            let html = '<table class="shift-table"><thead><tr><th>Temsilci</th>';
+            headers.forEach(h => { html += `<th>${escapeHtml(h)}</th>`; });
+            html += '</tr></thead><tbody>';
+            rows.forEach(r => {
+                html += '<tr>';
+                html += `<td>${escapeHtml(r.name)}</td>`;
+                headers.forEach((h,idx)=>{
+                    const v = (r.cells || [])[idx] || '';
+                    html += `<td>${escapeHtml(v)}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            tableWrap.innerHTML = html;
+        }
+    }
+
+    const listEl = document.getElementById('shift-requests-list');
+    if(listEl){
+        const reqs = shifts.myRequests || [];
+        if(!reqs.length){
+            listEl.innerHTML = '<p style="color:#666;">Henüz oluşturulmuş vardiya talebin yok.</p>';
+        }else{
+            listEl.innerHTML = reqs.map(r => `
+                <div class="shift-request-item">
+                    <div class="shift-request-top">
+                        <span class="shift-request-date">${escapeHtml(r.date || '')}</span>
+                        <span class="shift-request-status">${escapeHtml(r.status || 'Açık')}</span>
+                    </div>
+                    <div class="shift-request-body">
+                        <div><strong>Tür:</strong> ${escapeHtml(r.type || '')}</div>
+                        <div><strong>Mevcut:</strong> ${escapeHtml(r.current || '')}</div>
+                        <div><strong>Talep Edilen:</strong> ${escapeHtml(r.requested || '')}</div>
+                        ${r.friend ? `<div><strong>Arkadaş:</strong> ${escapeHtml(r.friend || '')}</div>` : ''}
+                        ${r.friendShift ? `<div><strong>Arkadaş Vardiyası:</strong> ${escapeHtml(r.friendShift || '')}</div>` : ''}
+                        ${r.note ? `<div><strong>Not:</strong> ${escapeHtml(r.note || '')}</div>` : ''}
+                    </div>
+                    <div class="shift-request-footer">${escapeHtml(r.timestamp || '')}</div>
+                </div>
+            `).join('');
+        }
+    }
+}
+
+async function submitShiftRequest(evt){
+    if(evt) evt.preventDefault();
+
+    const date = document.getElementById('shift-req-date').value;
+    const type = document.getElementById('shift-req-type').value;
+    const current = document.getElementById('shift-req-current').value;
+    const requested = document.getElementById('shift-req-requested').value;
+    const friend = document.getElementById('shift-req-friend').value;
+    const friendShift = document.getElementById('shift-req-friend-shift').value;
+    const note = document.getElementById('shift-req-note').value;
+
+    if(!date || !requested){
+        Swal.fire('Uyarı', 'Tarih ve talep edilen vardiya alanları zorunludur.', 'warning');
+        return;
+    }
+
+    try{
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({
+                action: "submitShiftRequest",
+                username: currentUser,
+                token: getToken(),
+                date: date,
+                type: type,
+                current: current,
+                requested: requested,
+                friend: friend,
+                friendShift: friendShift,
+                note: note,
+                week: document.getElementById('shift-week-label') ? document.getElementById('shift-week-label').textContent : ''
+            })
+        });
+        const data = await response.json();
+        if(data.result === "success"){
+            Swal.fire({ icon:'success', title:'Kaydedildi', text:'Vardiya talebin kaydedildi.', timer:1500, showConfirmButton:false });
+            const form = document.getElementById('shift-request-form');
+            if(form) form.reset();
+            await loadShiftData();
+        }else{
+            Swal.fire('Hata', data.message || 'Talep kaydedilemedi.', 'error');
+        }
+    }catch(e){
+        console.error(e);
+        Swal.fire('Hata', 'Talep kaydedilirken bir hata oluştu.', 'error');
+    }
 }
 
 const TECH_DOC_CONTENT = {"broadcast": [{"title": "Smart TV – Canlı Yayında Donma Problemi Yaşıyorum", "body": "Müşterinin sorun yaşadığı yayın ya da yayınlarda genel bir sorun var mı kontrol edilir? Genel bir sorun var ise teknik ekibin incelediği yönünde bilgi verilir.\nMüşterinin kullandığı cihaz TVmanager ‘da loglardan kontrol edilir. Arçelik/Beko/Grundig/Altus marka Android TV olmayan Smart TV’lerden ise genel sorun hakkında bilgi verilir.\nYukarıdaki durumlar dışında yaşanan bir sorun ise TV ve modemin elektrik bağlantısını kesilip tekrar verilmesi istenir. « Yaşadığınız sorunu kontrol ederken TV ve modeminizin elektrik bağlantısını kesip 10 sn sonra yeniden açabilir misiniz? Ardından yeniden yayını açıp kontrol edebilir misiniz? (Ayrıca öneri olarak modemi kapatıp tekrar açtıktan sonra, sadece izleme yaptığı cihaz modeme bağlı olursa daha iyi bir bağlantı olacağı bilgisi verilebilir)\nSorun devam eder ise Smart TV tarayıcısından https://www.hiztesti.com.tr/ bir hız testi yapması sonucu bizimle paylaşması istenir.\nHız testi sonucu 8 Mbps altında ise internet bağlantı hızının düşük olduğunu internet servis sağlayıcısı iletişime geçmesi istenir.\n8 Mbps üzerinde ise müşteriden sorunu gösteren kısa bir video talep edilir.\nVideo kaydı ve hız testinin sonuçları gösteren bilgiler alındıktan sonra müşteriye incelenmesi için teknik ekibimize iletildiği inceleme tamamlandığında eposta ile bilgi verileceği yönünde bilgi verilir.\nSorun aynı gün içinde benzer cihazlarda farklı müşterilerde yaşıyor ise tüm bilgilerle Erlab’a arıza kaydı açılır. Sorun birkaç müşteri ile sınırlı ise 17:00 – 01:00 vardiyasındaki ekip arkadaşında sistemsel bir sorun olmadığına dair eposta gönderilmesi için bilgileri paylaşılır."}, {"title": "Mobil Uygulama – Canlı Yayında Donma Sorunu Yaşıyorum", "body": "Müşterinin sorun yaşadığı yayın ya da yayınlarda genel bir sorun var mı kontrol edilir? Genel bir sorun var ise teknik ekibin incelediği yönünde bilgi verilir.(Müşteri İOS veya Android işletim sistemli hangi cihazdan izliyorsa, mümkünse aynı işletim sistemli mobil cihazdan kontrol edilebilir, gerekirse ekip arkadaşlarından kontrol etmeleri istenebilir)\nGenel bir sorun yok ise, www.hiztesti.com.tr link üzerinden hız testi yapması sonucu bizimle paylaşması istenir.\nHız testi sonucu 8 mbps altında ise internet bağlantı hızının düşük olduğu internet servisi sağlayıcısı ile iletişime geçmesi istenir. (Öneri olarak modemi kapatıp tekrar açtıktan sonra sadece izleme yaptığı cihaz modeme bağlı olursa daha iyi bir bağlantı olacağı bilgisi verilebilir)\n8 mbps üzerinde ise, uygulama verilerin temizlenmesi veya uygulamanın silip tekrar yüklenmesi istenilir, sorun devam etmesi durumunda sorunu gösteren video kaydı istenir.\n 4. Hız testi, cihaz marka model ve sürüm bilgileri alındıktan sonra, incelenmesi için teknik ekibe iletildiği, inceleme tamamlandığında e-posta  ile bilgi verileceği yönünde bilgi verilir.\n 5. Sorun aynı gün içerinde benzer cihazlarda farklı müşterilerde yaşıyor ise tüm bilgilerle Erlab’a arıza kaydı açılır. Sorun birkaç müşteri ile sınırlı  ise 17:00 – 01:00 vardiyasındaki ekip arkadaşında sistemsel bir sorun olmadığına dair eposta gönderilmesi için bilgileri paylaşılır."}, {"title": "Bilgisayar – Canlı Yayında Donma Sorunu Yaşıyorum", "body": "Müşterinin sorun yaşadığı yayın ya da yayınlarda genel bir sorun var mı kontrol edilir? Genel bir sorun var ise teknik ekibin incelediği yönünde bilgi verilir.\nGenel bir sorun değilse, öncelikle https://www.hiztesti.com.tr/ bir hız testi yapması sonucu bizimle paylaşması istenir.\nHız testi sonucu 8 mbps altında ise internet bağlantı hızının düşük olduğunu internet servis sağlayıcısı iletişime geçmesi istenir.\n8 mbps üzerinde ise müşteriden aşağıdaki adımları uygulaması istenir.\n3. Bilgisayarın işletim sitemi öğrenilip, görüşme üzerinden ‘’pingWindows7’’ veya ‘’pingwindows10’’ kısayollarından müşteri sunucuları kontrol edilir.\n(Windows 10 üzeri işletim sistemi cihazlara pingwindows10 kısayolu gönderilebilir.)\n4. Sunucu kontrol ekranında kontrol edilmesi gereken, ok ile gösterilen yerden, sunucu ile kayıp olup olmadığı ve kırmızı alan içerisinde sunucu ile web sitemize kaç saniyede işlem sağladığı kontrol edilir.\n5. 1 – 35 arası normal sayılabilir, bu saniye aralığında sorun yaşanıyorsa, web sitemize daha hızlı tepsi süresi veren ve genellikle sorunsuz bir şekilde izleme sağlanabilen 193.192.103.249, 185.11.14.27 veya 195.175.178.8 sunucuları kontrol edilmelidir.\n6. Uygun sunucuyu tespit ettikten sonra canlı destek ekranında ‘’Host’’ ‘’host2’’ kısa yolları kullanarak, kısa yoldaki adımlar ile müşterinin sadece bizim sitemize bağlandığı sunucusunu, en uygun sunucu ile değiştirip tarayıcı açıp kapattırdıktan sonra tekrar yayını kontrol etmesini iletebiliriz. (Ayrıca müşteri yayınları auto değil, manuel olarak 720 veya 1080p seçip kontrol edilmesi önerilir)\n7. Sorun aynı gün içerinde benzer işletim sistemi veya sunucuda farklı müşterilerde yaşıyor ise tüm bilgilerle Erlab’a arıza kaydı açılır. Sorun birkaç müşteri ile sınırlı ise 17:00 – 01:00 vardiyasındaki ekip arkadaşında sistemsel bir sorun olmadığına dair eposta gönderilmesi için bilgileri paylaşılır"}, {"title": "YAYIN SORUNLARI", "body": "35 sn arası normal sayılabilir, bu saniye aralığında sorun yaşanıyorsa, web sitemize daha hızlı tepsi süresi veren ve genellikle sorunsuz bir şekilde izleme sağlanabilen 193.192.103.249, 185.11.14.27 veya 195.175.178.8 sunucuları kontrol edilmelidir."}, {"title": "MacOS – Canlı Yayında Donma Sorunu Yaşıyorum", "body": "Müşterinin sorun yaşadığı yayın ya da yayınlarda genel bir sorun var mı kontrol edilir? Genel bir sorun var ise teknik ekibin incelediği yönünde bilgi verilir.\nGenel bir sorun değilse, öncelikle https://www.hiztesti.com.tr/ bir hız testi yapması sonucu bizimle paylaşması istenir.\nHız testi sonucu 8 mbps altında ise internet bağlantı hızının düşük olduğunu internet servis sağlayıcısı iletişime geçmesi istenir.\n8 mbps üzerinde ise müşteriden aşağıdaki adımları uygulaması istenir.\nMindbehind üzerinden ‘’pingmacOS’’ kısayolundan müşteri sunucuları kontrol edilir.\nSunucu kontrol ekranında kontrol edilmesi gereken, ‘’packet loss’’ kısmında kayıp olup olmadığı,  alan içerisinde sunucu ile web sitemize kaç saniyede işlem sağladığı kontrol edilir.\n1 – 35 arası normal sayılabilir, bu saniye aralığında sorun yaşanıyorsa, web sitemize daha hızlı tepsi süresi veren ve genellikle sorunsuz bir şekilde izleme sağlanabilen 193.192.103.249, 185.11.14.27 veya 195.175.178.8 sunucuları kontrol edilmelidir.\nUygun sunucuyu tespit ettikten sonra canlı destek ekranında ‘’macOShost’’ kısa yolunu kullanarak, kısa yoldaki adımlar ile müşterinin sadece bizim sitemize bağlandığı sunucuyu, en uygun sunucu ile değiştirip tarayıcı açıp kapattırdıktan sonra tekrar yayını kontrol etmesini iletebiliriz. (Ayrıca müşteri yayınları auto değil, manuel olarak 720 veya 1080p seçip kontrol edilmesi önerilir)\nSorun aynı gün içerinde benzer işletim sistemi veya sunucuda farklı müşterilerde yaşıyor ise tüm bilgilerle Erlab’a arıza kaydı açılır. Sorun birkaç müşteri ile sınırlı ise 17:00 – 01:00 vardiyasındaki ekip arkadaşında sistemsel bir sorun olmadığına dair eposta gönderilmesi için bilgileri paylaşılır."}, {"title": "‘’Yayında beklenmedik bir kesinti oluştu’’ Uyarısı", "body": "Bu uyarı genel bir yayın sorunu olduğunda ya da kullanıcı Türkiye sınırları dışında bir yerden erişim sağladığında karşımıza çıkmaktadır.\nKullanıcının sorun yaşadığı yayın kontrol edilir ve genel bir yayın sorunu olup olmadığı teyit edilir.\nTvmanager’da SubscriberLog ekranından ip adresi alınır ve yurtdışı bir konum olup olmadığı teyit edilir.\nKullanıcı yurtdışında ise erişim sağlayamayacağı bilgisi verilir, VPN kullanıyor ise kapatması istenir.\nTVmanager Devices kısmında oturumlar sonlandırılır ve kullanıcıdan tekrar giriş yaparak kontrol etmesi rica edilir.\nMobil veri veya farklı bir ağda bu hata mesajının alınıp alınmadığı teyit edilir.\nCihaz ve modem kapama ve açma işlemi uygulanır.\nSorun devam eder ise inceleme için cihaz ve diğer bilgilerle teknik ekibimize bilgi verileceği iletilir. Excel de kullanıcıdan alınan bilgiler not edilir."}], "access": [{"title": "ERİŞİM SORUNLARI", "body": "‘’Lisans hakları sebebiyle Türkiye sınırları dışında hizmet verilememektedir.’’ Uyarısı\nAlınan hata müşterinin yurt dışında olması ve yurt içinde ise VPN ya da benzeri bir uygulamanın cihazında aktif olmasından kaynaklanmaktadır.\n\nMüşteriye yurt dışında olup olmadığı sorulur, yurt dışında ise ‘’lisans hakları sebebiyle yayınların yurt dışından izlenemediği’’ yönünde bilgi verilir.\nYurt içinde ise VPN ya da benzeri bir uygulamanın cihazında aktif olup ya da olmadığı sorulur. Aktif ise devre dışı bırakılıp tekrar denemesi önerilir.\nVPN ya da benzeri bir uygulama kullanmıyor ise müşterinin ip adresi öğrenilir ve https://tr.wizcase.com/tools/whats-my-ip/ ip adresi kontrol edilir.  Aynı zamanda adresin vpn üzerinden alınıp alınmadığının kontrolü için https://vpnapi.io adresine girilip kontrol edilir.\nIp adresi yurt dışı ya da ISP bilgisi bilinen bir servis sağlayıcısı değilse müşteriye bulunduğu lokasyonun otel, yurt vb. bir yer olup olmadığı ya da cihazının şirket cihazı olup olmadığı sorulur."}, {"title": "‘’IP Karantina’’ Uyarısı", "body": "İp Karantina sorunu genel bir sorun yok ise, eposta veya şifre bir çok defa hatalı girilmesinden dolayı alınır.\nKullanıcının ip adresi karantina da olup ya da olmadığı, TVmanager – CMS – Admission Gate menüsü üzerinden kontrol edilerek çıkarılabilir. İkinci bir seçenek olarak modem kapama ve açma işlemi yaptırılabilir."}], "app": [{"title": "Teknik Sorun Analizi Nasıl Yapılır?", "body": "App Kaynaklı Nedenler\nCihaz Kaynaklı Nedenler\nApp hataları başlığında uygulamanın açılmaması ya da kendi kendine kapanması şeklinde teknik sorunlar ile karşılaşabiliriz. Bu tip sorunlar, kullanıcı deneyimini doğrudan etkileyerek uygulamaya erişilememesine neden olur.\nUygulamanın eski sürümü\nÖnbellek sorunları\nUyumsuz cihazlar\nDolu RAM/Arka planda çalışan fazla uygulama\nCihazın güncel olmaması (Eski sistemi sürümleri)\nKullanıcıya Sorulabilecek Sorular:\nUygulama açılıyor mu, yoksa açılmadan kapanıyor mu?\nUygulama sürümü, cihaz işletim sistemi sürümü nedir? (TVmanager kontrolü)\nCihazda yeterli depolama alanı var mı?"}], "activation": [{"title": "‘’Promosyon Kodu Bulunamadı’’ Uyarısı", "body": "Görselde ki örnekte doğrusu ‘’YILLIKLOCA’’ olan kampanya kodu, küçük harf ile yazıldığında ‘’Promosyon Kodu Bulunamadı’’ hatası alınmıştır. Bu hata ile karşılaşıldığında kampanya kodunun yanlış, eksik, küçük harf ya da boşluk bırakılarak yazıldığını tespitle, kullanıcıyı bu doğrultuda doğru yazım için yönlendirmemiz gerekir."}, {"title": "‘’Kampanya Kodu Aktif Edilemedi’’ Uyarısı", "body": "Görseldeki örnekteki gibi eski bir promosyon kodu yazıldığında ‘’Kampanya Kodu Aktif Edilemedi’’ uyarısı alınır."}, {"title": "‘’Geçersiz Kampanya Kodu’’ Uyarısı", "body": "Görseldeki örnekteki gibi daha önce kullanılmış bir promosyon kodu yazıldığında ‘’Geçersiz Kampanya Kodu’’ hatası alınır.\nPromosyon kodunun hangi hesapta kullanıldığını aşağıdaki görseldeki gibi Campaign alanında arama yaparak görüntüleyebiliriz."}, {"title": "Playstore Uygulama Aktivasyon Sorunu", "body": "Bazı durumlarda, kullanıcılar Google Play Store üzerinden S Sport Plus uygulamasında abonelik satın aldıklarında veya yenileme gerçekleştiğinde, üyelikleri otomatik olarak aktifleşmeyebiliyor.  Bu durumda, kullanıcının uygulama üzerinden manuel olarak paket aktivasyonu yapması gerekmektedir.\n\nAktivasyon işleminin başarılı olabilmesi için:\n Google Play Store üzerinden satın alma işlemi yapılırken kullanılan Gmail hesabı, aktivasyon anında cihazda açık olmalıdır.\n Aktivasyon işlemi uygulama içerisinden yapılmalıdır.\nDestek ekibi tarafından Mindbehind üzerinden “paketgoogle” kısayolu kullanılarak yönlendirme sağlanabilir.  Kullanıcı başarılı bir şekilde paket aktivasyonu yaptıktan sonra, paket ataması sistemde gerçekleşir ve log kayıtlarında ilgili işlem aşağıdaki gibi görünür (ekli görsellerdeki gibi).  Bu işlem, paketin doğru şekilde tanımlanması için önemlidir."}, {"title": "App Store Uygulama Aktivasyon Sorunu", "body": "Müşteriler App Store üzerinden uygulamamızdan abonelik satın aldığı veya yenileme olduğu zaman bazen üyelik aktif olmuyor.\nÜyelikleri aktif olabilmeleri için, uygulama üzerinden paket aktivasyon yapmaları gerekiyor. Paket aktivasyon yaparken, satın alma yaparken hangi Apple kimliği hesabı açık ise, o hesap açıkken aktivasyon denemesi gerekiyor.\nMindbehind üzerinden ‘’paketapple’’ kısayolu kullanılır.\nMüşteri paket aktivasyonu yaptıktan sonra üyelik ataması ve loglarda nasıl gözüktüğü görsellerdeki gibidir.\nPaket aktivasyon butonu örnek görüntüsü yandaki gibidir."}, {"title": "AKTİVASYON SORUNLARI", "body": "İOS Uygulama Paket Aktivasyon ‘’Abonelik Başkasına Aittir’’ Sorunu\n\nİos uygulamamızda müşteri paket aktivasyon işlemi yaptığında ‘’Abonelik Başkasına Aittir’’ hatası geliyor ise, cihazda açık olan Apple kimliği ile satın alınmış, ancak aktivasyon yaptığı eposta adresi farklı bir eposta adresidir.\n\nFarklı eposta adresi ile paket aktivasyon yaptığında ‘’Subscriberlog’’ kısmında örnek ekran görüntüsünde kırmızı alana alınan ‘’packageValidation’’  kısmı çıkar, ok ile gösterilen ID kısmından doğru üyeliği ID araması ile bulabiliriz."}, {"title": "AKTİVASYON SORUNLARI", "body": "Android ‘’Paket Başka Bir Kullanıcıya Ait Olduğu İçin Paket Atama İşlemi Başarısız Oldu’’ Sorunu\n\nAndroid uygulamamızda müşteri paket aktivasyon işlemi yaptığında ‘’Paket Başka Bir Kullanıcıya Ait Olduğu İçin Paket Atama İşlemi Başarısız Oldu’’ hatası geliyor ise, cihazda açık olan Play Store gmail hesabı ile satın alınmış, ancak aktivasyon yaptığı eposta adresi farklı bir eposta adresidir.\n\nFarklı eposta adresi ile paket aktivasyon yaptığında ‘’Subscriberlog’’ kısmında örnek ekran görüntüsünde kırmızı alana alınan ‘’Validate Google Package’’  kısmı çıkar, ok ile gösterilen ID kısmından doğru üyeliği ID araması ile bulabiliriz."}, {"title": "AKTİVASYON SORUNLARI", "body": "Android Uygulama Paket Aktivasyon İşlem Tamamlanamadı veya Üyelik Bulunamama Sorunu\nAndroid uygulamamızda müşteri ödeme yapmış olmasına rağmen paket aktivasyonu yaptığında ‘’İşlem tamamlandı, İşlem Tamamlanamadı veya Abone bulunamadı’’ hatası geliyor ve üyelik aktif olmuyor ise, müşteriden GPA kodunu paylaşılması istenir.\nGPA kodu, Google tarafından ödeme yapıldığına dair müşteriye gönderilen ödeme faturası (makbuz) içerisinde yer almaktadır.\nBu GPA kodu ile üyeliği Tvmanager üzerinden aşağıdaki görseldeki gibi Reporting > General > Payments kısmında tarihi aralığı ayarlanıp ‘’Transaction Identifer’’ kısmından arama yapılıp, üyelik ID’sine ‘’Subscriber ID’’ üzerinden ulaşılabilir."}, {"title": "AKTİVASYON SORUNLARI", "body": "Türksat Abone Bulunamadı veya Abone Active Değil Sorunu\nBu hata, Hizmet ID veya Geçici Kod hatalı yazılmasından dolayı alınır.  Müşteriler genellikle bazı büyük küçük harfleri karıştırabiliyor veya sistemden dolayı bazen bu sorun alınabiliyor.\nÇözüm olarak harf hatası olmaması için Tvmanager>Reporting>General>Thirtdparty Provisions kısmından tarih aralığı belirleyip, Hizmet ID numarasını ‘’Extrenal ID’’ kısmından aratıp, kullanıcı Türksat bilgilerini bulup ‘’UniqueID’’ kısmından geçici kodu bulup, kullanıcıya paylaştığımızda, ID ve Geçici kodu kopyala yapıştırır şeklinde ilerlemesini iletebiliriz.\nAynı sorun devam eder ise, kullanıcıdan onay alıp, ID ve geçici kod ile kullanıcının üyeliğini kendimiz yapabiliriz. Müşterinin üyeliğini biz tarafından yapıldı ise, müşteriye şifresini nasıl güncelleyebileceği ile ilgili bilgi verilir."}]};
