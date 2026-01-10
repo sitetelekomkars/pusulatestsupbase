@@ -256,9 +256,7 @@
       <li class="q-nav-item active" data-shift-tab="plan" onclick="switchShiftTab('plan')">
         <i class="fas fa-calendar-week" aria-hidden="true"></i>Vardiya Planım
       </li>
-      <li class="q-nav-item" data-shift-tab="request" onclick="switchShiftTab('request')">
-        <i class="fas fa-exchange-alt" aria-hidden="true"></i>Vardiya Talebi
-      </li>
+      
     </ul>
     <div class="q-sidebar-footer">
       <button onclick="closeFullShift()" class="q-exit-btn">
@@ -280,51 +278,6 @@
         <div id="shift-plan-table"></div>
       </div>
     </div>
-    <div id="shift-view-request" class="q-view-section">
-      <div class="q-view-header">
-        <h2>Vardiya Talebi / Değişim</h2>
-      </div>
-      <form id="shift-request-form" class="shift-request-form" onsubmit="submitShiftRequest(event)">
-        <div>
-          <label for="shift-req-date">Tarih</label>
-          <input type="date" id="shift-req-date" required>
-        </div>
-        <div>
-          <label for="shift-req-type">Talep Türü</label>
-          <select id="shift-req-type">
-            <option value="Normal Vardiya Talebi">Normal Vardiya Talebi</option>
-            <option value="Vardiya Değişim Talebi">Vardiya Değişim Talebi</option>
-          </select>
-        </div>
-        <div>
-          <label for="shift-req-current">Mevcut Vardiyan</label>
-          <input type="text" id="shift-req-current" placeholder="Örn: 09:00 - 18:00">
-        </div>
-        <div>
-          <label for="shift-req-requested">Talep Ettiğin Vardiya</label>
-          <input type="text" id="shift-req-requested" placeholder="Örn: 13:30 - 22:00" required>
-        </div>
-        <div>
-          <label for="shift-req-friend">Değişim Yapmak İstediğin Arkadaş</label>
-          <input type="text" id="shift-req-friend" placeholder="Opsiyonel">
-        </div>
-        <div>
-          <label for="shift-req-friend-shift">Arkadaşın Vardiyası</label>
-          <input type="text" id="shift-req-friend-shift" placeholder="Opsiyonel">
-        </div>
-        <div class="full-row">
-          <label for="shift-req-note">Açıklama</label>
-          <textarea id="shift-req-note" placeholder="Talebinle ilgili kısa bir açıklama gir."></textarea>
-        </div>
-        <div class="full-row" style="text-align:right;">
-          <button type="submit">
-            <i class="fas fa-paper-plane" aria-hidden="true"></i> Talebi Gönder
-          </button>
-        </div>
-      </form>
-      <div class="shift-requests-list" id="shift-requests-list">
-        <!-- Daha önce oluşturulan talepler burada listelenecek -->
-      </div>
     </div>
   </div>
 </div>
