@@ -3978,9 +3978,9 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
                                 <span><i class="fas fa-phone"></i> Çağrı: ${callDateDisplay}</span>
                                 <span><i class="fas fa-headphones"></i> Dinlenme: ${listenDateDisplay}</span>
                             </div>
-                            <div style="font-size:0.75rem; color:#999; margin-top:2px;">
-                        ID: <span class="eval-id" ondblclick="copyText('${escapeHtml(evalItem.callId || '')}')">${escapeHtml(evalItem.callId || '')}</span>
-                    </div
+                            <div style="margin-top:5px;">
+                                <span class="eval-id-badge" onclick="event.stopPropagation(); copyText('${escapeHtml(evalItem.callId || '')}')" title="Kopyala"><i class="fas fa-copy"></i> ${escapeHtml(evalItem.callId || '')}</span>
+                            </div>
                         </div>
                         <div style="text-align:right;">
                              ${editBtn} <span style="font-weight:800; font-size:1.6rem; color:${scoreColor};">${evalItem.score}</span>
