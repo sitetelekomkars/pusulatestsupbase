@@ -1,23 +1,5 @@
 
 
-// --- YENİ HELPERLAR ---
-function _getMonthDateRange(mm_yyyy) {
-    if (!mm_yyyy) return { startDate: null, endDate: null };
-    try {
-        const parts = mm_yyyy.split('.');
-        const m = parseInt(parts[0], 10);
-        const y = parseInt(parts[1], 10);
-        const lastDay = new Date(y, m, 0).getDate();
-        return {
-            startDate: `01.${String(m).padStart(2, '0')}.${y}`,
-            endDate: `${lastDay}.${String(m).padStart(2, '0')}.${y}`
-        };
-    } catch (e) { return { startDate: null, endDate: null }; }
-}
-function logActionFrontend(type, detail) {
-    apiCall("logAction", { type: type, detail: detail || "" }).catch(() => { });
-}
-
 function formatWeekLabel(raw) {
     try {
         if (!raw) return '';
@@ -86,6 +68,31 @@ async function apiCall(action, payload = {}) {
     if (json.result !== "success") throw new Error(json.message || json.error || "API error");
     return json;
 }
+
+
+// Basit kullanıcı aksiyon loglayıcı (Logs sayfası)
+function logUserAction(eventName, meta) {
+    try {
+        const username = (typeof currentUser !== "undefined" && currentUser) ? currentUser : (localStorage.getItem("sSportUser") || "");
+        const token = (typeof getToken === "function" ? getToken() : (localStorage.getItem("sSportToken") || ""));
+        const payload = {
+            action: "logUserAction",
+            username: username,
+            token: token,
+            event: eventName || "",
+            meta: meta || {},
+            page: "quality"
+        };
+        fetch(SCRIPT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload)
+        }).catch(function () { });
+    } catch (e) {
+        // sessiz
+    }
+}
+
 
 // SweetAlert2 yoksa minimal yedek (sessiz kırılma olmasın)
 if (typeof Swal === "undefined") {
@@ -2465,6 +2472,8 @@ function closeFullQuality() {
 }
 // Sekme Değiştirme
 function switchQualityTab(tabName, element) {
+    // Kullanıcı aksiyon logu
+    if (typeof logUserAction === 'function') { try { logUserAction('quality_tab_open', { tab: tabName }); } catch (e) {} }
     // Menu active class
     document.querySelectorAll('.q-nav-item').forEach(item => item.classList.remove('active'));
     // Element varsa onu aktif yap, yoksa varsayılanı (dashboard) bulup aktif yap
@@ -2477,9 +2486,6 @@ function switchQualityTab(tabName, element) {
     // View active class
     document.querySelectorAll('.q-view-section').forEach(section => section.classList.remove('active'));
     document.getElementById(`view-${tabName}`).classList.add('active');
-    // Loglama
-    logActionFrontend("TabChange", "Quality Tab: " + tabName);
-
     // Veri Yükleme
     if (tabName === 'dashboard') loadQualityDashboard();
     else if (tabName === 'evaluations') fetchEvaluationsForAgent();
@@ -2489,17 +2495,10 @@ function switchQualityTab(tabName, element) {
         refreshFeedbackData();
     }
     else if (tabName === 'training') loadTrainingData();
-    else if (tabName === 'logs') fetchLogsData();
-    // DÜZELTME: Feedback sekmesi açılırken önce Feedback_Logs çekilmeli
-    else if (tabName === 'feedback') {
-        populateFeedbackFilters();
-        refreshFeedbackData();
-    }
-    else if (tabName === 'training') loadTrainingData();
 }
 // --- DASHBOARD FONKSİYONLARI ---
 function populateMonthFilterFull() {
-    const selectIds = ['q-dash-month', 'q-evals-month', 'q-logs-month']; // Sadece yeni filtre
+    const selectIds = ['q-dash-month', 'q-eval-month']; // Dashboard + Değerlendirme
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -2758,6 +2757,7 @@ async function fetchEvaluationsForFeedback() {
                 action: 'fetchEvaluations',
                 targetAgent: targetAgent,
                 targetGroup: targetGroup,
+                period: periodSelect ? periodSelect.value : '',
                 username: currentUser,
                 token: getToken()
             })
@@ -2805,8 +2805,7 @@ async function fetchEvaluationsForDashboard() {
                 action: "fetchEvaluations",
                 targetAgent: targetAgent,
                 targetGroup: targetGroup,
-                startDate: _getMonthDateRange(document.getElementById('q-dash-month')?.value).startDate,
-                endDate: _getMonthDateRange(document.getElementById('q-dash-month')?.value).endDate,
+                period: periodSelect ? periodSelect.value : '',
                 username: currentUser,
                 token: getToken()
             })
@@ -3933,6 +3932,7 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
     if (!silent) listEl.innerHTML = 'Yükleniyor...';
     const groupSelect = document.getElementById('q-admin-group');
     const agentSelect = document.getElementById('q-admin-agent');
+    const periodSelect = document.getElementById('q-eval-month');
 
     let targetAgent = forcedName || currentUser;
     let targetGroup = 'all';
@@ -3941,22 +3941,10 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
         targetAgent = forcedName || agentSelect.value;
         targetGroup = groupSelect ? groupSelect.value : 'all';
     }
-    // Tarih Filtresi
-    const monthVal = document.getElementById('q-evals-month')?.value;
-    const { startDate, endDate } = _getMonthDateRange(monthVal);
-
     try {
         const response = await fetch(SCRIPT_URL, {
             method: 'POST', headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({
-                action: "fetchEvaluations",
-                targetAgent: targetAgent,
-                targetGroup: targetGroup,
-                startDate: startDate,
-                endDate: endDate,
-                username: currentUser,
-                token: getToken()
-            })
+            body: JSON.stringify({ action: "fetchEvaluations", targetAgent: targetAgent, targetGroup: targetGroup, username: currentUser, token: getToken() })
         });
         const data = await response.json();
 
@@ -3968,6 +3956,18 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
 
             // Sadece normal değerlendirmeleri filtrele ve göster
             const normalEvaluations = allEvaluationsData.filter(e => !String(e.callId).toUpperCase().startsWith('MANUEL-'));
+
+            if (typeof logUserAction === 'function') {
+                try {
+                    logUserAction('eval_list_loaded', {
+                        period: (typeof periodSelect !== 'undefined' && periodSelect) ? periodSelect.value : '',
+                        targetAgent,
+                        targetGroup,
+                        count: normalEvaluations.length
+                    });
+                } catch (e) { }
+            }
+
             if (normalEvaluations.length === 0) { listEl.innerHTML = `<p style="text-align:center; color:#666;">Kayıt yok.</p>`; return; }
 
             normalEvaluations.forEach((evalItem, index) => {
@@ -4042,6 +4042,7 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
 function updateAgentListBasedOnGroup() {
     const groupSelect = document.getElementById('q-admin-group');
     const agentSelect = document.getElementById('q-admin-agent');
+    const periodSelect = document.getElementById('q-eval-month');
     if (!groupSelect || !agentSelect) return;
     const selectedGroup = groupSelect.value;
     agentSelect.innerHTML = '';
@@ -4090,6 +4091,7 @@ async function exportEvaluations() {
 
     const groupSelect = document.getElementById('q-admin-group');
     const agentSelect = document.getElementById('q-admin-agent');
+    const periodSelect = document.getElementById('q-eval-month');
 
     fetch(SCRIPT_URL, {
         method: 'POST', headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -6227,45 +6229,3 @@ window.switchTechTab = async function (tab) {
 
 // expose for onclick
 try { window.openMenuPermissions = openMenuPermissions; } catch (e) { }
-
-// --- LOG PANELİ ---
-function fetchLogsData() {
-    const listEl = document.getElementById('logs-table-body');
-    if (!listEl) return;
-    listEl.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:10px;">Yükleniyor...</td></tr>';
-
-    const monthVal = document.getElementById('q-logs-month')?.value;
-    const { startDate, endDate } = _getMonthDateRange(monthVal);
-
-    fetch(SCRIPT_URL, {
-        method: 'POST',
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-            action: "fetchActionLogs",
-            username: currentUser,
-            token: getToken(),
-            startDate: startDate,
-            endDate: endDate
-        })
-    }).then(r => r.json()).then(data => {
-        if (data.result === 'success') {
-            const logs = data.logs || [];
-            if (logs.length === 0) {
-                listEl.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:10px;color:#999">Kayıt bulunamadı.</td></tr>';
-                return;
-            }
-            listEl.innerHTML = logs.map(l => `
-                <tr style="border-bottom:1px solid #eee;">
-                    <td style="padding:10px;color:#666;">${l.date}</td>
-                    <td style="padding:10px;font-weight:600;">${l.username}</td>
-                    <td style="padding:10px;">${l.action}</td>
-                    <td style="padding:10px;color:#444; word-break:break-all;">${l.detail}</td>
-                </tr>
-            `).join('');
-        } else {
-            listEl.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:10px;color:red;">${data.message || 'Hata'}</td></tr>`;
-        }
-    }).catch(e => {
-        listEl.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:10px;color:red;">Bağlantı hatası.</td></tr>';
-    });
-}
