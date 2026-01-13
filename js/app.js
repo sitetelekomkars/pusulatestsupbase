@@ -28,16 +28,6 @@ function formatWeekLabel(raw) {
     return raw || '';
 }
 
-function getPeriodKeyFromDateStr(dateStr) {
-    if (!dateStr) return '';
-    const m = String(dateStr).match(/(\d{2})\.(\d{2})\.(\d{4})/);
-    if (!m) return '';
-    // m[2] = month, m[3] = year -> "MM.YYYY"
-    return `${m[2]}.${m[3]}`;
-}
-
-
-
 function formatShiftDate(d) {
     try {
         const dt = new Date(d);
@@ -78,41 +68,6 @@ async function apiCall(action, payload = {}) {
     if (json.result !== "success") throw new Error(json.message || json.error || "API error");
     return json;
 }
-
-
-// Gelişmiş kullanıcı aksiyon loglayıcı (Logs sayfası)
-function logUserAction(eventName, meta) {
-    try {
-        const username = (typeof currentUser !== "undefined" && currentUser) ? currentUser : (localStorage.getItem("sSportUser") || "");
-        const token = (typeof getToken === "function" ? getToken() : (localStorage.getItem("sSportToken") || ""));
-        const screen = (typeof currentView !== "undefined" && currentView) ? currentView : (meta && meta.screen) || "";
-        const payload = {
-            action: "logUserAction",
-            username: username,
-            token: token,
-            // Eski alanlar (geriye dönük uyum)
-            event: eventName || "",
-            meta: meta || {},
-            page: screen || "quality",
-            // Yeni detay alanları
-            logAction: eventName || "",
-            logScreen: screen || "quality",
-            targetAgent: meta && meta.targetAgent ? meta.targetAgent : "",
-            callDate: meta && meta.callDate ? meta.callDate : "",
-            callId: meta && meta.callId ? meta.callId : "",
-            score: meta && typeof meta.score !== "undefined" ? meta.score : "",
-            logDetail: JSON.stringify(meta || {})
-        };
-        fetch(SCRIPT_URL, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(payload)
-        }).catch(function () { });
-    } catch (e) {
-        // sessiz
-    }
-}
-
 
 // SweetAlert2 yoksa minimal yedek (sessiz kırılma olmasın)
 if (typeof Swal === "undefined") {
@@ -2492,8 +2447,6 @@ function closeFullQuality() {
 }
 // Sekme Değiştirme
 function switchQualityTab(tabName, element) {
-    // Kullanıcı aksiyon logu
-    if (typeof logUserAction === 'function') { try { logUserAction('quality_tab_open', { tab: tabName }); } catch (e) {} }
     // Menu active class
     document.querySelectorAll('.q-nav-item').forEach(item => item.classList.remove('active'));
     // Element varsa onu aktif yap, yoksa varsayılanı (dashboard) bulup aktif yap
@@ -2518,7 +2471,7 @@ function switchQualityTab(tabName, element) {
 }
 // --- DASHBOARD FONKSİYONLARI ---
 function populateMonthFilterFull() {
-    const selectIds = ['q-dash-month', 'q-eval-month']; // Dashboard + Değerlendirme
+    const selectIds = ['q-dash-month', 'q-eval-month']; // Dashboard + Değerlendirme listesi
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -2777,7 +2730,6 @@ async function fetchEvaluationsForFeedback() {
                 action: 'fetchEvaluations',
                 targetAgent: targetAgent,
                 targetGroup: targetGroup,
-                period: periodSelect ? periodSelect.value : '',
                 username: currentUser,
                 token: getToken()
             })
@@ -2825,7 +2777,6 @@ async function fetchEvaluationsForDashboard() {
                 action: "fetchEvaluations",
                 targetAgent: targetAgent,
                 targetGroup: targetGroup,
-                period: periodSelect ? periodSelect.value : '',
                 username: currentUser,
                 token: getToken()
             })
@@ -3909,8 +3860,6 @@ async function addManualFeedbackPopup() {
             .then(r => r.json()).then(async d => {
                 if (d.result === "success") {
                     Swal.fire({ icon: 'success', title: 'Kaydedildi', timer: 1500, showConfirmButton: false });
-                    logAction("eval_save", { targetAgent: formValues.agentName || '', callDate: formValues.callDate || '', callId: formValues.callId || '', score: formValues.totalScore || '' }, formValues);
-
                     // DÜZELTME: Hem evaluations hem de feedback logs güncellenmeli
                     fetchEvaluationsForAgent(formValues.agentName);
                     fetchFeedbackLogs().then(() => { loadFeedbackList(); });
@@ -3954,7 +3903,6 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
     if (!silent) listEl.innerHTML = 'Yükleniyor...';
     const groupSelect = document.getElementById('q-admin-group');
     const agentSelect = document.getElementById('q-admin-agent');
-    const periodSelect = document.getElementById('q-eval-month');
 
     let targetAgent = forcedName || currentUser;
     let targetGroup = 'all';
@@ -3964,9 +3912,20 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
         targetGroup = groupSelect ? groupSelect.value : 'all';
     }
     try {
+        const periodSelect = document.getElementById('q-eval-month');
+        const selectedPeriod = periodSelect ? periodSelect.value : null;
+
         const response = await fetch(SCRIPT_URL, {
-            method: 'POST', headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({ action: "fetchEvaluations", targetAgent: targetAgent, targetGroup: targetGroup, username: currentUser, token: getToken() })
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({
+                action: "fetchEvaluations",
+                targetAgent: targetAgent,
+                targetGroup: targetGroup,
+                period: selectedPeriod,
+                username: currentUser,
+                token: getToken()
+            })
         });
         const data = await response.json();
 
@@ -3976,33 +3935,29 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
             if (silent) return; // Silent mode ise burada bitir (veri yüklendi)
             listEl.innerHTML = '';
 
-            // Sadece normal değerlendirmeleri filtrele
-            let normalEvaluations = allEvaluationsData.filter(e => !String(e.callId).toUpperCase().startsWith('MANUEL-'));
+            // Sadece normal değerlendirmeleri filtrele ve göster
+            const normalEvaluations = allEvaluationsData.filter(e => !String(e.callId).toUpperCase().startsWith('MANUEL-'));
 
-            // Dönem filtresi (önce backend, sonra ön tarafta ekstra güvenlik)
-            const selectedPeriod = (periodSelect && periodSelect.value) ? periodSelect.value : '';
-            if (selectedPeriod && selectedPeriod !== 'all') {
-                normalEvaluations = normalEvaluations.filter(e => {
-                    const srcDate = e.callDate || e.date || e.evalDate || '';
-                    const key = getPeriodKeyFromDateStr(srcDate);
-                    return key === selectedPeriod;
+            // Dönem filtresini uygula (seçili ay / yıl)
+            let filteredEvaluations = normalEvaluations;
+            const periodSelectForList = document.getElementById('q-eval-month');
+            const selectedPeriodForList = periodSelectForList ? periodSelectForList.value : null;
+            if (selectedPeriodForList) {
+                filteredEvaluations = normalEvaluations.filter(e => {
+                    if (!e.date) return false;
+                    const parts = String(e.date).split('.');
+                    if (parts.length < 3) return false;
+                    const monthYear = `${parts[1].padStart(2, '0')}.${parts[2]}`;
+                    return monthYear === selectedPeriodForList;
                 });
             }
 
-            if (typeof logUserAction === 'function') {
-                try {
-                    logUserAction('eval_list_loaded', {
-                        period: selectedPeriod,
-                        targetAgent,
-                        targetGroup,
-                        count: normalEvaluations.length
-                    });
-                } catch (e) { }
+            if (filteredEvaluations.length === 0) {
+                listEl.innerHTML = '<p style="padding:20px; text-align:center; color:#666;">Kayıt yok.</p>';
+                return;
             }
 
-            if (normalEvaluations.length === 0) { listEl.innerHTML = `<p style="text-align:center; color:#666;">Kayıt yok.</p>`; return; }
-
-            normalEvaluations.forEach((evalItem, index) => {
+            filteredEvaluations.forEach((evalItem, index) => {
                 const scoreColor = evalItem.score >= 90 ? '#2e7d32' : (evalItem.score >= 70 ? '#ed6c02' : '#d32f2f');
                 let editBtn = isAdminMode ? `<i class="fas fa-pen" style="font-size:1rem; color:#fabb00; cursor:pointer; margin-right:5px;" onclick="event.stopPropagation(); editEvaluation('${evalItem.callId}')"></i>` : '';
                 // İsim iki kez yazılmasın: agent zaten başlıkta var. Eğer agentName gibi ayrı bir alan varsa onu göster.
@@ -4074,7 +4029,6 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
 function updateAgentListBasedOnGroup() {
     const groupSelect = document.getElementById('q-admin-group');
     const agentSelect = document.getElementById('q-admin-agent');
-    const periodSelect = document.getElementById('q-eval-month');
     if (!groupSelect || !agentSelect) return;
     const selectedGroup = groupSelect.value;
     agentSelect.innerHTML = '';
@@ -4123,7 +4077,6 @@ async function exportEvaluations() {
 
     const groupSelect = document.getElementById('q-admin-group');
     const agentSelect = document.getElementById('q-admin-agent');
-    const periodSelect = document.getElementById('q-eval-month');
 
     fetch(SCRIPT_URL, {
         method: 'POST', headers: { "Content-Type": "text/plain;charset=utf-8" },
