@@ -16,9 +16,6 @@
 <button class="filter-btn link-btn" data-menu-key="telesales" onclick="openTelesalesArea()" aria-label="TeleSatış"><i class="fas fa-headset" aria-hidden="true"></i>TeleSatış</button>
 <button class="filter-btn link-btn" data-menu-key="game" onclick="openGameHub()" aria-label="Oyun"><i class="fas fa-futbol" aria-hidden="true"></i>Oyun</button>
 <button class="filter-btn link-btn" data-menu-key="quality" onclick="openQualityArea()" aria-label="Kalite"><i class="fas fa-chart-pie" aria-hidden="true"></i>Kalite</button>
-<button class="filter-btn link-btn" data-menu-key="shift" onclick="openShiftArea()" aria-label="Vardiyam">
-<i class="fas fa-calendar-check" aria-hidden="true">
-</i>Vardiyam</button>
 </div></div></div><div id="global-news-ticker" class="news-ticker-box" onclick="openNews()"><div class="ticker-label"><span class="pulse-dot"></span>DUYURU</div><div class="ticker-scroll-wrapper"><div id="ticker-content" class="ticker-content">Duyurular yükleniyor...</div></div></div></div><div class="container"><div id="home-screen" class="home-screen" style="display:none">
   <div class="home-hero">
     <div class="home-hero-left">
@@ -150,18 +147,14 @@
       </div>
       <div class="q-chart-wrap"><canvas id="q-group-avg-chart"></canvas></div>
     </div>
-
-    <div class="q-chart-card q-card-wide">
-      <div class="q-card-head">
-        <h3>Temsilci Karşılaştırması</h3>
-        <div class="q-card-sub" id="q-agent-comp-sub">Sıralama</div>
-      </div>
-      <div class="q-chart-wrap"><canvas id="q-agent-comp-chart"></canvas></div>
-    </div>
   </div>
 </div>
 
-<div id="view-evaluations" class="q-view-section"><div class="q-view-header"><h2>Değerlendirme Geçmişi</h2><div id="admin-filters" style="display:none;gap:10px"><button class="add-btn" onclick="logEvaluationPopup()"><i class="fas fa-plus" aria-hidden="true"></i>Ekle</button><button class="admin-btn" onclick="exportEvaluations()"><i class="fas fa-file-csv" aria-hidden="true"></i>Rapor</button><select id="q-admin-group" onchange="updateAgentListBasedOnGroup()" class="minimal-select"><option value="all">Tüm Gruplar</option></select><select id="q-admin-agent" onchange="fetchEvaluationsForAgent()" class="minimal-select"><option value="all">Tüm Temsilciler</option></select></div></div><div id="evaluations-list" class="q-scroll-area"></div></div><div id="view-feedback" class="q-view-section"><div class="q-view-header"><h2>Geri Bildirimler</h2><div id="q-feedback-filters" style="display:flex;gap:10px;margin-left:auto;align-items:center;flex-wrap:wrap"><select id="q-feedback-group" onchange="updateFeedbackAgentList()" style="width:120px"><option value="all">Tüm Gruplar</option></select><select id="q-feedback-agent" onchange="refreshFeedbackData()" style="width:130px"><option value="all">Tüm Temsilciler</option></select></div><button id="manual-feedback-admin-btn" class="add-manual-feedback-btn" style="display:none" onclick="addManualFeedbackPopup()"><i class="fas fa-plus-circle" aria-hidden="true"></i>Geri Bildirim Ekle</button></div><div id="feedback-list" class="q-scroll-area"></div></div><div id="view-training" class="q-view-section"><div class="q-view-header"><h2>Eğitim & Gelişim</h2><button id="assign-training-btn" class="add-btn" style="display:none" onclick="assignTrainingPopup()">+ Eğitim Ata</button></div><div id="training-list" class="q-training-grid"></div></div></div></div><div class="crafted-by-badge">Crafted by Doğuş Yalçınkaya</div><script src="js/app.js"></script><script>function toggleUserDropdown() {
+<div id="view-evaluations" class="q-view-section"><div class="q-view-header"><h2>Değerlendirme Geçmişi</h2><div id="admin-filters" style="display:none;gap:10px"><button class="add-btn" onclick="logEvaluationPopup()"><i class="fas fa-plus" aria-hidden="true"></i>Ekle</button><button class="admin-btn" onclick="exportEvaluations()"><i class="fas fa-file-csv" aria-hidden="true"></i>Rapor</button><select id="q-admin-group" onchange="updateAgentListBasedOnGroup()" class="minimal-select"><option value="all">Tüm Gruplar</option></select><select id="q-admin-agent" onchange="fetchEvaluationsForAgent()" class="minimal-select"><option value="all">Tüm Temsilciler</option></select>
+    <div class="q-period-selector">
+      <span>Ay:</span>
+      <select id="q-admin-month" onchange="fetchEvaluationsForAgent()" class="minimal-select"></select>
+    </div></div></div><div id="evaluations-list" class="q-scroll-area"></div></div><div id="view-feedback" class="q-view-section"><div class="q-view-header"><h2>Geri Bildirimler</h2><div id="q-feedback-filters" style="display:flex;gap:10px;margin-left:auto;align-items:center;flex-wrap:wrap"><select id="q-feedback-group" onchange="updateFeedbackAgentList()" style="width:120px"><option value="all">Tüm Gruplar</option></select><select id="q-feedback-agent" onchange="refreshFeedbackData()" style="width:130px"><option value="all">Tüm Temsilciler</option></select></div><button id="manual-feedback-admin-btn" class="add-manual-feedback-btn" style="display:none" onclick="addManualFeedbackPopup()"><i class="fas fa-plus-circle" aria-hidden="true"></i>Geri Bildirim Ekle</button></div><div id="feedback-list" class="q-scroll-area"></div></div><div id="view-training" class="q-view-section"><div class="q-view-header"><h2>Eğitim & Gelişim</h2><button id="assign-training-btn" class="add-btn" style="display:none" onclick="assignTrainingPopup()">+ Eğitim Ata</button></div><div id="training-list" class="q-training-grid"></div></div></div></div><div class="crafted-by-badge">Crafted by Doğuş Yalçınkaya</div><script src="js/app.js"></script><script>function toggleUserDropdown() {
             const dropdown = document.getElementById('userDropdown');
             const arrow = document.getElementById('user-menu-arrow');
             dropdown.classList.toggle('show');
@@ -242,50 +235,6 @@
         <div class="q-toolbar"><input id="t-scripts-search" class="q-input" placeholder="Script ara..." oninput="renderTelesalesScripts()"></div>
         <div id="t-scripts-grid" class="q-list"></div>
       </section>
-    </div>
-  </div>
-</div>
-
-<div 
-<div id="shift-fullscreen" class="q-fullscreen" style="display:none">
-  <div class="q-sidebar">
-    <div class="q-sidebar-header">
-      <i class="fas fa-calendar-check fa-lg" aria-hidden="true"></i>
-      <span>Vardiyam</span>
-    </div>
-    <div class="q-user-profile">
-      <div class="q-avatar-circle" id="shift-side-avatar">U</div>
-      <div class="q-user-info">
-        <div class="q-user-name" id="shift-side-name">Kullanıcı Adı</div>
-        <div class="q-user-role" id="shift-side-role">Temsilci</div>
-      </div>
-    </div>
-    <ul class="q-nav-menu">
-      <li class="q-nav-item active" data-shift-tab="plan" onclick="switchShiftTab('plan')">
-        <i class="fas fa-calendar-week" aria-hidden="true"></i>Vardiya Planım
-      </li>
-      
-    </ul>
-    <div class="q-sidebar-footer">
-      <button onclick="closeFullShift()" class="q-exit-btn">
-        <i class="fas fa-sign-out-alt" aria-hidden="true"></i>Geri
-      </button>
-    </div>
-  </div>
-  <div class="q-content">
-    <div id="shift-view-plan" class="q-view-section active">
-      <div class="q-view-header q-dash-header" style="flex-wrap:wrap;gap:10px">
-        <h2>Vardiya Planım</h2>
-        <div id="shift-week-label" class="shift-week-info"></div>
-      </div>
-      <div id="shift-plan-my" class="shift-plan-card">
-        <!-- Kullanıcının kendi vardiyası burada gösterilecek -->
-      </div>
-      <div class="shift-plan-table-wrapper">
-        <h3 style="margin-bottom:8px;">Takım Vardiya Tablosu</h3>
-        <div id="shift-plan-table"></div>
-      </div>
-    </div>
     </div>
   </div>
 </div>
