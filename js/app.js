@@ -3957,6 +3957,7 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
                 return;
             }
 
+            let listElBuffer = ""; // Buffer tanımla
             filteredEvaluations.forEach((evalItem, index) => {
                 const scoreColor = evalItem.score >= 90 ? '#2e7d32' : (evalItem.score >= 70 ? '#ed6c02' : '#d32f2f');
                 let editBtn = isAdminMode ? `<i class="fas fa-pen" style="font-size:1rem; color:#fabb00; cursor:pointer; margin-right:5px;" onclick="event.stopPropagation(); editEvaluation('${evalItem.callId}')"></i>` : '';
@@ -3997,7 +3998,8 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
                 const callDateDisplay = evalItem.callDate && evalItem.callDate !== 'N/A' ? evalItem.callDate : 'N/A';
                 const listenDateDisplay = evalItem.date || 'N/A';
 
-                listEl.innerHTML += `
+                // HTML Buffer (Performans için)
+                listElBuffer += `
                 <div class="evaluation-summary" id="eval-summary-${index}" style="border-left:4px solid ${scoreColor}; padding:15px; margin-bottom:10px; border-radius:8px; background:#fff; cursor:pointer;" onclick="toggleEvaluationDetail(${index})">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
@@ -4023,6 +4025,7 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
                     </div>
                 </div>`;
             });
+            listEl.innerHTML = listElBuffer; // Tek seferde DOM update
         }
     } catch (err) { if (!silent) listEl.innerHTML = `<p style="color:red; text-align:center;">Hata oluştu.</p>`; }
 }
