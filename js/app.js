@@ -948,7 +948,7 @@ function renderCards(data) {
             const editIconHtml = (isAdminMode && isEditingActive) ? `<i class="fas fa-pencil-alt edit-icon" onclick="editContent(${index})" style="display:block;"></i>` : '';
             let formattedText = (item.text || "").replace(/\n/g, '<br>').replace(/\*(.*?)\*/g, '<b>$1</b>');
 
-            const imgNotif = item.image ? `<div style="margin-bottom:8px;"><img src="${item.image}" style="max-width:100%;border-radius:6px;max-height:150px;object-fit:cover;"></div>` : '';
+            const imgNotif = item.image ? `<div style="margin-bottom:8px;"><img src="${processImageUrl(item.image)}" loading="lazy" onerror="this.style.display='none'" style="max-width:100%;border-radius:6px;max-height:150px;object-fit:cover;"></div>` : '';
 
             return `<div class="card ${item.category}">${newBadge}
                 <div class="icon-wrapper">${editIconHtml}<i class="${favClass} fav-icon" onclick="toggleFavorite('${safeTitle}')"></i></div>
@@ -1103,10 +1103,11 @@ function showCardDetailByIndex(index) {
     const script = (item.script || '').toString();
     const link = (item.link || '').toString();
     const img = (item.image || '').toString();
+    const processedImg = processImageUrl(img);
 
     const html = `
       <div style="text-align:left; font-size:1rem; line-height:1.6; white-space:pre-line;">
-        ${img ? `<div style="margin-bottom:15px;text-align:center;"><img src="${escapeHtml(img)}" style="max-width:100%;border-radius:8px;"></div>` : ''}
+        ${img ? `<div style="margin-bottom:15px;text-align:center;"><img src="${escapeHtml(processedImg)}" onerror="this.style.display='none'" style="max-width:100%;border-radius:8px;"></div>` : ''}
         ${escapeHtml(body).replace(/\n/g, '<br>')}
         ${link ? `<div style="margin-top:12px"><a href="${escapeHtml(link)}" target="_blank" rel="noreferrer" style="font-weight:800;color:var(--info);text-decoration:none"><i class="fas fa-link"></i> Link</a></div>` : ''}
         ${script ? `<div class="tech-script-box" style="margin-top:12px">
@@ -6266,6 +6267,20 @@ window.switchTechTab = async function (tab) {
 
 // expose for onclick
 try { window.openMenuPermissions = openMenuPermissions; } catch (e) { }
+
+function processImageUrl(url) {
+    if (!url) return '';
+    try {
+        // Drive linki düzeltme: uc?export=view -> thumbnail?sz=w800
+        if (url.indexOf('drive.google.com') > -1 && url.indexOf('id=') > -1) {
+            const match = url.match(/id=([a-zA-Z0-9_-]+)/);
+            if (match && match[1]) {
+                return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`;
+            }
+        }
+    } catch (e) { }
+    return url;
+}
 
 // --- GÖRSEL YÜKLEME ARACI (Admin/LocAdmin) ---
 function openImageUploader() {
