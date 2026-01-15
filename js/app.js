@@ -700,30 +700,53 @@ function girisYap() {
         });
 }
 function checkAdmin(role) {
-    const addCardDropdown = document.getElementById('dropdownAddCard');
-    const imageDropdown = document.getElementById('dropdownImage');
+    // Rolü normalize et (küçük harfe çevir)
+    const r = normalizeRole(role);
+
+    const addCardDropdown   = document.getElementById('dropdownAddCard');
+    const imageDropdown     = document.getElementById('dropdownImage');
     const quickEditDropdown = document.getElementById('dropdownQuickEdit');
 
-    isAdminMode = (role === "admin" || role === "locadmin");
-    isLocAdmin = (role === "locadmin");
+    // admin / locadmin kontrolü artık case-insensitive
+    isAdminMode     = (r === "admin" || r === "locadmin");
+    isLocAdmin      = (r === "locadmin");
     isEditingActive = false;
     document.body.classList.remove('editing');
 
-    
     const filterButtons = document.querySelectorAll('.filter-btn:not(.btn-fav)');
     filterButtons.forEach(btn => {
         btn.style.opacity = '1';
         btn.style.pointerEvents = 'auto';
         btn.style.filter = 'none';
     });
+
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
-        searchInput.disabled = false;
+        searchInput.disabled    = false;
         searchInput.placeholder = "İçeriklerde hızlı ara...";
         searchInput.style.opacity = '1';
     }
 
+    if (isAdminMode) {
+        if (addCardDropdown) addCardDropdown.style.display = 'flex';
+        if (imageDropdown)   imageDropdown.style.display   = 'flex';
+        if (quickEditDropdown) {
+            quickEditDropdown.style.display = 'flex';
+            // İstek: Yetki Yönetimi sadece LocAdmin rolünde görünsün
+            const perms = document.getElementById('dropdownPerms');
+            if (perms) perms.style.display = (isLocAdmin ? 'flex' : 'none');
+            quickEditDropdown.innerHTML = '<i class="fas fa-pen" style="color:var(--secondary);"></i> Düzenlemeyi Aç';
+            quickEditDropdown.classList.remove('active');
+        }
+    } else {
+        if (addCardDropdown)   addCardDropdown.style.display   = 'none';
+        if (imageDropdown)     imageDropdown.style.display     = 'none';
+        if (quickEditDropdown) quickEditDropdown.style.display = 'none';
+        const perms = document.getElementById('dropdownPerms');
+        if (perms) perms.style.display = 'none';
     }
+}
+
 
     if (isAdminMode) {
         if (addCardDropdown) addCardDropdown.style.display = 'flex';
@@ -743,7 +766,7 @@ function checkAdmin(role) {
         const perms = document.getElementById('dropdownPerms');
         if (perms) perms.style.display = 'none';
     }
-
+}
 function logout() {
     currentUser = ""; isAdminMode = false; isEditingActive = false;
     try { document.getElementById("user-display").innerText = "Misafir"; } catch (e) { }
