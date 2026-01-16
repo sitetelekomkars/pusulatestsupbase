@@ -604,6 +604,7 @@ function checkSession() {
         // ✅ YENİ: Yenilemede de menü/blok yetkilerini uygula
         try { loadMenuPermissions(); } catch (e) { }
         try { loadHomeBlocks(); } catch (e) { }
+        try { loadPermissionsOnStartup(); } catch (e) { }
 
         if (BAKIM_MODU) {
             document.getElementById("maintenance-screen").style.display = "flex";
@@ -687,6 +688,7 @@ async function girisYap() {
                     // Menü yetkilerini ve ana sayfa bloklarını login sonrası yükle
                     try { loadMenuPermissions(); } catch (e) { }
                     try { loadHomeBlocks(); } catch (e) { }
+                    try { loadPermissionsOnStartup(); } catch (e) { }
 
                     if (BAKIM_MODU) {
                         document.getElementById("maintenance-screen").style.display = "flex";
@@ -753,13 +755,12 @@ function checkAdmin(role) {
         if (imageDropdown) imageDropdown.style.display = 'flex';
         if (quickEditDropdown) {
             quickEditDropdown.style.display = 'flex';
-            // İstek: Yetki Yönetimi sadece LocAdmin rolünde görünsün
+            // Yetki Yönetimi ve Aktif Kullanıcılar sadece LocAdmin'de görünsün
             const perms = document.getElementById('dropdownPerms');
             if (perms) perms.style.display = (isLocAdmin ? 'flex' : 'none');
 
-            // Aktif Kullanıcılar butonu (admin ve locadmin için)
             const activeUsersBtn = document.getElementById('dropdownActiveUsers');
-            if (activeUsersBtn) activeUsersBtn.style.display = 'flex';
+            if (activeUsersBtn) activeUsersBtn.style.display = (isLocAdmin ? 'flex' : 'none');
 
             quickEditDropdown.innerHTML = '<i class="fas fa-pen" style="color:var(--secondary);"></i> Düzenlemeyi Aç';
             quickEditDropdown.classList.remove('active');
@@ -773,6 +774,9 @@ function checkAdmin(role) {
         const activeUsersBtn = document.getElementById('dropdownActiveUsers');
         if (activeUsersBtn) activeUsersBtn.style.display = 'none';
     }
+
+    // RBAC Yetkilerini uygula
+    try { applyPermissionsToUI(); } catch (e) { }
 }
 function logout() {
     currentUser = ""; isAdminMode = false; isEditingActive = false;
@@ -6474,4 +6478,232 @@ async function kickUser(username, token) {
     } catch (e) {
         Swal.fire("Hata", "Bir hata oluştu: " + e.message, "error");
     }
+}
+
+// ============================================================
+// --- GELİŞMİŞ YETKİ YÖNETİMİ (RBAC) (v14.2) ---
+// ============================================================
+
+let allRolePermissions = []; // Backend'den gelen tüm yetki listesi
+
+async function openMenuPermissions() {
+    try {
+        Swal.fire({ title: 'Yetkiler Yükleniyor...', didOpen: () => { Swal.showLoading() } });
+
+        const res = await apiCall("getRolePermissions", {});
+        if (!res || res.result !== "success") {
+            Swal.fire("Hata", "Yetki listesi alınamadı.", "error");
+            return;
+        }
+
+        allRolePermissions = res.permissions || [];
+
+        // Düzenlenebilir roller (LocAdmin kendini düzenleyemez, o her zaman tam yetkilidir)
+        const roles = ["admin", "qusers", "users"];
+        let activeTabIndex = 0;
+
+        const renderRbacContent = (roleIndex) => {
+            const role = roles[roleIndex];
+            const rolePerms = allRolePermissions.filter(p => p.role === role);
+
+            const resources = [
+                {
+                    cat: "Genel Yetkiler", items: [
+                        { key: "EditMode", label: "Düzenleme Modunu Açma", perms: ["Execute"] },
+                        { key: "AddContent", label: "Yeni İçerik Ekleme", perms: ["Execute"] },
+                        { key: "ImageUpload", label: "Görsel Yükleme", perms: ["Execute"] },
+                        { key: "Reports", label: "Rapor Çekme (Dışa Aktar)", perms: ["Execute"] }
+                    ]
+                },
+                {
+                    cat: "Sayfa Erişimi", items: [
+                        { key: "tech", label: "Teknik Sayfası", perms: ["View"] },
+                        { key: "telesales", label: "TeleSatış Sayfası", perms: ["View"] },
+                        { key: "kalite", label: "Kalite Paneli", perms: ["View"] },
+                        { key: "shift", label: "Vardiyam", perms: ["View"] },
+                        { key: "broadcast", label: "Yayın Akışı", perms: ["View"] },
+                        { key: "game", label: "Oyun Merkezi", perms: ["View"] }
+                    ]
+                },
+                {
+                    cat: "Kalite Yönetimi", items: [
+                        { key: "Evaluation", label: "Değerlendirme Yapma", perms: ["Execute"] },
+                        { key: "Feedback", label: "Geri Bildirim Ekleme", perms: ["Execute"] },
+                        { key: "Training", label: "Eğitim Atama", perms: ["Execute"] }
+                    ]
+                }
+            ];
+
+            let html = `
+                <div class="rbac-container">
+                    <div class="rbac-header">
+                        <div style="font-weight:700;color:var(--primary)">
+                            <i class="fas fa-user-shield"></i> 
+                            <span style="text-transform:capitalize">${role}</span> Rolü Yetki Tanımları
+                        </div>
+                        <div class="rbac-info-box">
+                            <i class="fas fa-info-circle"></i> LocAdmin her zaman tam yetkilidir.
+                        </div>
+                    </div>
+
+                    <div class="rbac-role-selector">
+                        ${roles.map((r, i) => `
+                            <button class="rbac-role-btn ${i === roleIndex ? 'active' : ''}" onclick="window.switchRbacRole(${i})">
+                                ${r.toUpperCase()}
+                            </button>
+                        `).join('')}
+                    </div>
+
+                    <div class="rbac-table-wrapper">
+                        <table class="rbac-table">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:left">Kaynak / Yetki Alanı</th>
+                                    <th style="text-align:center">Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${resources.map(cat => `
+                                    <tr class="rbac-category-row"><td colspan="2">${cat.cat}</td></tr>
+                                    ${cat.items.map(item => {
+                const isEnabled = rolePerms.some(p => p.resource === item.key && p.value === true);
+                return `
+                                            <tr>
+                                                <td class="rbac-resource-name">${item.label}</td>
+                                                <td style="text-align:center">
+                                                    <label class="rbac-switch">
+                                                        <input type="checkbox" id="perm_${item.key}" ${isEnabled ? 'checked' : ''} 
+                                                            onchange="window.toggleRbacPerm('${role}', '${item.key}', this.checked)">
+                                                        <span class="rbac-slider"></span>
+                                                    </label>
+                                                </td>
+                                            </tr>
+                                        `;
+            }).join('')}
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            return html;
+        };
+
+        // Modal içinden çağrılacak global fonksiyonlar
+        window.switchRbacRole = (idx) => {
+            activeTabIndex = idx;
+            Swal.update({ html: renderRbacContent(idx) });
+        };
+
+        window.toggleRbacPerm = (role, resource, val) => {
+            const idx = allRolePermissions.findIndex(p => p.role === role && p.resource === resource);
+            if (idx > -1) {
+                allRolePermissions[idx].value = val;
+            } else {
+                allRolePermissions.push({ role, resource, permission: "All", value: val });
+            }
+        };
+
+        Swal.fire({
+            title: "🛡️ Gelişmiş Yetki Yönetimi",
+            html: renderRbacContent(0),
+            width: 800,
+            showCancelButton: true,
+            cancelButtonText: "Vazgeç",
+            confirmButtonText: "Değişiklikleri Kaydet",
+            confirmButtonColor: "var(--success)",
+            preConfirm: async () => {
+                const results = [];
+                roles.forEach(r => {
+                    const rPerms = allRolePermissions.filter(p => p.role === r).map(p => ({
+                        resource: p.resource,
+                        permission: p.permission || "All",
+                        value: p.value
+                    }));
+                    results.push({ role: r, perms: rPerms });
+                });
+
+                try {
+                    Swal.showLoading();
+                    for (const resObj of results) {
+                        await apiCall("setRolePermissions", resObj);
+                    }
+                    return true;
+                } catch (e) {
+                    Swal.showValidationMessage(`Kayıt hatası: ${e.message}`);
+                }
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire("Başarılı", "Tüm yetkiler güncellendi. Kullanıcıların etkilenmesi için sayfayı yenilemeleri gerekebilir.", "success");
+            }
+        });
+
+    } catch (e) {
+        Swal.fire("Hata", "Bir hata oluştu: " + e.message, "error");
+    }
+}
+
+/**
+ * Uygulama genelinde yetki kontrolü yapan yardımcı fonksiyon.
+ * LocAdmin her zaman true döner.
+ */
+function hasPerm(resource, permission = "All") {
+    if (activeRole === "locadmin") return true;
+
+    const perm = allRolePermissions.find(p =>
+        p.role === activeRole &&
+        (p.resource === resource || p.resource === "All") &&
+        (p.permission === permission || p.permission === "All")
+    );
+
+    return perm ? perm.value : false;
+}
+
+// Login sonrası yetkileri arka planda yükle
+async function loadPermissionsOnStartup() {
+    if (!currentUser) return;
+    const res = await apiCall("getRolePermissions", {});
+    if (res && res.result === "success") {
+        allRolePermissions = res.permissions || [];
+        applyPermissionsToUI();
+    }
+}
+
+/**
+ * Kaydedilen yetkilere göre arayüzdeki butonları gizle/göster
+ */
+function applyPermissionsToUI() {
+    if (activeRole === "locadmin") return;
+
+    const editBtn = document.getElementById('dropdownQuickEdit');
+    if (editBtn && !hasPerm("EditMode")) editBtn.style.display = 'none';
+
+    const addCardBtn = document.getElementById('dropdownAddCard');
+    if (addCardBtn && !hasPerm("AddContent")) addCardBtn.style.display = 'none';
+
+    const imageBtn = document.getElementById('dropdownImage');
+    if (imageBtn && !hasPerm("ImageUpload")) imageBtn.style.display = 'none';
+
+    const reportBtns = document.querySelectorAll('.admin-btn');
+    reportBtns.forEach(btn => {
+        if (!hasPerm("Reports")) btn.style.display = 'none';
+    });
+
+    const menuMap = {
+        "home": "home",
+        "tech": "tech",
+        "telesales": "telesales",
+        "kalite": "kalite",
+        "shift": "shift",
+        "broadcast": "broadcast",
+        "game": "game"
+    };
+
+    Object.keys(menuMap).forEach(key => {
+        const btn = document.querySelector(`[data-menu-key="${key}"]`);
+        if (btn && !hasPerm(menuMap[key], "View")) {
+            btn.style.display = 'none';
+        }
+    });
 }
