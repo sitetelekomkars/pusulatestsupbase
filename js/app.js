@@ -135,7 +135,8 @@ function normalizeGroup(v) {
     // map common variants to display names used in permissions table
     if (tr.includes('telesat')) return 'Telesatış';
     if (tr.includes('chat')) return 'Chat';
-    return String(v || '').trim();
+    if (tr.includes('yonetim')) return 'Yönetim';
+    return tr.charAt(0).toUpperCase() + tr.slice(1);
 }
 
 function normalizeList(v) {
@@ -6543,13 +6544,15 @@ async function openMenuPermissions() {
                                     <tr class="rbac-category-row"><td colspan="2">${cat.cat}</td></tr>
                                     ${cat.items.map(item => {
                 const isEnabled = rolePerms.some(p => p.resource === item.key && p.value === true);
+                // HTML içinde çift tırnak çakışmasını önlemek için rol ismini güvenli hale getir
+                const safeRole = role.replace(/'/g, "\\'");
                 return `
                                             <tr>
                                                 <td class="rbac-resource-name">${item.label}</td>
                                                 <td style="text-align:center">
                                                     <label class="rbac-switch">
-                                                        <input type="checkbox" id="perm_${item.key}" ${isEnabled ? 'checked' : ''} 
-                                                            onchange="window.toggleRbacPerm('${role}', '${item.key}', this.checked)">
+                                                        <input type="checkbox" id="perm_${roleIndex}_${item.key}" ${isEnabled ? 'checked' : ''} 
+                                                            onchange="window.toggleRbacPerm('${safeRole}', '${item.key}', this.checked)">
                                                         <span class="rbac-slider"></span>
                                                     </label>
                                                 </td>
@@ -6625,12 +6628,13 @@ async function openMenuPermissions() {
  * LocAdmin her zaman true döner.
  */
 function hasPerm(resource, permission = "All") {
-    const role = getMyRole();
-    const group = normalizeGroup(localStorage.getItem("sSportGroup") || "").toLowerCase();
+    const role = (getMyRole() || "").toLowerCase();
+    const rawGroup = localStorage.getItem("sSportGroup") || "";
+    const group = normalizeGroup(rawGroup).toLowerCase();
 
     if (role === "locadmin") return true;
 
-    // 1. Önce grup (takım) bazlı yetkiye bak (Daha spesifik)
+    // 1. Önce grup (takım) bazlı yetkiye bak
     const groupPerm = allRolePermissions.find(p =>
         p.role === group &&
         (p.resource === resource || p.resource === "All") &&
@@ -6716,4 +6720,9 @@ function applyPermissionsToUI() {
             }
         });
     });
+
+    // Ana sayfa düzenleme butonlarını da yetkiye göre tazele
+    try {
+        if (currentCategory === 'home') renderHomePanels();
+    } catch (e) { }
 }
