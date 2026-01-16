@@ -1,5 +1,3 @@
-
-
 function formatWeekLabel(raw) {
     try {
         if (!raw) return '';
@@ -92,6 +90,7 @@ let __dataLoadedResolve;
 window.__dataLoadedPromise = new Promise(r => { __dataLoadedResolve = r; });
 let techWizardData = {}; // Teknik Sihirbaz Verisi
 let currentUser = "";
+let globalUserIP = "";
 
 // -------------------- Menu Permissions (LocAdmin) --------------------
 let menuPermissions = null; // { key: {allowedGroups:[], allowedRoles:[]} }
@@ -541,7 +540,14 @@ function copyText(t) {
 }
 document.addEventListener('contextmenu', event => event.preventDefault());
 document.onkeydown = function (e) { if (e.keyCode == 123) return false; }
-document.addEventListener('DOMContentLoaded', () => { checkSession(); });
+document.addEventListener('DOMContentLoaded', () => {
+    checkSession();
+    // IP Fetch
+    fetch('https://api.ipify.org?format=json')
+        .then(r => r.json())
+        .then(d => { globalUserIP = d.ip; })
+        .catch(() => { });
+});
 // --- SESSION & LOGIN ---
 function checkSession() {
     const savedUser = localStorage.getItem("sSportUser");
@@ -630,7 +636,7 @@ function girisYap() {
     fetch(SCRIPT_URL, {
         method: 'POST',
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "login", username: uName, password: hashedPass })
+        body: JSON.stringify({ action: "login", username: uName, password: hashedPass, ip: globalUserIP || "" })
     }).then(response => response.json())
         .then(data => {
             loadingMsg.style.display = "none";
