@@ -4590,12 +4590,13 @@ async function maybeLoadTelesalesScriptsFromSheet() {
     }
 }
 
-// Backend desteği varsa Sheets'e yaz; yoksa sessizce local'de kalsın.
-try {
-    await apiCall('saveTelesalesScripts', { scripts: arr || [] });
-} catch (e) {
-    // sessiz fallback
-}
+async function syncTelesalesScriptsToSheet(arr) {
+    // Backend desteği varsa Sheets'e yaz; yoksa sessizce local'de kalsın.
+    try {
+        await apiCall('saveTelesalesScripts', { scripts: arr || [] });
+    } catch (e) {
+        // sessiz fallback
+    }
 }
 
 async function openTelesalesArea() {
