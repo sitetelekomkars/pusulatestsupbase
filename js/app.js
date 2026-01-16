@@ -845,6 +845,7 @@ function processRawData(rawData) {
 
     // Post-process
     database.sort((a, b) => parseDateTRToTS(b.date) - parseDateTRToTS(a.date));
+    newsData.sort((a, b) => parseDateTRToTS(b.date) - parseDateTRToTS(a.date));
     try { applySportsRights(); } catch (e) { }
 
     cardsData = database; // Legacy support
