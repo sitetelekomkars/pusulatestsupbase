@@ -4731,7 +4731,7 @@ function renderTelesalesDataOffers() {
             </div>
             <div class="t-training-badge">${escapeHtml(o.segment || o.tag || '')}</div>
           </div>
-          <div class="t-training-desc">${escapeHtml((o.desc || '').slice(0, 140))}${(o.desc || '').length > 140 ? '...' : ''}</div>
+          <div class="t-training-desc" style="white-space: pre-line">${escapeHtml((o.desc || '').slice(0, 140))}${(o.desc || '').length > 140 ? '...' : ''}</div>
           <div style="margin-top:10px;color:#999;font-size:.8rem">(Detay için tıkla)</div>
           ${(isAdminMode && isEditingActive) ? `
             <div style="margin-top:12px;display:flex;gap:10px">
@@ -4890,9 +4890,9 @@ function showTelesalesOfferDetail(idx) {
         html: `<div style="text-align:left;line-height:1.6">
                 ${imgHtml}
                 <div style="margin-bottom:10px"><b>Segment:</b> ${escapeHtml(o.segment || '-')}</div>
-                 ${o.note ? `<div style="margin-bottom:10px;background:#fff3cd;padding:8px;border-radius:4px;border-left:4px solid #ffc107;"><b>Not:</b> ${escapeHtml(o.note)}</div>` : ''}
-                <div>${escapeHtml(o.desc || 'Detay yok.').replace(/\n/g, '<br>')}</div>
-                ${o.detail ? `<hr><div style="font-size:0.9rem;color:#666">${escapeHtml(o.detail)}</div>` : ''}
+                 ${o.note ? `<div style="margin-bottom:10px;background:#fff3cd;padding:8px;border-radius:4px;border-left:4px solid #ffc107;white-space: pre-line"><b>Not:</b> ${escapeHtml(o.note)}</div>` : ''}
+                 <div style="white-space: pre-line">${escapeHtml(o.desc || 'Detay yok.')}</div>
+                 ${o.detail ? `<hr><div style="font-size:0.9rem;color:#666;white-space: pre-line">${escapeHtml(o.detail)}</div>` : ''}
               </div>`,
         showCloseButton: true,
         showConfirmButton: false,
@@ -6028,8 +6028,8 @@ function __renderTechList(tabKey, items) {
             const body = [
                 it.icerik ? `<div class="q-doc-body" style="white-space: pre-line">${it.icerik}</div>` : "",
                 it.image ? `<div style="margin:10px 0;"><img src="${processImageUrl(it.image)}" loading="lazy" onerror="this.style.display='none'" style="max-width:100%; border-radius:8px; max-height:300px; object-fit:cover;"></div>` : "",
-                it.adim ? `<div class="q-doc-meta"><b>Adım:</b> ${__escapeHtml(it.adim)}</div>` : "",
-                it.not ? `<div class="q-doc-meta"><b>Not:</b> ${__escapeHtml(it.not)}</div>` : "",
+                it.adim ? `<div class="q-doc-meta" style="white-space: pre-line"><b>Adım:</b> ${__escapeHtml(it.adim)}</div>` : "",
+                it.not ? `<div class="q-doc-meta" style="white-space: pre-line"><b>Not:</b> ${__escapeHtml(it.not)}</div>` : "",
                 it.link ? `<div class="q-doc-meta"><b>Link:</b> <a href="${__escapeHtml(it.link)}" target="_blank">${__escapeHtml(it.link)}</a></div>` : ""
             ].join("");
             const adminBtns = (isAdminMode && isEditingActive)
