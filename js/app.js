@@ -6470,6 +6470,29 @@ async function openMenuPermissions() {
             const role = roles[roleIndex];
             const rolePerms = allRolePermissions.filter(p => p.role === role);
 
+            // ✅ Dinamik Sayfa Listesi (Arayüzdeki tüm data-menu-key öğelerini otomatik bulur)
+            const pageLabels = {
+                home: "Ana Sayfa", search: "Arama Çubuğu", news: "Duyurular", tech: "Teknik Sayfası",
+                persuasion: "İkna Sayfası", campaign: "Kampanya Sayfası", info: "Bilgi Sayfası",
+                broadcast: "Yayın Akışı", guide: "Spor Rehberi", return: "İade Asistanı",
+                telesales: "TeleSatış", game: "Oyun Merkezi", quality: "Kalite Paneli", shift: "Vardiyam"
+            };
+            const discoveredPages = [];
+            const processedKeys = new Set();
+            document.querySelectorAll('[data-menu-key]').forEach(el => {
+                const key = el.getAttribute('data-menu-key');
+                if (!processedKeys.has(key)) {
+                    discoveredPages.push({
+                        key: key,
+                        label: pageLabels[key] || (el.textContent.trim().replace(/\s+/g, ' ') || key),
+                        perms: ["View"]
+                    });
+                    processedKeys.add(key);
+                }
+            });
+            // Alfabetik sırala
+            discoveredPages.sort((a, b) => a.label.localeCompare(b.label, 'tr'));
+
             const resources = [
                 {
                     cat: "Genel Yetkiler", items: [
@@ -6480,21 +6503,7 @@ async function openMenuPermissions() {
                     ]
                 },
                 {
-                    cat: "Sayfa Erişimi", items: [
-                        { key: "home", label: "Ana Sayfa (Kartlar)", perms: ["View"] },
-                        { key: "search", label: "Arama Çubuğu", perms: ["View"] },
-                        { key: "telesales", label: "TeleSatış Sayfası", perms: ["View"] },
-                        { key: "persuasion", label: "İkna Sayfası", perms: ["View"] },
-                        { key: "campaign", label: "Kampanya Sayfası", perms: ["View"] },
-                        { key: "info", label: "Bilgi Sayfası", perms: ["View"] },
-                        { key: "news", label: "Duyurular", perms: ["View"] },
-                        { key: "quality", label: "Kalite Paneli", perms: ["View"] },
-                        { key: "shift", label: "Vardiyam", perms: ["View"] },
-                        { key: "broadcast", label: "Yayın Akışı", perms: ["View"] },
-                        { key: "guide", label: "Spor Rehberi", perms: ["View"] },
-                        { key: "return", label: "İade Asistanı", perms: ["View"] },
-                        { key: "game", label: "Oyun Merkezi", perms: ["View"] }
-                    ]
+                    cat: "Sayfa Erişimi", items: discoveredPages
                 },
                 {
                     cat: "Kalite Yönetimi", items: [
