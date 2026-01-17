@@ -131,10 +131,7 @@ function normalizeGroup(v) {
         .replace(/ü/g, 'u').replace(/ö/g, 'o')
         .replace(/ç/g, 'c');
 
-    // Standartlaştırma (Opsiyonel: Eğer her yerde standart isimler isteniyorsa)
-    if (s.includes('chat') || s === 'ob') return "Chat";
-    if (s.includes('telesat')) return "Telesatış";
-
+    // NOT: Grup bazlı form eşleşmesi logEvaluationPopup içinde yapılıyor.
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
@@ -683,19 +680,18 @@ async function girisYap() {
                     document.getElementById("user-display").innerText = currentUser;
                     setHomeWelcomeUser(currentUser);
                     const savedGroup = data.group || localStorage.getItem('sSportGroup') || '';
-                    checkAdmin(savedRole);
+                    checkAdmin(data.role); // ✅ DÜZELTME: savedRole yerine data.role kullanıldı
                     startSessionTimer();
-                    // Menü yetkilerini ve ana sayfa bloklarını login sonrası yükle
-                    try { loadMenuPermissions(); } catch (e) { }
-                    try { loadHomeBlocks(); } catch (e) { }
-                    try { loadPermissionsOnStartup(); } catch (e) { }
 
                     if (BAKIM_MODU) {
                         document.getElementById("maintenance-screen").style.display = "flex";
                     } else {
                         document.getElementById("main-app").style.display = "block";
+                        // Menü yetkilerini ve ana sayfa bloklarını login sonrası yükle
                         // ✅ YENİ: Veri yüklemeden önce yetkileri yükle ve bekle
                         loadPermissionsOnStartup().then(() => {
+                            loadMenuPermissions();
+                            loadHomeBlocks();
                             loadContentData();
                             loadWizardData();
                             loadTechWizardData();
