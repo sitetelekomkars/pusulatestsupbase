@@ -53,7 +53,7 @@ function showGlobalError(message) {
 }
 
 // Apps Script URL'si
-let SCRIPT_URL = localStorage.getItem("PUSULA_SCRIPT_URL") || "https://script.google.com/macros/s/AKfycbxt1GN8hhnrsDheB5a_xUn8r_RxjmqB-tulhOtRX6yhZB84zgb4li0J9oyE5fQSVEPE/exec"; // Apps Script Web App URL
+let SCRIPT_URL = localStorage.getItem("PUSULA_SCRIPT_URL") || "https://script.google.com/macros/s/AKfycbx9LV5bCnRRu4sBx9z6mZqUiDCqRI3yJeh4td4ba1n8Zx4ebSRQ2FvtwSVEg4zsbVeZ/exec"; // Apps Script Web App URL
 
 // ---- API CALL helper (Menu/Yetki vs için gerekli) ----
 async function apiCall(action, payload = {}) {
@@ -6748,16 +6748,31 @@ async function openAgentNotePopup(callId, color) {
     const { value: note } = await Swal.fire({
         title: 'Değerlendirme Onayı',
         html: `
-        <p style="font-size:0.9rem; color:#666;">Değerlendirmeyi incelediğini onaylıyorsun.</p>
-        <p style="font-size:0.9rem; margin-bottom:15px;">Bu değerlendirmeyle ilgili bir notun veya itirazın varsa aşağıya yazabilirsin:</p>
-        <textarea id="swal-agent-note" class="swal2-textarea" placeholder="Buraya yazabilirsin (İsteğe bağlı)..."></textarea>
+        <div style="text-align:left; margin-top:10px;">
+            <label style="display:flex; align-items:center; gap:10px; padding:10px; background:#e8f5e9; border-radius:6px; cursor:pointer;">
+                <input type="checkbox" id="chk-read-confirm" style="transform:scale(1.3); cursor:pointer;">
+                <span style="font-weight:600; color:#2e7d32;">Değerlendirmeyi okudum, anlaşıldı.</span>
+            </label>
+        </div>
+        <div style="margin-top:15px; text-align:left;">
+            <p style="font-size:0.9rem; color:#666; margin-bottom:5px;">(Opsiyonel) Görüş, teşekkür veya sorun bildirebilirsiniz:</p>
+            <textarea id="swal-agent-note" class="swal2-textarea" style="margin-top:0;" placeholder="Notunuz..."></textarea>
+        </div>
         `,
         showCancelButton: true,
-        confirmButtonText: 'Tamamla',
+        confirmButtonText: 'Onayla',
         cancelButtonText: 'Vazgeç',
         confirmButtonColor: '#2e7d32',
         preConfirm: () => {
-            return document.getElementById('swal-agent-note').value;
+            const isChecked = document.getElementById('chk-read-confirm').checked;
+            const noteVal = document.getElementById('swal-agent-note').value;
+
+            // Eğer not yoksa, mutlaka tik atılmalı
+            if (!isChecked && !noteVal.trim()) {
+                Swal.showValidationMessage('Lütfen "Okudum" kutucuğunu işaretleyin veya bir not yazın.');
+                return false;
+            }
+            return noteVal; // Notu döndür (boş olabilir)
         }
     });
 
