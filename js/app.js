@@ -4055,13 +4055,39 @@ function toggleEvaluationDetail(index) {
 }
 async function exportEvaluations() {
     if (!isAdminMode) return;
-    const { isConfirmed } = await Swal.fire({ icon: 'question', title: 'Gelişmiş Rapor (Excel)', text: 'Detaylı ve renkli rapor hazırlanacak.', showCancelButton: true, confirmButtonText: 'İndir' });
-    if (!isConfirmed) return;
 
-    Swal.fire({ title: 'Rapor Hazırlanıyor...', html: 'Veriler işleniyor, lütfen bekleyin.<br>Bu işlem veri yoğunluğuna göre biraz sürebilir.', didOpen: () => Swal.showLoading() });
+    // Son 12 ayın listesini oluştur
+    let periodOptions = `<option value="all">Tüm Zamanlar</option>`;
+    const d = new Date();
+    for (let i = 0; i < 12; i++) {
+        let title = d.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+        let val = (d.getMonth() + 1).toString().padStart(2, '0') + "-" + d.getFullYear(); // "01-2026"
+        periodOptions += `<option value="${val}">${title}</option>`;
+        d.setMonth(d.getMonth() - 1);
+    }
+
+    const { value: selectedPeriod } = await Swal.fire({
+        title: 'Rapor İndir',
+        html: `
+            <p style="font-size:0.9rem; color:#666; margin-bottom:15px;">Hangi dönem için rapor almak istersiniz?</p>
+            <select id="swal-export-period" class="swal2-input" style="width:80%; margin:0 auto;">
+                ${periodOptions}
+            </select>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'İndir',
+        cancelButtonText: 'Vazgeç',
+        preConfirm: () => {
+            return document.getElementById('swal-export-period').value;
+        }
+    });
+
+    if (!selectedPeriod) return; // Vazgeçildi
 
     const groupSelect = document.getElementById('q-admin-group');
     const agentSelect = document.getElementById('q-admin-agent');
+
+    Swal.fire({ title: 'Rapor Hazırlanıyor...', html: 'Veriler işleniyor, lütfen bekleyin.<br>Bu işlem veri yoğunluğuna göre biraz sürebilir.', didOpen: () => Swal.showLoading() });
 
     fetch(SCRIPT_URL, {
         method: 'POST', headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -4069,6 +4095,7 @@ async function exportEvaluations() {
             action: "exportEvaluations",
             targetAgent: agentSelect ? agentSelect.value : 'all',
             targetGroup: groupSelect ? groupSelect.value : 'all',
+            targetPeriod: selectedPeriod, // YENİ PARAMETRE
             username: currentUser, token: getToken()
         })
     }).then(r => r.json()).then(data => {
