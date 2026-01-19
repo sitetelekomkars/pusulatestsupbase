@@ -6584,7 +6584,8 @@ async function loadPermissionsOnStartup() {
  */
 function applyPermissionsToUI() {
     const role = getMyRole();
-    if (role === "locadmin") return;
+    // Admin ve LocAdmin için yetki kısıtlaması yok (tam yetki)
+    if (role === "admin" || role === "locadmin") return;
 
     const editBtn = document.getElementById('dropdownQuickEdit');
     if (editBtn && !hasPerm("EditMode")) editBtn.style.display = 'none';
