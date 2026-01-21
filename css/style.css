@@ -1075,7 +1075,8 @@ body.editing .edit-icon {
   background: radial-gradient(circle at 50% 30%, #2e7d32 0%, #1b5e20 40%, #0a250a 100%);
   border: 4px solid #00f2ff;
   border-radius: 12px;
-  height: 480px;
+  height: 400px;
+  /* Reduced from 480px */
   position: relative;
   overflow: hidden;
   perspective: 1000px;
@@ -1164,10 +1165,12 @@ body.editing .edit-icon {
   background: rgba(10, 20, 40, 0.98) !important;
   border: 2px solid #00f2ff !important;
   box-shadow: 0 0 30px rgba(0, 242, 255, 0.4), inset 0 0 15px rgba(0, 242, 255, 0.1) !important;
-  backdrop-filter: blur(20px) !important;
+  backdrop-filter: none !important;
+  /* Removed blur to fix user complaint */
   color: #fff !important;
-  max-height: 95vh !important;
+  max-height: 98vh !important;
   overflow-y: auto !important;
+  padding: 20px !important;
 }
 
 /* Responsive Scaling for Games on smaller screens */
@@ -1185,13 +1188,17 @@ body.editing .edit-icon {
 }
 
 .gamer-modal h2 {
-  text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+  text-shadow: none !important;
+  /* Removed blur effect */
+  color: #00f2ff !important;
+  /* Ensuring high contrast cyan */
 }
 
 .gamer-modal p {
   color: #fff !important;
-  font-size: 1.1rem;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  font-size: 1.05rem;
+  text-shadow: none !important;
+  /* Removed blur effect */
 }
 
 /* Gamer Action Buttons */
@@ -1745,38 +1752,39 @@ body.editing .edit-icon {
 }
 
 .ball-shoot-left-top {
-  bottom: 380px !important;
+  bottom: 300px !important;
+  /* Adjusted for 400px height */
   left: 35% !important;
   transform: scale(0.4) rotate(720deg) !important;
 }
 
 .ball-shoot-right-top {
-  bottom: 380px !important;
+  bottom: 300px !important;
   left: 65% !important;
   transform: scale(0.4) rotate(720deg) !important;
 }
 
 .ball-shoot-left-low {
-  bottom: 330px !important;
+  bottom: 250px !important;
   left: 32% !important;
   transform: scale(0.45) rotate(720deg) !important;
 }
 
 .ball-shoot-right-low {
-  bottom: 330px !important;
+  bottom: 250px !important;
   left: 68% !important;
   transform: scale(0.45) rotate(720deg) !important;
 }
 
 .ball-miss-left {
-  bottom: 380px !important;
+  bottom: 300px !important;
   left: 10% !important;
   transform: scale(0.3) !important;
   opacity: 0;
 }
 
 .ball-miss-right {
-  bottom: 380px !important;
+  bottom: 300px !important;
   left: 90% !important;
   transform: scale(0.3) !important;
   opacity: 0;
