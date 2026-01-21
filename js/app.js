@@ -1976,17 +1976,6 @@ function finishQuickDecision(timeout) {
         else closeModal('quick-modal');
     });
 }
-confirmButtonText: 'Tamam'
-    });
-
-// Lobby'e dön
-const lobby = document.getElementById('qd-lobby');
-const game = document.getElementById('qd-game');
-if (lobby) lobby.style.display = 'block';
-if (game) game.style.display = 'none';
-const t = document.getElementById('qd-time'); if (t) t.innerText = '30';
-const st = document.getElementById('qd-step'); if (st) st.innerText = '0';
-}
 
 function openPenaltyGame() {
     try { closeModal('game-hub-modal'); } catch (e) { }
