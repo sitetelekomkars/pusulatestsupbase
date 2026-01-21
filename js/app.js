@@ -1794,36 +1794,87 @@ function resetQuickDecision() {
     openQuickDecisionGame();
 }
 
+// --- REKABET VE OYUN LOGIĞİ (Gamer Modu) ---
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+function getGameQuestionQueue(pool, storageKey, count) {
+    if (!pool || pool.length === 0) return [];
+
+    // LocalStorage'dan son görülenleri al
+    let seenIds = [];
+    try {
+        seenIds = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    } catch (e) { seenIds = []; }
+
+    // Soruları index bazlı filtrele (Title veya text bazlı unique ID varsayıyoruz)
+    let availableIndices = pool.map((_, i) => i);
+
+    // Eğer pool yeterince büyükse (istenen sayının 2 katı kadar), görülenleri ele
+    if (pool.length > count * 2) {
+        availableIndices = availableIndices.filter(idx => {
+            const q = pool[idx];
+            const qId = q.q || q.title || idx.toString();
+            return !seenIds.includes(qId);
+        });
+    }
+
+    // Eğer kalan soru yoksa veya çok azsa temizle (döngüye girsin)
+    if (availableIndices.length < count) {
+        availableIndices = pool.map((_, i) => i);
+    }
+
+    shuffleArray(availableIndices);
+    const resultIndices = availableIndices.slice(0, count);
+
+    // Yeni seçilenleri "seen" listesine ekle (en fazla 30 tane sakla)
+    resultIndices.forEach(idx => {
+        const q = pool[idx];
+        const qId = q.q || q.title || idx.toString();
+        if (!seenIds.includes(qId)) seenIds.push(qId);
+    });
+    if (seenIds.length > 30) seenIds = seenIds.slice(-30);
+    localStorage.setItem(storageKey, JSON.stringify(seenIds));
+
+    return resultIndices;
+}
+
 function startQuickDecision() {
     const bank = (Array.isArray(quickDecisionQuestions) && quickDecisionQuestions.length) ? quickDecisionQuestions : QUICK_DECISION_BANK;
     if (!bank.length) {
-        Swal.fire('Bilgi', 'Sorular henüz yüklenmedi. Lütfen admin panelden soruları ekleyin ve sayfayı yenileyin.', 'info');
+        Swal.fire('Hata', 'Hızlı Karar verisi yok.', 'warning');
         return;
     }
 
-    const take = Math.min(5, bank.length);
-    const idxs = Array.from({ length: bank.length }, (_, i) => i).sort(() => Math.random() - 0.5).slice(0, take);
-    qdQueue = idxs.map(i => bank[i]);
-    qdTimeLeft = 30;
-    qdScore = 0;
-    qdStep = 0;
-
+    // Modal UI
     const lobby = document.getElementById('qd-lobby');
     const game = document.getElementById('qd-game');
     if (lobby) lobby.style.display = 'none';
     if (game) game.style.display = 'block';
 
-    updateQuickHud();
-    renderQuickQuestion();
+    // Skor ve Soru Sıfırla
+    qdScore = 0; qdStep = 0; qdTimeLeft = 30;
 
+    // Rastgele 5 soru seç (Unseen tracking ile)
+    const indices = getGameQuestionQueue(bank, 'seenQuickQuestions', 5);
+    qdQueue = indices.map(idx => bank[idx]);
+
+    updateQuickHud();
     if (qdTimer) clearInterval(qdTimer);
     qdTimer = setInterval(() => {
-        qdTimeLeft -= 1;
-        updateQuickHud();
+        qdTimeLeft--;
         if (qdTimeLeft <= 0) {
+            qdTimeLeft = 0;
             finishQuickDecision(true);
         }
     }, 1000);
+
+    renderQuickQuestion();
 }
 
 function updateQuickHud() {
@@ -1860,11 +1911,19 @@ function answerQuick(idx) {
 
     const correct = (idx === q.a);
 
-    if (btns[idx]) btns[idx].classList.add(correct ? 'good' : 'bad');
-    if (!correct && btns[q.a]) btns[q.a].classList.add('good');
+    // Görsel Feedback
+    if (btns[idx]) {
+        btns[idx].style.borderColor = correct ? "#00f2ff" : "#ff5252";
+        btns[idx].style.background = correct ? "rgba(0, 242, 255, 0.2)" : "rgba(255, 82, 82, 0.2)";
+        btns[idx].style.boxShadow = correct ? "0 0 15px #00f2ff" : "0 0 15px #ff5252";
+    }
+    if (!correct && btns[q.a]) {
+        btns[q.a].style.borderColor = "#00f2ff";
+        btns[q.a].style.boxShadow = "0 0 10px #00f2ff";
+    }
 
-    // puanlama: doğru +2, yanlış -1
-    qdScore += correct ? 2 : -1;
+    // Puanlama: doğru +10, yanlış -5 (Gamer puanlama daha tatmin edicidir)
+    qdScore += correct ? 10 : -5;
     if (qdScore < 0) qdScore = 0;
     updateQuickHud();
 
@@ -1872,10 +1931,12 @@ function answerQuick(idx) {
         toast: true,
         position: 'top',
         icon: correct ? 'success' : 'warning',
-        title: correct ? 'Doğru seçim!' : 'Yanlış seçim',
+        title: correct ? 'DOĞRU!' : 'YANLIŞ!',
         text: q.exp,
         showConfirmButton: false,
-        timer: 1100
+        background: '#0a1428',
+        color: '#fff',
+        timer: 1500
     });
 
     setTimeout(() => {
@@ -1883,30 +1944,48 @@ function answerQuick(idx) {
         updateQuickHud();
         if (qdStep >= qdQueue.length) finishQuickDecision(false);
         else renderQuickQuestion();
-    }, 650);
+    }, 1200);
 }
 
 function finishQuickDecision(timeout) {
     if (qdTimer) { clearInterval(qdTimer); qdTimer = null; }
 
-    const msg = timeout ? 'Süre bitti!' : 'Bitti!';
+    const msg = timeout ? 'SÜRE BİTTİ!' : 'TAMAMLANDI!';
+    const scoreColor = qdScore >= 40 ? "#00f2ff" : (qdScore >= 20 ? "#ffcc00" : "#ff5252");
+
     Swal.fire({
         icon: 'info',
-        title: `🧠 Hızlı Karar ${msg}`,
-        html: `<div style="text-align:center;">
-                <div style="font-size:1.0rem; margin-bottom:8px;">Skorun: <b>${qdScore}</b></div>
-                <div style="color:#666; font-size:0.9rem;">İstersen yeniden başlatıp rekor deneyebilirsin.</div>
-              </div>`,
-        confirmButtonText: 'Tamam'
+        title: msg,
+        background: '#0a1428',
+        color: '#fff',
+        html: `
+            <div style="text-align:center; padding: 10px;">
+                <div style="font-size:1.2rem; color:#bbb; margin-bottom:15px;">🧠 Hızlı Karar Sonucu</div>
+                <div style="font-size:2.5rem; font-weight:900; color:${scoreColor}; text-shadow: 0 0 15px ${scoreColor}88;">${qdScore}</div>
+                <div style="margin-top:10px; color:#888;">Puan topladın!</div>
+                <hr style="border:0; border-top:1px solid #333; margin:20px 0;">
+                <div style="color:#666; font-size:0.9rem;">Daha hızlı karar vererek rekorunu geliştirebilirsin.</div>
+            </div>`,
+        confirmButtonText: '<i class="fas fa-redo"></i> Tekrar Oyna',
+        confirmButtonColor: '#00f2ff',
+        showCancelButton: true,
+        cancelButtonText: 'Kapat',
+        cancelButtonColor: '#444'
+    }).then((r) => {
+        if (r.isConfirmed) resetQuickDecision();
+        else closeModal('quick-modal');
+    });
+}
+confirmButtonText: 'Tamam'
     });
 
-    // Lobby'e dön
-    const lobby = document.getElementById('qd-lobby');
-    const game = document.getElementById('qd-game');
-    if (lobby) lobby.style.display = 'block';
-    if (game) game.style.display = 'none';
-    const t = document.getElementById('qd-time'); if (t) t.innerText = '30';
-    const st = document.getElementById('qd-step'); if (st) st.innerText = '0';
+// Lobby'e dön
+const lobby = document.getElementById('qd-lobby');
+const game = document.getElementById('qd-game');
+if (lobby) lobby.style.display = 'block';
+if (game) game.style.display = 'none';
+const t = document.getElementById('qd-time'); if (t) t.innerText = '30';
+const st = document.getElementById('qd-step'); if (st) st.innerText = '0';
 }
 
 function openPenaltyGame() {
@@ -1974,13 +2053,7 @@ function fetchLeaderboard() {
 }
 
 function buildQuestionQueue() {
-    const n = quizQuestions.length;
-    const idxs = Array.from({ length: n }, (_, i) => i);
-    idxs.sort(() => Math.random() - 0.5);
-
-    // 10 soru için yeter yoksa, yine de döngüye sokmayalım: kalan toplarda tekrar olabilir.
-    // ama önce tüm sorular bir kez gelsin.
-    return idxs;
+    return getGameQuestionQueue(quizQuestions, 'seenArenaQuestions', 10);
 }
 
 function startPenaltySession() {
@@ -2107,26 +2180,45 @@ function shootBall(idx) {
 
             setTimeout(() => {
                 if (goalMsg) {
-                    goalMsg.innerText = "GOL!!!";
-                    goalMsg.style.color = "#fabb00";
+                    goalMsg.innerText = "GOOOOL!";
+                    goalMsg.style.color = "#00f2ff";
+                    goalMsg.style.textShadow = "0 0 20px #00f2ff";
                     goalMsg.classList.add('show');
                 }
-                pScore++;
+                pScore += (doubleChanceUsed ? 2 : 1);
                 pCorrectCount++;
                 document.getElementById('p-score').innerText = pScore;
 
-                Swal.fire({ toast: true, position: 'top', icon: 'success', title: 'Mükemmel Şut!', showConfirmButton: false, timer: 900, background: '#a5d6a7' });
-            }, 450);
+                Swal.fire({
+                    toast: true,
+                    position: 'top',
+                    icon: 'success',
+                    title: 'MÜKEMMEL ŞUT!',
+                    showConfirmButton: false,
+                    timer: 1200,
+                    background: '#0e1b42',
+                    color: '#00f2ff'
+                });
+            }, 500);
 
         } else {
             pWrongCount++;
 
             const showWrong = () => {
                 if (goalMsg) {
-                    goalMsg.style.color = "#ef5350";
+                    goalMsg.style.color = "#ff5252";
+                    goalMsg.style.textShadow = "0 0 20px #ff5252";
                     goalMsg.classList.add('show');
                 }
-                Swal.fire({ icon: 'error', title: 'Kaçırdın!', text: `Doğru: ${String.fromCharCode(65 + pCurrentQ.a)}`, showConfirmButton: true, timer: 2400, background: '#ef9a9a' });
+                Swal.fire({
+                    icon: 'error',
+                    title: 'KAÇIRDIN!',
+                    text: `Doğru Cevap: ${String.fromCharCode(65 + pCurrentQ.a)}`,
+                    showConfirmButton: true,
+                    background: '#0a1428',
+                    color: '#fff',
+                    confirmButtonColor: '#ff5252'
+                });
             };
 
             if (Math.random() > 0.5) {
@@ -2135,19 +2227,19 @@ function shootBall(idx) {
                     ballWrap.style.left = (shotDir === 0 || shotDir === 2) ? "40%" : "60%";
                     ballWrap.style.transform = "scale(0.6)";
                 }
-                setTimeout(() => { if (goalMsg) goalMsg.innerText = "KURTARDI!"; showWrong(); }, 450);
+                setTimeout(() => { if (goalMsg) goalMsg.innerText = "KURTARDI!"; showWrong(); }, 500);
             } else {
                 if (ballWrap) ballWrap.classList.add(Math.random() > 0.5 ? 'ball-miss-left' : 'ball-miss-right');
-                setTimeout(() => { if (goalMsg) goalMsg.innerText = "DIŞARI!"; showWrong(); }, 450);
+                setTimeout(() => { if (goalMsg) goalMsg.innerText = "DIŞARI!"; showWrong(); }, 500);
             }
         }
-    }, 300);
+    }, 400);
 
     // top azalt
     pBalls--;
     document.getElementById('p-balls').innerText = pBalls;
 
-    setTimeout(() => { resetField(); loadPenaltyQuestion(); }, 2400);
+    setTimeout(() => { resetField(); loadPenaltyQuestion(); }, 3200);
 }
 
 function resetField() {
@@ -2165,9 +2257,10 @@ function resetField() {
         b.classList.remove('wrong-first-try');
         b.style.textDecoration = '';
         b.style.opacity = '';
-        b.style.background = '#fabb00';
-        b.style.color = '#0e1b42';
-        b.style.borderColor = '#f0b500';
+        b.style.background = '';
+        b.style.color = '';
+        b.style.borderColor = '';
+        b.style.boxShadow = '';
         b.disabled = false;
     });
 }
@@ -2176,21 +2269,27 @@ function finishPenaltyGame() {
     const totalShots = 10;
     const title = pScore >= 8 ? "EFSANE! 🏆" : (pScore >= 5 ? "İyi Maçtı! 👏" : "Antrenman Lazım 🤕");
     const acc = Math.round((pCorrectCount / Math.max(1, (pCorrectCount + pWrongCount))) * 100);
+    const scoreColor = pScore >= 8 ? "#00f2ff" : (pScore >= 5 ? "#ffcc00" : "#ff5252");
 
     const qEl = document.getElementById('p-question-text');
     if (qEl) {
         qEl.innerHTML = `
-            <div style="font-size:1.5rem; color:#fabb00; font-weight:800;">MAÇ BİTTİ!</div>
-            <div style="margin-top:4px; font-size:1.1rem; color:#fff;">${title}</div>
-            <div style="margin-top:8px; font-size:1rem; color:#ddd;">
-                <b>Skor:</b> ${pScore}/${totalShots} &nbsp; • &nbsp;
-                <b>Doğruluk:</b> ${acc}%
-            </div>
-            <div style="margin-top:6px; font-size:0.9rem; color:#bbb;">
-                Doğru: ${pCorrectCount} &nbsp; | &nbsp; Yanlış: ${pWrongCount}
-            </div>
-            <div style="margin-top:10px; font-size:0.85rem; color:#aaa;">
-                Yeniden oynamak için aşağıdan başlatabilirsin.
+            <div style="text-align:center; padding:15px; background:rgba(0,0,0,0.3); border-radius:12px; border:1px solid #333;">
+                <div style="font-size:1.8rem; color:#00f2ff; font-weight:900; text-shadow:0 0 10px #00f2ff66;">MAÇ BİTTİ!</div>
+                <div style="margin-top:8px; font-size:1.2rem; color:#fff; font-weight:600;">${title}</div>
+                <div style="display:flex; justify-content:center; gap:20px; margin-top:20px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:0.8rem; color:#888; text-transform:uppercase;">Skor</div>
+                        <div style="font-size:2rem; font-weight:900; color:${scoreColor};">${pScore}/${totalShots}</div>
+                    </div>
+                    <div style="text-align:center; border-left:1px solid #333; padding-left:20px;">
+                        <div style="font-size:0.8rem; color:#888; text-transform:uppercase;">Doğruluk</div>
+                        <div style="font-size:2rem; font-weight:900; color:#fff;">${acc}%</div>
+                    </div>
+                </div>
+                <div style="margin-top:15px; font-size:0.9rem; color:#aaa;">
+                    Doğru: <span style="color:#00f2ff">${pCorrectCount}</span> &nbsp; | &nbsp; Yanlış: <span style="color:#ff5252">${pWrongCount}</span>
+                </div>
             </div>
         `;
     }
