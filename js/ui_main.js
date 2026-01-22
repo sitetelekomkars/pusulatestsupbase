@@ -11,6 +11,64 @@ function loadHomeBlocks() {
     });
 }
 
+function loadContentData() {
+    const CACHE_KEY = "sSportContentCache";
+    let loadedFromCache = false;
+
+    // 1. Try Cache
+    try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+                console.log("[Cache] Veriler önbellekten yüklendi.");
+                document.getElementById('loading').style.display = 'none';
+                processRawData(parsed);
+                loadedFromCache = true;
+            }
+        }
+    } catch (e) { console.warn("Cache read error:", e); }
+
+    // If no cache, show loader
+    if (!loadedFromCache) {
+        document.getElementById('loading').style.display = 'block';
+    }
+
+    // 2. Fetch Fresh Data
+    apiCall('fetchData').then(data => {
+        if (!loadedFromCache) document.getElementById('loading').style.display = 'none';
+
+        if (data.result === "success") {
+            // Update Cache
+            try { localStorage.setItem(CACHE_KEY, JSON.stringify(data.data)); } catch (e) { }
+            // Render
+            processRawData(data.data);
+        } else {
+            if (!loadedFromCache) document.getElementById('loading').innerHTML = `Veriler alınamadı: ${data.message || 'Bilinmeyen Hata'}`;
+        }
+    }).catch(error => {
+        if (!loadedFromCache) document.getElementById('loading').innerHTML = 'Bağlantı Hatası! Sunucuya ulaşılamıyor.';
+    }).finally(() => { try { __dataLoadedResolve && __dataLoadedResolve(); } catch (e) { } });
+}
+
+function processRawData(data) {
+    if (!data || !Array.isArray(data)) return;
+
+    // Filtreleme ve global stores güncelleme
+    database = data.filter(item => VALID_CATEGORIES.includes(item.category));
+    newsData = data.filter(item => item.category === 'Duyuru');
+    sportsData = data.filter(item => item.category === 'Spor');
+    salesScripts = data.filter(item => item.category === 'Script');
+
+    // Duyuruları tarihe göre sırala
+    newsData.sort((a, b) => parseDateTRToTS(b.date) - parseDateTRToTS(a.date));
+
+    // Arayüz tetikleyicileri
+    startTicker();
+    if (currentCategory === 'home') renderHomePanels();
+    else filterContent();
+}
+
 function renderCards(data) {
     try {
         activeCards = data;
@@ -326,7 +384,7 @@ function startTicker() {
 
 function openNews() {
     document.getElementById('news-modal').style.display = 'flex';
-    const grid = document.getElementById('news-grid');
+    const grid = document.getElementById('news-container');
     grid.innerHTML = '';
     newsData.filter(n => isAdminMode || n.status === 'Aktif').forEach((n, index) => {
         let typeClass = n.type === 'update' ? 'update' : n.type === 'fix' ? 'fix' : 'info';
@@ -459,3 +517,15 @@ function toggleFavorite(title) {
     if (document.getElementById('guide-modal').style.display === 'flex') openGuide();
 }
 function isFav(title) { return getFavs().includes(title); }
+
+function setHomeWelcomeUser(userName) {
+    const el = document.getElementById('home-welcome-user');
+    if (!el) return;
+    const hour = new Date().getHours();
+    let msg = "Merhabalar";
+    if (hour >= 6 && hour < 12) msg = "Günaydın";
+    else if (hour >= 12 && hour < 18) msg = "İyi Günler";
+    else if (hour >= 18 && hour < 24) msg = "İyi Akşamlar";
+    else msg = "İyi Geceler";
+    el.innerHTML = `${msg}, <span style="color:var(--secondary)">${userName}</span>`;
+}
