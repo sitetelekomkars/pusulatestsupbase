@@ -24,6 +24,10 @@
         type="text" id="usernameInput" class="login-input" placeholder="Kullanıcı Adı"> <input type="password"
         id="passInput" class="login-input" placeholder="Şifre" onkeyup="enterBas(event)"><button class="login-btn"
         onclick="girisYap()">Giriş Yap</button>
+      <div style="margin-top:10px; text-align:center;">
+        <a href="javascript:void(0)" onclick="forgotPasswordPopup()"
+          style="color:rgba(255,255,255,0.5); font-size:0.8rem; text-decoration:none;">Şifremi Unuttum?</a>
+      </div>
       <div id="loading-msg" class="loading-text">Bağlanıyor...</div>
       <p id="error-msg" style="color:#ef5350;display:none;margin-top:10px;font-size:.9rem">Hatalı Kullanıcı Adı veya
         Şifre!</p>
