@@ -3106,10 +3106,10 @@ function renderDashboardChart(data) {
         },
         options: {
             responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-            layout: { padding: { top: 45, right: 60, bottom: 10, left: 10 } },
+            layout: { padding: { top: 45, right: 75, bottom: 10, left: 10 } },
             scales: {
-                x: { beginAtZero: true, max: 130, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { display: false } },
-                y: { grid: { display: false }, ticks: { font: { weight: '600' } } }
+                x: { beginAtZero: true, max: 135, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { display: false } },
+                y: { grid: { display: false }, ticks: { font: { weight: '700', size: 12 } } }
             },
             plugins: {
                 legend: { display: false },
@@ -3143,8 +3143,8 @@ const valueLabelPlugin = {
         const datasets = chart.data && chart.data.datasets ? chart.data.datasets : [];
 
         ctx.save();
-        ctx.font = opt.font || '600 11px sans-serif';
-        ctx.fillStyle = opt.color || '#374151';
+        ctx.font = opt.font || '700 13px "Inter", sans-serif';
+        ctx.fillStyle = opt.color || '#0f172a';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
@@ -3426,10 +3426,10 @@ function renderDashboardGroupAvgChart(data) {
             responsive: true,
             maintainAspectRatio: false,
             indexAxis: 'y',
-            layout: { padding: { top: 45, right: 70, bottom: 10, left: 10 } },
+            layout: { padding: { top: 45, right: 85, bottom: 10, left: 10 } },
             scales: {
-                x: { beginAtZero: true, max: 130, grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { display: false } },
-                y: { grid: { display: false }, ticks: { font: { weight: '600' } } }
+                x: { beginAtZero: true, max: 140, grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { display: false } },
+                y: { grid: { display: false }, ticks: { font: { weight: '700', size: 12 } } }
             },
             plugins: {
                 legend: { display: false },
