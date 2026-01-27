@@ -4608,7 +4608,7 @@ body.editing .edit-icon {
 }
 
 .q-dashboard-grid.v2 .q-card-wide {
-  grid-column: span 6;
+  grid-column: span 12;
 }
 
 .q-dashboard-grid.v2 .q-card-ring {
@@ -4620,13 +4620,18 @@ body.editing .edit-icon {
   grid-column: span 12;
 }
 
+/* Takım Ortalamaları (Son grafik) genişliği doldursun */
+.q-dashboard-grid.v2 .q-chart-card:last-child {
+  grid-column: span 12;
+}
+
 @media (max-width: 1400px) {
   .q-dashboard-grid.v2 .q-chart-card:not(.q-card-wide) {
-    grid-column: span 4;
+    grid-column: span 12;
   }
 
   .q-dashboard-grid.v2 .q-card-wide {
-    grid-column: span 8;
+    grid-column: span 12;
   }
 }
 
