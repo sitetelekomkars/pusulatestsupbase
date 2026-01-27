@@ -3050,7 +3050,7 @@ function renderDashboardChart(data) {
                 responsive: true,
                 maintainAspectRatio: false,
                 indexAxis: 'y',
-                layout: { padding: { top: 40, right: 35, bottom: 10, left: 10 } },
+                layout: { padding: { top: 45, right: 45, bottom: 10, left: 10 } },
                 scales: {
                     x: { beginAtZero: true, max: 100, grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { font: { size: 10 } } },
                     y: { grid: { display: false }, ticks: { font: { weight: '600', size: 11 } } }
@@ -3098,9 +3098,9 @@ function renderDashboardChart(data) {
         },
         options: {
             responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-            layout: { padding: { top: 40, right: 45, bottom: 10, left: 10 } },
+            layout: { padding: { top: 45, right: 60, bottom: 10, left: 10 } },
             scales: {
-                x: { beginAtZero: true, max: 120, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { display: false } },
+                x: { beginAtZero: true, max: 130, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { display: false } },
                 y: { grid: { display: false }, ticks: { font: { weight: '600' } } }
             },
             plugins: {
@@ -3239,10 +3239,10 @@ function renderDashboardTrendChart(data) {
             }]
         },
         options: {
-            layout: { padding: { top: 40, right: 20, left: 10 } },
+            layout: { padding: { top: 45, right: 25, left: 10 } },
             responsive: true, maintainAspectRatio: false,
             scales: {
-                y: { beginAtZero: true, max: 115, grid: { color: 'rgba(0,0,0,0.03)' } },
+                y: { beginAtZero: true, max: 120, grid: { color: 'rgba(0,0,0,0.03)' } },
                 x: { grid: { display: false } }
             },
             plugins: {
@@ -3353,10 +3353,10 @@ function renderDashboardScoreDistributionChart(data) {
             }]
         },
         options: {
-            layout: { padding: { top: 40 } },
+            layout: { padding: { top: 45 } },
             responsive: true, maintainAspectRatio: false,
             scales: {
-                y: { beginAtZero: true, max: 115, grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { precision: 0 } },
+                y: { beginAtZero: true, max: 120, grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { precision: 0 } },
                 x: { grid: { display: false } }
             },
             plugins: {
@@ -3418,9 +3418,9 @@ function renderDashboardGroupAvgChart(data) {
             responsive: true,
             maintainAspectRatio: false,
             indexAxis: 'y',
-            layout: { padding: { top: 40, right: 50, bottom: 10, left: 10 } },
+            layout: { padding: { top: 45, right: 70, bottom: 10, left: 10 } },
             scales: {
-                x: { beginAtZero: true, max: 120, grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { display: false } },
+                x: { beginAtZero: true, max: 130, grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { display: false } },
                 y: { grid: { display: false }, ticks: { font: { weight: '600' } } }
             },
             plugins: {
@@ -4202,7 +4202,7 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
 
                 const statusBadge = status === 'Bekliyor'
                     ? `<span style="background:#fff3e0; color:#e65100; font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:10px; margin-left:8px; border:1px solid #ffe0b2;">${status}</span>`
-                    : (status === 'Kapatıldı' ? `<span style="background:#e3f2fd; color:#1565c0; font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:10px; margin-left:8px; border:1px solid #bbdefb;">${status}</span>` : '');
+                    : '';
 
                 listElBuffer += `
                 <div class="eval-card-v2" id="eval-card-${index}" onclick="newToggleEvaluationDetail(${index}, '${evalItem.callId}', ${isSeen}, this)">
