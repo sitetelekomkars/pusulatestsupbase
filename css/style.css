@@ -4464,83 +4464,126 @@ body.editing .edit-icon {
 /* RESMİ ENGELLEYEN MOZAİK KODU BURADAN SİLİNMİŞTİR */
 
 /* --- v2 Quality Dashboard (Sales + Chat unified) --- */
-.q-stats-row-4 {
-  grid-template-columns: repeat(4, 1fr);
+/* --- Dashboard Stat Boxes Enhancements --- */
+.q-stats-row {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
-@media (max-width: 1100px) {
-  .q-stats-row-4 {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.q-stat-box {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-@media (max-width: 520px) {
-  .q-stats-row-4 {
-    grid-template-columns: 1fr;
-  }
+.q-stat-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.q-stat-box .stat-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.box-blue {
+  border-left: 5px solid #3498db;
+}
+
+.box-blue .stat-icon {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+}
+
+.box-green {
+  border-left: 5px solid #2ecc71;
+}
+
+.box-green .stat-icon {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+}
+
+.box-orange {
+  border-left: 5px solid #f1c40f;
+}
+
+.box-orange .stat-icon {
+  background: linear-gradient(135deg, #f1c40f, #f39c12);
 }
 
 .box-red {
-  border-color: #d32f2f;
+  border-left: 5px solid #e74c3c;
 }
 
 .box-red .stat-icon {
-  background: #d32f2f;
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-val {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0e1b42;
+  line-height: 1.1;
+}
+
+.stat-label {
+  font-size: 0.82rem;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+/* --- High Performance Ring --- */
+.score-circle-outer.large-ring {
+  width: 130px;
+  height: 130px;
+  margin: 15px auto;
+  position: relative;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+}
+
+.score-circle-inner {
+  width: 100px;
+  height: 100px;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #0e1b42;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
 .q-dashboard-grid.v2 {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 16px;
-  align-items: stretch;
-}
-
-.q-dashboard-grid.v2 .q-chart-card {
-  align-items: stretch;
-}
-
-.q-dashboard-grid.v2 .q-card-ring {
-  grid-column: span 3;
-}
-
-.q-dashboard-grid.v2 .q-card-wide {
-  grid-column: span 6;
-}
-
-.q-dashboard-grid.v2 .q-chart-card:not(.q-card-ring):not(.q-card-wide) {
-  grid-column: span 3;
-}
-
-@media (max-width: 1200px) {
-  .q-dashboard-grid.v2 .q-card-ring {
-    grid-column: span 4;
-  }
-
-  .q-dashboard-grid.v2 .q-card-wide {
-    grid-column: span 8;
-  }
-
-  .q-dashboard-grid.v2 .q-chart-card:not(.q-card-ring):not(.q-card-wide) {
-    grid-column: span 4;
-  }
-}
-
-@media (max-width: 900px) {
-  .q-dashboard-grid.v2 {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
-
-  .q-dashboard-grid.v2 .q-card-ring {
-    grid-column: span 6;
-  }
-
-  .q-dashboard-grid.v2 .q-card-wide {
-    grid-column: span 6;
-  }
-
-  .q-dashboard-grid.v2 .q-chart-card {
-    grid-column: span 6;
-  }
+  gap: 20px;
 }
 
 .q-card-head {
