@@ -257,6 +257,21 @@ async function apiCall(action, params = {}) {
                 // Şimdilik sıfır dönelim
                 return { result: "success", notifications: { pendingFeedbackCount: 0, unseenCount: 0 } };
             }
+            case "getBroadcastFlow": {
+                const { data, error } = await sb.from('BroadcastFlow').select('*');
+                if (error) {
+                    console.warn("[Pusula] BroadcastFlow fetch error:", error);
+                    return { result: "success", items: [] };
+                }
+                return { result: "success", items: data || [] };
+            }
+            case "deleteTechDoc": {
+                const { error } = await sb.from('TechDocs').delete().match({
+                    Kategori: params.keyKategori,
+                    Başlık: params.keyBaslik
+                });
+                return { result: error ? "error" : "success" };
+            }
             default:
                 console.warn(`[Pusula] Bilinmeyen apiCall action: ${action}`);
                 return { result: "error", message: `Hizmet taşınıyor: ${action}` };
@@ -573,6 +588,24 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(d => { globalUserIP = `${d.ip} [${d.city || '-'}, ${d.region || '-'}]`; })
         .catch(() => { });
 });
+// --- BROADCAST FLOW ---
+async function fetchBroadcastFlow() {
+    return new Promise((resolve) => {
+        apiCall("getBroadcastFlow", {})
+            .then(data => {
+                if (data.result === 'success' && Array.isArray(data.items)) {
+                    resolve(data.items);
+                } else {
+                    resolve([]);
+                }
+            })
+            .catch(e => {
+                console.error("fetchBroadcastFlow error", e);
+                resolve([]);
+            });
+    });
+}
+
 // --- SESSION & LOGIN ---
 function checkSession() {
     const savedUser = localStorage.getItem("sSportUser");
