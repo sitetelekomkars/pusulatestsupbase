@@ -1,5 +1,3 @@
-
-
 function formatWeekLabel(raw) {
     try {
         if (!raw) return '';
@@ -488,18 +486,27 @@ async function girisYap() {
     try {
         const hashedPass = CryptoJS.SHA256(uPass).toString();
 
-        // --- SUPABASE LOGIN ---
+        // --- SUPABASE LOGIN (Flexible Search) ---
+        // Kullanıcı adını büyük/küçük harf gözetmeksizin ara (ilike)
         const { data, error } = await sb
             .from('Users')
             .select('*')
-            .eq('Username', uName)
-            .eq('Password', hashedPass)
+            .ilike('Username', uName)
             .single();
 
         loadingMsg.style.display = "none";
         document.querySelector('.login-btn').disabled = false;
 
         if (error || !data) {
+            console.error("[Pusula Login] Kullanıcı bulunamadı veya hata:", error);
+            errorMsg.innerText = "Hatalı Kullanıcı Adı veya Şifre!";
+            errorMsg.style.display = "block";
+            return;
+        }
+
+        // Şifre kontrolü (Manuel kontrol daha güvenli debug sağlar)
+        if (data.Password !== hashedPass) {
+            console.warn("[Pusula Login] Şifre eşleşmedi.");
             errorMsg.innerText = "Hatalı Kullanıcı Adı veya Şifre!";
             errorMsg.style.display = "block";
             return;
