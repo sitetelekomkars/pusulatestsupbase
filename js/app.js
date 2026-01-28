@@ -594,7 +594,18 @@ async function fetchBroadcastFlow() {
         apiCall("getBroadcastFlow", {})
             .then(data => {
                 if (data.result === 'success' && Array.isArray(data.items)) {
-                    resolve(data.items);
+                    // Normalize keys to lowercase to ensure field access works
+                    const normed = data.items.map(i => {
+                        const n = {};
+                        Object.keys(i).forEach(k => n[k.toLowerCase()] = i[k]);
+                        // Fallbacks
+                        n.time = n.time || n.saat;
+                        n.match = n.match || n.title || n.baslik || n.mac || n.event;
+                        n.channel = n.channel || n.kanal || n.platform;
+                        n.date = n.date || n.tarih;
+                        return n;
+                    });
+                    resolve(normed);
                 } else {
                     resolve([]);
                 }
@@ -603,6 +614,73 @@ async function fetchBroadcastFlow() {
                 console.error("fetchBroadcastFlow error", e);
                 resolve([]);
             });
+    });
+}
+
+function openBroadcastFlow() {
+    Swal.fire({
+        title: 'Yayın Akışı',
+        html: `
+        <div style="text-align:left; max-height:400px; overflow-y:auto; font-size:0.9rem;">
+            <div style="margin-bottom:10px; font-size:0.8rem; color:#666;">
+                <span style="display:inline-block; width:10px; height:10px; background:#e53e3e; border-radius:50%; margin-right:5px;"></span>Yaklaşan
+                <span style="display:inline-block; width:10px; height:10px; background:#718096; border-radius:50%; margin-left:10px; margin-right:5px;"></span>Geçmiş
+            </div>
+            <div id="broadcast-list-container">Yükleniyor...</div>
+        </div>`,
+        width: '600px',
+        showCloseButton: true,
+        showConfirmButton: false,
+        didOpen: async () => {
+            const container = document.getElementById('broadcast-list-container');
+            const items = await fetchBroadcastFlow();
+            if (!items || items.length === 0) {
+                container.innerHTML = '<p style="color:#999; text-align:center;">Akış verisi bulunamadı.</p>';
+                return;
+            }
+
+            // Sort by date/time
+            items.sort((a, b) => {
+                const dA = new Date((a.dateISO || a.date) + ' ' + (a.time || '00:00'));
+                const dB = new Date((b.dateISO || b.date) + ' ' + (b.time || '00:00'));
+                return dA - dB;
+            });
+
+            const now = new Date();
+            const listHtml = items.map(it => {
+                // Parse date
+                let dt = new Date(); // default
+                try {
+                    const ds = (it.dateISO || it.date || '').split(' ')[0]; // yyyy-mm-dd or dd.mm.yyyy
+                    if (ds.includes('.')) {
+                        const p = ds.split('.');
+                        dt = new Date(`${p[2]}-${p[1]}-${p[0]}T${it.time || '00:00'}:00`);
+                    } else {
+                        dt = new Date(`${ds}T${it.time || '00:00'}:00`);
+                    }
+                } catch (e) { }
+
+                const isPast = dt < now;
+                const borderLeftColor = isPast ? '#718096' : '#e53e3e';
+                const opacity = isPast ? '0.6' : '1';
+
+                return `
+                <div style="border-left: 4px solid ${borderLeftColor}; padding: 8px 12px; background:#f7fafc; margin-bottom:8px; border-radius:4px; opacity:${opacity}; display:flex; align-items:center;">
+                    <div style="font-weight:bold; width: 60px; font-size:1.1rem; color:#2d3748;">${escapeHtml(it.time || '--:--')}</div>
+                    <div style="flex:1; padding:0 10px;">
+                        <div style="font-weight:600; color:#1a202c;">${escapeHtml(it.match || 'Maç/Program')}</div>
+                        <div style="font-size:0.8rem; color:#4a5568;">
+                            ${it.date ? `<i class="far fa-calendar"></i> ${escapeHtml(it.date)} ` : ''}
+                            ${it.channel ? `• ${escapeHtml(it.channel)}` : ''} 
+                            ${it.league ? `• ${escapeHtml(it.league)}` : ''}
+                        </div>
+                         ${it.spiker ? `<div style="font-size:0.75rem; color:#718096; margin-top:2px;">🎙 ${escapeHtml(it.spiker)}</div>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+
+            container.innerHTML = listHtml;
+        }
     });
 }
 
