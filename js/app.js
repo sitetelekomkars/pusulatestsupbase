@@ -82,7 +82,11 @@ function normalizeKeys(obj) {
 
         // Çağrı / Değerlendirme Bilgileri
         if (k === 'CallID' || k === 'CallId' || k === 'Call_ID') n.callId = obj[k];
-        if (k === 'CallDate' || k === 'Tarih' || k === 'Date') { n.callDate = obj[k]; n.date = obj[k]; }
+        if (k === 'CallDate' || k === 'Tarih' || k === 'Date') {
+            const formatted = formatDateToDDMMYYYY(obj[k]);
+            n.callDate = formatted;
+            n.date = formatted;
+        }
         if (k === 'Score' || k === 'Puan') n.score = obj[k];
         if (k === 'Okundu') n.isSeen = (obj[k] === 1 || obj[k] === true);
         if (k === 'Durum' || k === 'Status') n.status = obj[k];
@@ -216,21 +220,12 @@ async function apiCall(action, params = {}) {
                 return { result: "success", users: users };
             }
             case "getCriteria": {
-                // Criteria sheet is stored in "Settings" table after CSV import.
-                // Expected output shape for UI: [{text, points, mediumScore, badScore, order}]
                 let q = sb.from('Settings').select('*');
                 if (params.group) q = q.eq('Grup', params.group);
                 const { data, error } = await q.order('Sira', { ascending: true });
                 if (error) throw error;
 
-                const criteria = (data || []).map(r => ({
-                    text: r.Soru ?? r.text ?? r["Soru"] ?? '',
-                    points: r.Puan ?? r.points ?? r["Puan"] ?? 0,
-                    mediumScore: r["Orta Puan"] ?? r.OrtaPuan ?? r.mediumScore ?? 0,
-                    badScore: r["Kötü Puan"] ?? r["Kotu Puan"] ?? r.KotuPuan ?? r.badScore ?? 0,
-                    order: r.Sira ?? r.order ?? 0
-                })).filter(c => c.text);
-
+                const criteria = (data || []).map(normalizeKeys).filter(c => c.text);
                 return { result: "success", criteria };
             }
             case "getShiftData": {
@@ -4541,10 +4536,20 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
             const selectedPeriodForList = periodSelectForList ? periodSelectForList.value : null;
             if (selectedPeriodForList) {
                 filteredEvaluations = normalEvaluations.filter(e => {
-                    if (!e.date) return false;
-                    const parts = String(e.date).split('.');
-                    if (parts.length < 3) return false;
-                    const monthYear = `${parts[1].padStart(2, '0')}.${parts[2]}`;
+                    const dateVal = e.date || e.callDate;
+                    if (!dateVal) return false;
+                    const parts = String(dateVal).split('.');
+                    if (parts.length < 3) {
+                        // ISO format fallback (YYYY-MM-DD ...)
+                        const d = new Date(dateVal);
+                        if (!isNaN(d)) {
+                            const m = String(d.getMonth() + 1).padStart(2, '0');
+                            const y = d.getFullYear();
+                            return `${m}.${y}` === selectedPeriodForList;
+                        }
+                        return false;
+                    }
+                    const monthYear = `${parts[1].padStart(2, '0')}.${parts[2].split(' ')[0]}`;
                     return monthYear === selectedPeriodForList;
                 });
             }
