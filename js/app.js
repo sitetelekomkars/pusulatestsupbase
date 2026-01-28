@@ -58,7 +58,9 @@ let SCRIPT_URL = localStorage.getItem("PUSULA_SCRIPT_URL") || "https://script.go
 // --- SUPABASE BAĞLANTISI ---
 const SUPABASE_URL = "https://psauvjohywldldgppmxz.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ITFx76ndmOc3UJkNbHOSlQ_kD91kq45";
-const supabase = typeof supabase !== 'undefined' ? supabase : (window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null);
+const sb = (window.supabase && typeof window.supabase.createClient === 'function')
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+    : null;
 
 // ---- API CALL helper (Menu/Yetki vs için gerekli) ----
 async function apiCall(action, payload = {}, retries = 2) {
@@ -116,7 +118,7 @@ let homeBlocks = {}; // { quote:{...}, ... }
 
 async function loadHomeBlocks() {
     try {
-        const { data, error } = await supabase.from('HomeBlocks').select('*');
+        const { data, error } = await sb.from('HomeBlocks').select('*');
         if (error) throw error;
 
         homeBlocks = {};
@@ -487,7 +489,7 @@ async function girisYap() {
         const hashedPass = CryptoJS.SHA256(uPass).toString();
 
         // --- SUPABASE LOGIN ---
-        const { data, error } = await supabase
+        const { data, error } = await sb
             .from('Users')
             .select('*')
             .eq('Username', uName)
@@ -605,7 +607,7 @@ function checkAdmin(role) {
 
     async function loadPermissionsOnStartup() {
         try {
-            const { data, error } = await supabase.from('RolePermissions').select('*');
+            const { data, error } = await sb.from('RolePermissions').select('*');
             if (error) throw error;
 
             // Rol bazlı filtrele ve UI uygula
@@ -713,7 +715,7 @@ async function changePasswordPopup(isMandatory = false) {
 async function loadContentData() {
     try {
         console.log("[Pusula] Fetching data from Supabase...");
-        const { data, error } = await supabase
+        const { data, error } = await sb
             .from('Data')
             .select('*');
 
@@ -1422,7 +1424,7 @@ function openNews() {
 // =========================
 async function fetchBroadcastFlow() {
     try {
-        const { data, error } = await supabase.from('YayinAkisi').select('*');
+        const { data, error } = await sb.from('YayinAkisi').select('*');
         if (error) throw error;
         return data || [];
     } catch (err) {
@@ -2915,7 +2917,7 @@ async function fetchEvaluationsForDashboard() {
     async function fetchEvaluationsForDashboard() {
         try {
             console.log("[Pusula] Fetching evaluations from Supabase...");
-            const { data, error } = await supabase
+            const { data, error } = await sb
                 .from('Evaluations')
                 .select('*');
 
