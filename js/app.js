@@ -62,6 +62,30 @@ const sb = (window.supabase && typeof window.supabase.createClient === 'function
 // SCRIPT_URL ve apiCall kaldırıldı. Tüm işlemler Supabase üzerinden yürütülmektedir.
 // Aşağıdaki apiCall fonksiyonu, eski kodların çalışabilmesi için Supabase üzerine bir köprü (wrapper) görevi görür.
 
+// ⚠️ KRİTİK FIX: Supabase PascalCase → Frontend camelCase dönüşümü
+function normalizeKeys(obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(normalizeKeys);
+
+    const n = {};
+    Object.keys(obj).forEach(k => {
+        // Hem orijinal hem de lowercase/camelCase versiyonları tut
+        n[k] = obj[k];
+        const lower = k.toLowerCase();
+        n[lower] = obj[k];
+
+        // Kritik mappingler
+        if (k === 'AgentName') { n.agent = obj[k]; n.agentName = obj[k]; }
+        if (k === 'CallId') n.callId = obj[k];
+        if (k === 'CallDate') n.callDate = obj[k];
+        if (k === 'IsSeen') n.isSeen = obj[k];
+        if (k === 'FeedbackType') n.feedbackType = obj[k];
+        if (k === 'AgentNote') n.agentNote = obj[k];
+        if (k === 'ManagerReply') n.managerReply = obj[k];
+    });
+    return n;
+}
+
 async function apiCall(action, params = {}) {
     console.log(`[Pusula] apiCall: ${action}`, params);
     try {
@@ -94,7 +118,18 @@ async function apiCall(action, params = {}) {
                 }
                 const { data, error } = await query.order('id', { ascending: false });
                 if (error) throw error;
-                return { result: "success", evaluations: data };
+
+                console.log('[Pusula] fetchEvaluations RAW:', data);
+                const normalized = (data || []).map(e => {
+                    const n = normalizeKeys(e);
+                    // Ekstra mappingler ChatGPT versiyonu için
+                    if (e.CallID) n.callId = e.CallID;
+                    if (e.Okundu !== undefined) n.isSeen = e.Okundu === 1 || e.Okundu === true;
+                    if (e.Durum) n.status = e.Durum;
+                    return n;
+                });
+                console.log('[Pusula] fetchEvaluations NORMALIZED:', normalized);
+                return { result: "success", evaluations: normalized };
             }
             case "logEvaluation": {
                 const { data, error } = await sb.from('Evaluations').insert([{
