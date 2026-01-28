@@ -4382,6 +4382,7 @@ body.editing .edit-icon {
 .x-card-text-truncate {
   display: -webkit-box;
   -webkit-line-clamp: 4;
+  line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -4687,10 +4688,112 @@ body.editing .edit-icon {
 }
 
 .q-card-sub {
-  color: #6b7280;
-  font-size: .82rem;
-  font-weight: 600;
+  color: #64748b;
+  font-size: .78rem;
+  font-weight: 700;
   text-align: right;
+}
+
+/* --- Premium Filter Bar --- */
+.q-dash-filters,
+#admin-filters {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.minimal-select {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1e293b;
+  cursor: pointer;
+  transition: 0.2s;
+  outline: none;
+}
+
+.minimal-select:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+/* --- Compact Evaluation Cards --- */
+.eval-card-v2 {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: 0.2s;
+}
+
+.eval-card-main {
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.eval-card-main:hover {
+  background: #f8fafc;
+}
+
+.eval-grid-v2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  /* Kriterler ve Diğerleri */
+  gap: 20px;
+  padding: 20px;
+  background: #fafafa;
+  border-top: 1px solid #eee;
+}
+
+.eval-row-grid-v2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 12px;
+}
+
+.eval-crit-card-v2 {
+  background: #fff;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+}
+
+.eval-crit-card-v2.failed {
+  border-left: 4px solid #ef4444;
+  background: #fff5f5;
+}
+
+.eval-crit-card-v2.success {
+  border-left: 4px solid #10b981;
+}
+
+.eval-crit-text-v2 {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #334155;
+  line-height: 1.4;
+}
+
+.eval-crit-val-v2 {
+  font-weight: 900;
+  font-size: 1rem;
+  white-space: nowrap;
 }
 
 .q-chart-wrap {
@@ -4788,12 +4891,26 @@ body.editing .edit-icon {
   color: var(--primary);
 }
 
-.rbac-category-row {
-  background: #f4f6f9 !important;
-  font-weight: bold;
-  color: #555;
-  font-size: 0.8rem;
-  text-transform: uppercase;
+.q-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f1f5f9;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.q-filter-item i {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.q-filter-item .minimal-select {
+  border: none !important;
+  background: transparent !important;
+  padding: 8px 4px !important;
+  font-weight: 800;
 }
 
 /* Modern Toggle Switch */
