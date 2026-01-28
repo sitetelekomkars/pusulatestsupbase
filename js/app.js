@@ -4476,7 +4476,10 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
             listEl.innerHTML = '';
 
             // Sadece normal değerlendirmeleri filtrele ve göster
-            const normalEvaluations = allEvaluationsData.filter(e => !String(e.callId).toUpperCase().startsWith('MANUEL-'));
+            const normalEvaluations = allEvaluationsData.filter(e => {
+                const cid = e.callId || e.callid || '';
+                return !String(cid).toUpperCase().startsWith('MANUEL-');
+            });
 
             // Dönem filtresini uygula (seçili ay / yıl)
             let filteredEvaluations = normalEvaluations;
