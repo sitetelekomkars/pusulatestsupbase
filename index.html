@@ -356,16 +356,22 @@
       <div id="view-dashboard" class="q-view-section active">
         <div class="q-view-header q-dash-header" style="flex-wrap:wrap;gap:10px">
           <h2>Genel Bakış</h2>
-          <div class="q-dash-filters" style="display:flex;gap:10px;margin-left:auto;align-items:center;flex-wrap:wrap">
-            <select id="q-dash-group" onchange="updateDashAgentList()" class="minimal-select" style="max-width:140px">
-              <option value="all">Tüm Gruplar</option>
-            </select>
-            <select id="q-dash-agent" onchange="refreshQualityData()" class="minimal-select" style="max-width:150px">
-              <option value="all">Tüm Temsilciler</option>
-            </select>
-            <div class="q-period-selector" style="margin-left:10px">
-              <span>Dönem:</span>
-              <select id="q-dash-month" onchange="refreshQualityData()"></select>
+          <div class="q-dash-filters">
+            <div class="q-filter-item">
+              <i class="fas fa-users-viewfinder"></i>
+              <select id="q-dash-group" onchange="updateDashAgentList()" class="minimal-select">
+                <option value="all">Tüm Gruplar</option>
+              </select>
+            </div>
+            <div class="q-filter-item">
+              <i class="fas fa-user-tie"></i>
+              <select id="q-dash-agent" onchange="refreshQualityData()" class="minimal-select">
+                <option value="all">Tüm Temsilciler</option>
+              </select>
+            </div>
+            <div class="q-filter-item">
+              <i class="fas fa-calendar-days"></i>
+              <select id="q-dash-month" onchange="refreshQualityData()" class="minimal-select"></select>
             </div>
           </div>
         </div>
@@ -447,20 +453,33 @@
       <div id="view-evaluations" class="q-view-section">
         <div class="q-view-header">
           <h2>Değerlendirme Geçmişi</h2>
-          <div id="admin-filters" style="display:none;gap:10px;align-items:center;margin-left:auto;flex-wrap:wrap">
-            <button class="add-btn" onclick="logEvaluationPopup()">
-              <i class="fas fa-plus" aria-hidden="true"></i>Ekle</button>
-            <button class="admin-btn" onclick="exportEvaluations()">
-              <i class="fas fa-file-csv" aria-hidden="true"></i>Rapor</button>
-            <select id="q-admin-group" onchange="updateAgentListBasedOnGroup()" class="minimal-select">
-              <option value="all">Tüm Gruplar</option>
-            </select>
-            <select id="q-admin-agent" onchange="fetchEvaluationsForAgent()" class="minimal-select">
-              <option value="all">Tüm Temsilciler</option>
-            </select>
-            <div class="q-period-selector" style="margin-left:10px">
-              <span>Dönem:</span>
-              <select id="q-eval-month" onchange="fetchEvaluationsForAgent()"></select>
+          <div id="admin-filters" style="display:none; margin-left:auto;">
+            <div class="q-dash-filters">
+              <button class="add-btn" onclick="logEvaluationPopup()">
+                <i class="fas fa-plus"></i> Ekle
+              </button>
+              <button class="admin-btn" onclick="exportEvaluations()" style="background:#4b5563; color:white;">
+                <i class="fas fa-file-csv"></i> Rapor
+              </button>
+              <div class="q-filter-item">
+                <i class="fas fa-users"></i>
+                <select id="q-admin-group" onchange="updateAgentListBasedOnGroup()" class="minimal-select">
+                  <option value="all">Tüm Gruplar</option>
+                </select>
+              </div>
+              <div class="q-filter-item">
+                <i class="fas fa-user-tag"></i>
+                <select id="q-admin-agent" onchange="fetchEvaluationsForAgent()" class="minimal-select">
+                  <option value="all">Tüm Temsilciler</option>
+                </select>
+              </div>
+              <div class="q-filter-item">
+                <i class="fas fa-calendar-days"></i>
+                <div class="q-period-selector">
+                  <span>Dönem:</span>
+                  <select id="q-eval-month" onchange="fetchEvaluationsForAgent()"></select>
+                </div>
+              </div>
             </div>
           </div>
         </div>
