@@ -5039,7 +5039,7 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
                             detailTableHtml += `
                             <div class="eval-crit-card-v2 ${isFailed ? 'failed' : 'success'}">
                                 <div class="eval-crit-text-v2">
-                                    ${item.q}
+                                    ${escapeHtml(item.q)}
                                     ${noteDisplay}
                                 </div>
                                 <div class="eval-crit-val-v2" style="color: ${isFailed ? '#ef4444' : '#10b981'}">
@@ -5049,10 +5049,11 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
                         });
                         detailTableHtml += '</div>';
                     } else {
-                        detailTableHtml = `<div class="eval-feedback-box-v2">${(typeof evalItem.details === "object" ? escapeHtml(JSON.stringify(evalItem.details)) : evalItem.details)}</div>`;
+                        detailTableHtml = `<div class="eval-feedback-box-v2">${(typeof evalItem.details === "object" ? escapeHtml(JSON.stringify(evalItem.details)) : escapeHtml(String(evalItem.details)))}</div>`;
                     }
                 } catch (e) {
-                    detailTableHtml = `<div class="eval-feedback-box-v2">${(typeof evalItem.details === "object" ? escapeHtml(JSON.stringify(evalItem.details)) : evalItem.details)}</div>`;
+                    console.error("Detail parse error:", e);
+                    detailTableHtml = `<div class="eval-feedback-box-v2">${(typeof evalItem.details === "object" ? escapeHtml(JSON.stringify(evalItem.details)) : escapeHtml(String(evalItem.details)))}</div>`;
                 }
 
                 const callDateDisplay = evalItem.callDate && evalItem.callDate !== 'N/A' ? evalItem.callDate : 'N/A';
