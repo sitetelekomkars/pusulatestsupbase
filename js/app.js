@@ -243,8 +243,8 @@ async function apiCall(action, params = {}) {
                 if (params.targetAgent && params.targetAgent !== 'all') {
                     query = query.eq('AgentName', params.targetAgent);
                 } else if (params.targetGroup && params.targetGroup !== 'all') {
-                    // ✅ GRUP FİLTRESİ (Bug 4 Fix)
-                    query = query.eq('Group', params.targetGroup);
+                    // ✅ GRUP FİLTRESİ (Bug 4 & 10 Fix: Case-insensitive match)
+                    query = query.ilike('Group', params.targetGroup);
                 }
                 // En yeni kayıtlar her zaman en üstte gelsin (ID descending)
                 const { data, error } = await query.order('id', { ascending: false });
