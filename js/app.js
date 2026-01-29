@@ -7974,7 +7974,6 @@ async function kickUser(username, token) {
         }
     }
 }
-}
 
 // ============================================================
 // --- GELİŞMİŞ YETKİ YÖNETİMİ (RBAC) (v14.2) ---
