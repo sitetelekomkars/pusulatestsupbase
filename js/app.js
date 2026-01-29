@@ -342,20 +342,44 @@ async function apiCall(action, params = {}) {
                 // Rapor için verileri çek ve formatla
                 let query = sb.from('Evaluations').select('*');
                 if (params.targetAgent !== 'all') query = query.ilike('AgentName', params.targetAgent);
+                if (params.targetGroup !== 'all') query = query.ilike('Group', params.targetGroup);
 
-                const { data, error } = await query.order('CallDate', { ascending: false });
+                const { data, error } = await query.order('id', { ascending: false });
                 if (error) throw error;
 
-                const normalized = data.map(normalizeKeys);
+                const normalized = (data || []).map(normalizeKeys);
                 const filtered = params.targetPeriod === 'all' ? normalized : normalized.filter(e => {
+                    // Tarih formatı: "DD.MM.YYYY" veya ISO
                     const d = e.callDate || e.date;
                     if (!d) return false;
-                    const p = d.split('.');
-                    if (p.length < 3) return false;
-                    return `${p[1]}.${p[2].split(' ')[0]}` === params.targetPeriod;
+
+                    // Eğer nokta (01.2026) içeriyorsa tireye çevirip karşılaştır (01-2026)
+                    if (d.includes('.')) {
+                        const p = d.split('.');
+                        if (p.length >= 3) {
+                            const mm = p[1];
+                            const yyyy = p[2].split(' ')[0];
+                            return `${mm}-${yyyy}` === params.targetPeriod;
+                        }
+                    } else if (d.includes('-')) {
+                        // ISO formatı ise: "YYYY-MM-DD..."
+                        const p = d.split('-');
+                        if (p.length >= 2) {
+                            const yyyy = p[0];
+                            const mm = p[1];
+                            return `${mm}-${yyyy}` === params.targetPeriod;
+                        }
+                    }
+                    return false;
                 });
 
-                const headers = ["Temsilci", "Değerlendiren", "Call ID", "Çağrı Tarihi", "Dinleme Tarihi", "Puan", "Detaylar", "Durum", "Geri Bildirim"];
+                // Zengin Rapor Formatı (Old System Style)
+                const headers = [
+                    "Log Tarihi", "Değerleyen", "Temsilci", "Grup", "Call ID",
+                    "Puan", "Genel Geri Bildirim", "Durum", "Temsilci Notu",
+                    "Yönetici Cevabı", "Çağrı Tarihi", "Detaylar"
+                ];
+
                 const rows = filtered.map(e => {
                     let dStr = "";
                     try {
@@ -366,15 +390,18 @@ async function apiCall(action, params = {}) {
                     } catch (err) { dStr = String(e.details || ''); }
 
                     return [
-                        e.agentName || e.agent || '',
+                        e.date ? new Date(e.date).toLocaleString('tr-TR') : '', // Log Tarihi
                         e.evaluator || '',
+                        e.agentName || e.agent || '',
+                        e.group || '',
                         e.callId || '',
+                        e.score || 0, // Index 5 (Puan)
+                        e.feedback || '',
+                        e.status || e.durum || '', // Index 7 (Durum)
+                        e.agentNote || '',
+                        e.managerReply || '',
                         e.callDate || '',
-                        e.date || e.callDate || '',
-                        e.score || 0,
-                        dStr,
-                        e.status || '',
-                        e.feedback || ''
+                        dStr
                     ];
                 });
                 return { result: "success", headers, data: rows, fileName: `Evaluations_${params.targetPeriod}.xls` };
