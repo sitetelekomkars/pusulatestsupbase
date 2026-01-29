@@ -873,7 +873,29 @@ async function apiCall(action, params = {}) {
                     AgentNote: params.note,
                     Durum: params.status || 'Bekliyor'
                 }).eq('CallID', params.callId);
+
+                if (error) console.error("[Pusula Note Error]", error);
+                return { result: error ? "error" : "success", message: error ? error.message : "" };
+            }
+            case "logQuiz": {
+                // Feature: Quiz Logging (QuizResults tablosu)
+                const { error } = await sb.from('QuizResults').insert([{
+                    Username: params.username,
+                    Score: params.score,
+                    TotalQuestions: params.total,
+                    SuccessRate: params.successRate,
+                    Date: new Date().toISOString()
+                }]);
+                if (error) console.error("[Pusula Quiz Error]", error);
                 return { result: error ? "error" : "success" };
+            }
+            case "getLogs": {
+                const { data, error } = await sb.from('Logs')
+                    .select('*')
+                    .order('Date', { ascending: false })
+                    .limit(500);
+                if (error) throw error;
+                return { result: "success", logs: data };
             }
             case "resolveAgentFeedback": {
                 const { error } = await sb.from('Evaluations').update({
