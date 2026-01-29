@@ -87,7 +87,9 @@ function normalizeKeys(obj) {
             n.callDate = formatted;
             n.date = formatted;
         }
-        if (k === 'Score' || k === 'Puan') n.score = obj[k];
+        if (k === 'Score' || k === 'Puan' || k === 'Points') { n.score = obj[k]; n.points = obj[k]; }
+        if (k === 'Orta Puan' || k === 'MediumScore') n.mediumScore = obj[k];
+        if (k === 'Kötü Puan' || k === 'BadScore') n.badScore = obj[k];
         if (k === 'Okundu') n.isSeen = (obj[k] === 1 || obj[k] === true);
         if (k === 'Durum' || k === 'Status') n.status = obj[k];
         if (k === 'FeedbackType') n.feedbackType = obj[k];
@@ -4782,7 +4784,7 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
                 });
             }
 
-            
+
             // Dinleme tarihine göre kronolojik (DESC) sırala
             const parseEvalDate = (e) => {
                 const v = (e.date || e.callDate || '').toString().trim();
@@ -4793,7 +4795,7 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
                 const d = new Date(v);
                 return isNaN(d) ? 0 : d.getTime();
             };
-            filteredEvaluations.sort((a,b) => parseEvalDate(b) - parseEvalDate(a));
+            filteredEvaluations.sort((a, b) => parseEvalDate(b) - parseEvalDate(a));
 
             if (filteredEvaluations.length === 0) {
                 listEl.innerHTML = '<p style="padding:20px; text-align:center; color:#666;">Kayıt yok.</p>';
@@ -5680,13 +5682,13 @@ function renderHomePanels() {
             // Fallback: cache boşsa Supabase'den tekil çekmeyi bir kez dene
             try {
                 if (sb) {
-                    sb.from('HomeBlocks').select('*').eq('Key', 'quote').single().then(({data, error}) => {
+                    sb.from('HomeBlocks').select('*').eq('Key', 'quote').single().then(({ data, error }) => {
                         if (!error && data) {
                             const qn = normalizeKeys(data);
                             homeBlocks = homeBlocks || {};
                             homeBlocks.quote = qn;
-                            try { localStorage.setItem('homeBlocksCache', JSON.stringify(homeBlocks || {})); } catch(e) {}
-                            try { renderHomePanels(); } catch(e) {}
+                            try { localStorage.setItem('homeBlocksCache', JSON.stringify(homeBlocks || {})); } catch (e) { }
+                            try { renderHomePanels(); } catch (e) { }
                         }
                     });
                 }
