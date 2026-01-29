@@ -210,7 +210,7 @@ async function apiCall(action, params = {}) {
                     Feedback: params.feedback,
                     FeedbackType: params.feedbackType,
                     Group: params.agentGroup,
-                    Date: new Date().toLocaleString('tr-TR'),
+                    Date: new Date().toISOString(),
                     Okundu: 0,
                     Durum: params.status || 'Tamamlandı'
                 }]);
@@ -398,7 +398,7 @@ async function apiCall(action, params = {}) {
                 const { error } = await sb.from('ShiftRequests').insert([{
                     username: currentUser,
                     ...params,
-                    timestamp: new Date().toLocaleString('tr-TR')
+                    timestamp: new Date().toISOString()
                 }]);
                 if (error) throw error;
                 return { result: "success" };
@@ -573,7 +573,7 @@ async function apiCall(action, params = {}) {
                     Score: params.score,
                     TotalQuestions: params.total,
                     SuccessRate: params.successRate,
-                    Date: new Date().toLocaleString('tr-TR')
+                    Date: new Date().toISOString()
                 };
                 const { error } = await sb.from('QuizResults').insert([payload]);
                 if (error) throw error;
