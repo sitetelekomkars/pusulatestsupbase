@@ -1510,13 +1510,18 @@ async function forgotPasswordPopup() {
             const tempPass = Math.floor(100000 + Math.random() * 900000).toString();
             const hashedPass = CryptoJS.SHA256(tempPass).toString();
 
-            // 3. Veritabanını Güncelle
+            // 3. Veritabanını Güncelle (Dinamik Kolon Tespiti)
+            const updatePayload = {};
+            if ("Password" in user) updatePayload.Password = hashedPass;
+            else if ("password" in user) updatePayload.password = hashedPass;
+            else updatePayload.Password = hashedPass;
+
+            if ("ForceChange" in user) updatePayload.ForceChange = '1';
+            else if ("forcechange" in user) updatePayload.forcechange = '1';
+            else updatePayload.ForceChange = '1';
+
             const { error: updErr } = await sb.from('Users')
-                .update({
-                    Password: hashedPass,
-                    ForceChange: true,
-                    forcechange: true
-                })
+                .update(updatePayload)
                 .ilike('Username', username.trim());
 
             if (updErr) throw updErr;
@@ -1529,8 +1534,8 @@ async function forgotPasswordPopup() {
 
             Swal.fire('Başarılı', 'Geçici şifreniz e-posta adresinize gönderildi. Lütfen gelen kutunuzu kontrol edin.', 'success');
         } catch (e) {
-            console.error(e);
-            Swal.fire('Hata', 'İşlem sırasında bir sorun oluştu.', 'error');
+            console.error("[Pusula] Forgot Pass Error:", e);
+            Swal.fire('Hata', 'İşlem sırasında bir sorun oluştu: ' + (e.message || e), 'error');
         }
     }
 }
