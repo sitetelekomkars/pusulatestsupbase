@@ -4973,25 +4973,25 @@ input:checked+.rbac-slider:before {
 }
 
 /* --- HOME SCREEN SPECIAL STYLES (v15.0) --- */
-/* --- HOME SCREEN SPECIAL STYLES (Premium Glassmorphism) --- */
+/* --- HOME SCREEN SPECIAL STYLES (Premium Glassmorphism - Compact) --- */
 .home-quote {
-  padding: 30px;
+  padding: 15px 20px;
   background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 20px;
-  min-height: 140px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  min-height: auto;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow:
-    0 10px 40px rgba(31, 38, 135, 0.08),
+    0 4px 15px rgba(31, 38, 135, 0.05),
     inset 0 0 0 1px rgba(255, 255, 255, 0.5);
   position: relative;
   overflow: hidden;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  margin-top: 10px;
+  margin-top: 5px;
 }
 
 .home-quote:hover {
@@ -5026,10 +5026,10 @@ input:checked+.rbac-slider:before {
 }
 
 .quote-text {
-  font-size: 1.15rem;
+  font-size: 0.95rem;
   font-style: italic;
   color: #2d3748;
-  line-height: 1.7;
+  line-height: 1.5;
   position: relative;
   z-index: 1;
   margin: 0;
