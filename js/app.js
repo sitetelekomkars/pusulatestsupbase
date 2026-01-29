@@ -93,10 +93,16 @@ function normalizeKeys(obj) {
         if (k === 'FeedbackType') n.feedbackType = obj[k];
 
         // İçerik / Başlık / Metin
-        if (k === 'Başlık' || k === 'Teklif Adı' || k === 'Title' || k === 'Key' || k === 'BlockId') { n.title = obj[k]; n.head = obj[k]; n.blockId = obj[k]; n.key = obj[k]; }
-        if (k === 'İçerik' || k === 'Açıklama' || k === 'Description' || k === 'Metin' || k === 'Soru_Metinleri' || k === 'Soru' || k === 'Text') { n.content = obj[k]; n.text = obj[k]; n.description = obj[k]; n.questions = obj[k]; }
+        if (k === 'Başlık' || k === 'Teklif Adı' || k === 'Title' || k === 'Key' || k === 'BlockId' || k === 'blockId') {
+            n.title = obj[k]; n.head = obj[k]; n.blockId = obj[k]; n.key = obj[k];
+        }
+        if (k === 'İçerik' || k === 'Açıklama' || k === 'Description' || k === 'Metin' || k === 'Soru_Metinleri' || k === 'Soru' || k === 'Text' || k === 'Content') {
+            n.content = obj[k]; n.text = obj[k]; n.description = obj[k]; n.questions = obj[k];
+        }
         if (k === 'Script' || k === 'Senaryo') { n.script = obj[k]; }
-        if (k === 'Kategori' || k === 'Segment' || k === 'TargetGroup' || k === 'Konu') { n.category = obj[k]; n.segment = obj[k]; n.group = obj[k]; n.subject = obj[k]; }
+        if (k === 'Kategori' || k === 'Segment' || k === 'TargetGroup' || k === 'Konu' || k === 'VisibleGroups') {
+            n.category = obj[k]; n.segment = obj[k]; n.group = obj[k]; n.subject = obj[k]; n.visibleGroups = obj[k];
+        }
         if (k === 'Görsel' || k === 'Image' || k === 'Link') { n.image = obj[k]; n.link = obj[k]; }
 
         // Yayın Akışı (Special table keys)
@@ -106,10 +112,13 @@ function normalizeKeys(obj) {
         if (k === 'ANNOUNCER') { n.channel = obj[k]; n.announcer = obj[k]; }
 
         // StartEpoch hesaplama (Yayın Akışı için)
-        if (n.date && n.time) {
+        const dVal = n.date || n.dateISO;
+        const tVal = n.time;
+        if (dVal && tVal) {
             try {
-                const datePart = String(n.date).includes('.') ? n.date.split('.').reverse().join('-') : n.date;
-                const isoStr = `${datePart.split(' ')[0]}T${n.time}`;
+                const datePart = String(dVal).includes('.') ? dVal.split('.').reverse().join('-') : dVal;
+                // datePart might be "dd.mm.yyyy" if not handled correctly, but reverse.join('-') handles it
+                const isoStr = `${String(datePart).split(' ')[0]}T${String(tVal).trim()}`;
                 const dt = new Date(isoStr);
                 if (!isNaN(dt.getTime())) n.startEpoch = dt.getTime();
             } catch (e) { }
@@ -128,6 +137,10 @@ function normalizeKeys(obj) {
         }
         if (k === 'Alert' || k === 'Uyarı') n.alert = obj[k];
         if (k === 'Result' || k === 'Sonuç') n.result = obj[k];
+
+        // Quiz / Game Results
+        if (k === 'SuccessRate' || k === 'Başarı') n.average = obj[k];
+        if (k === 'TotalQuestions') n.total = obj[k];
     });
     return n;
 }
@@ -162,6 +175,7 @@ async function apiCall(action, params = {}) {
                 if (params.targetAgent && params.targetAgent !== 'all') {
                     query = query.eq('AgentName', params.targetAgent);
                 }
+                // ID veya Tarihe göre sırala (Tarih bazlı sıralama isteği)
                 const { data, error } = await query.order('id', { ascending: false });
                 if (error) throw error;
                 return { result: "success", evaluations: data.map(normalizeKeys) };
@@ -299,9 +313,18 @@ async function apiCall(action, params = {}) {
                 return { result: "success", data: (data || []).map(normalizeKeys) };
             }
             case "saveAllTelesalesOffers": {
-                // Mevcut tüm teklifleri tek seferde değiştiren bir yapı (dikkatli kullanilmali)
-                await sb.from('Telesatis_DataTeklifleri').delete().neq('id', 0); // Hepsini sil
-                const { error } = await sb.from('Telesatis_DataTeklifleri').insert(params.offers);
+                // Mevcut tüm teklifleri tek seferde değiştiren bir yapı
+                await sb.from('Telesatis_DataTeklifleri').delete().neq('id', -1);
+                // Database kolon isimlerine geri map et
+                const dbOffers = params.offers.map(o => ({
+                    Segment: o.segment,
+                    Başlık: o.title,
+                    Açıklama: o.desc,
+                    Not: o.note,
+                    Görsel: o.image,
+                    Detay: o.detail || ''
+                }));
+                const { error } = await sb.from('Telesatis_DataTeklifleri').insert(dbOffers);
                 return { result: error ? "error" : "success" };
             }
             case "getTelesalesScripts": {
@@ -309,8 +332,15 @@ async function apiCall(action, params = {}) {
                 return { result: "success", items: (data || []).map(normalizeKeys) };
             }
             case "saveTelesalesScripts": {
-                await sb.from('Telesatis_Scripts').delete().neq('id', 0);
-                const { error } = await sb.from('Telesatis_Scripts').insert(params.scripts);
+                // Scripts verisini Sheets'e veya varsa DB tablosuna kaydet
+                // Burada Telesatis_Scripts tablosu kullanılıyor olabilir
+                const { scripts } = params;
+                // Mevcutları silip yenileri ekle (veya tek tek upsert)
+                await sb.from('Telesatis_Scripts').delete().neq('id', -1);
+                const { error } = await sb.from('Telesatis_Scripts').insert(scripts.map(s => ({
+                    Title: s.title,
+                    Content: s.text
+                })));
                 return { result: error ? "error" : "success" };
             }
             case "getTechDocs": {
@@ -333,18 +363,28 @@ async function apiCall(action, params = {}) {
                 return { result: error ? "error" : "success" };
             }
             case "updateHomeBlock": {
+                // Supabase'de kolon adı 'Key' (Görüntülerden teyit edildi)
                 const { error } = await sb.from('HomeBlocks').upsert({
                     Key: params.key,
                     Title: params.title,
                     Content: params.content,
-                    VisibleGroups: params.visibleGroups,
-                    UpdatedAt: new Date().toISOString(),
-                    UpdatedBy: currentUser || null
+                    VisibleGroups: params.visibleGroups
                 }, { onConflict: 'Key' });
                 return { result: error ? "error" : "success" };
             }
+            case "updateDoc": {
+                // Database kolon isimleri: Başlık, İçerik, Kategori, Görsel, Link
+                const { error } = await sb.from('Teknik_Dokumanlar').update({
+                    Başlık: params.title,
+                    İçerik: params.content,
+                    Kategori: params.category,
+                    Görsel: params.image,
+                    Link: params.link
+                }).eq('id', params.id);
+                return { result: error ? "error" : "success" };
+            }
             case "getActiveUsers": {
-                // Aktif kullanıcıları izleyen bir tablo (ActiveUsers) olmalı. 
+                // Aktif kullanıcıları izleyen bir tablo (ActiveUsers) olmalı.
                 // Şimdilik boş dönelim.
                 return { result: "success", users: [] };
             }
@@ -413,9 +453,8 @@ async function loadHomeBlocks() {
         homeBlocks = {};
         data.forEach(row => {
             const normalized = normalizeKeys(row);
-            if (normalized.blockId) homeBlocks[normalized.blockId] = normalized;
-            // Geriye dönük uyum için orijinal key'i de kontrol et
-            else if (row.BlockId) homeBlocks[row.BlockId] = normalized;
+            const id = normalized.key || row.Key || normalized.blockId || row.BlockId;
+            if (id) homeBlocks[id] = normalized;
         });
 
         try { localStorage.setItem('homeBlocksCache', JSON.stringify(homeBlocks || {})); } catch (e) { }
@@ -687,100 +726,9 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(() => { });
 });
 // --- BROADCAST FLOW ---
-async function fetchBroadcastFlow() {
-    return new Promise((resolve) => {
-        apiCall("getBroadcastFlow", {})
-            .then(data => {
-                if (data.result === 'success' && Array.isArray(data.items)) {
-                    // Normalize keys to lowercase to ensure field access works
-                    const normed = data.items.map(i => {
-                        const n = {};
-                        Object.keys(i).forEach(k => n[k.toLowerCase()] = i[k]);
-                        // Fallbacks
-                        n.time = n.time || n.saat;
-                        n.match = n.match || n.title || n.baslik || n.mac || n.event;
-                        n.channel = n.channel || n.kanal || n.platform;
-                        n.date = n.date || n.tarih;
-                        return n;
-                    });
-                    resolve(normed);
-                } else {
-                    resolve([]);
-                }
-            })
-            .catch(e => {
-                console.error("fetchBroadcastFlow error", e);
-                resolve([]);
-            });
-    });
-}
+// (Duplicate fetchBroadcastFlow removed)
 
-function openBroadcastFlow() {
-    Swal.fire({
-        title: 'Yayın Akışı',
-        html: `
-        <div style="text-align:left; max-height:400px; overflow-y:auto; font-size:0.9rem;">
-            <div style="margin-bottom:10px; font-size:0.8rem; color:#666;">
-                <span style="display:inline-block; width:10px; height:10px; background:#e53e3e; border-radius:50%; margin-right:5px;"></span>Yaklaşan
-                <span style="display:inline-block; width:10px; height:10px; background:#718096; border-radius:50%; margin-left:10px; margin-right:5px;"></span>Geçmiş
-            </div>
-            <div id="broadcast-list-container">Yükleniyor...</div>
-        </div>`,
-        width: '600px',
-        showCloseButton: true,
-        showConfirmButton: false,
-        didOpen: async () => {
-            const container = document.getElementById('broadcast-list-container');
-            const items = await fetchBroadcastFlow();
-            if (!items || items.length === 0) {
-                container.innerHTML = '<p style="color:#999; text-align:center;">Akış verisi bulunamadı.</p>';
-                return;
-            }
-
-            // Sort by date/time
-            items.sort((a, b) => {
-                const dA = new Date((a.dateISO || a.date) + ' ' + (a.time || '00:00'));
-                const dB = new Date((b.dateISO || b.date) + ' ' + (b.time || '00:00'));
-                return dA - dB;
-            });
-
-            const now = new Date();
-            const listHtml = items.map(it => {
-                // Parse date
-                let dt = new Date(); // default
-                try {
-                    const ds = (it.dateISO || it.date || '').split(' ')[0]; // yyyy-mm-dd or dd.mm.yyyy
-                    if (ds.includes('.')) {
-                        const p = ds.split('.');
-                        dt = new Date(`${p[2]}-${p[1]}-${p[0]}T${it.time || '00:00'}:00`);
-                    } else {
-                        dt = new Date(`${ds}T${it.time || '00:00'}:00`);
-                    }
-                } catch (e) { }
-
-                const isPast = dt < now;
-                const borderLeftColor = isPast ? '#718096' : '#e53e3e';
-                const opacity = isPast ? '0.6' : '1';
-
-                return `
-                <div style="border-left: 4px solid ${borderLeftColor}; padding: 8px 12px; background:#f7fafc; margin-bottom:8px; border-radius:4px; opacity:${opacity}; display:flex; align-items:center;">
-                    <div style="font-weight:bold; width: 60px; font-size:1.1rem; color:#2d3748;">${escapeHtml(it.time || '--:--')}</div>
-                    <div style="flex:1; padding:0 10px;">
-                        <div style="font-weight:600; color:#1a202c;">${escapeHtml(it.match || 'Maç/Program')}</div>
-                        <div style="font-size:0.8rem; color:#4a5568;">
-                            ${it.date ? `<i class="far fa-calendar"></i> ${escapeHtml(it.date)} ` : ''}
-                            ${it.channel ? `• ${escapeHtml(it.channel)}` : ''} 
-                            ${it.league ? `• ${escapeHtml(it.league)}` : ''}
-                        </div>
-                         ${it.spiker ? `<div style="font-size:0.75rem; color:#718096; margin-top:2px;">🎙 ${escapeHtml(it.spiker)}</div>` : ''}
-                    </div>
-                </div>`;
-            }).join('');
-
-            container.innerHTML = listHtml;
-        }
-    });
-}
+// (Duplicate openBroadcastFlow removed)
 
 // --- SESSION & LOGIN ---
 function checkSession() {
@@ -2055,6 +2003,7 @@ async function openBroadcastFlow() {
               </div>
               <div class="ba-sub">
                 <span><i class="fas fa-microphone"></i> ${escapeHtml(announcer || "-")}</span>
+                ${it.date ? `<span><i class="far fa-calendar"></i> ${escapeHtml(it.date)}</span>` : ''}
               </div>
             </div>`;
                 });
@@ -2626,7 +2575,8 @@ async function fetchLeaderboard(targetTbodyId = 'leaderboard-body', targetLoader
     tbody.innerHTML = '';
 
     try {
-        const { data, error } = await sb.from('Scoreboard').select('*').order('Average', { ascending: false }).limit(targetTbodyId === 'home-leaderboard-body' ? 5 : 10);
+        // TABLO İSMİ DÜZELTME: Scoreboard -> QuizResults (Ekran görüntüsünden teyit edildi)
+        const { data, error } = await sb.from('QuizResults').select('*').order('Score', { ascending: false }).limit(20);
 
         if (loader) loader.style.display = 'none';
         if (error) throw error;
@@ -2638,11 +2588,34 @@ async function fetchLeaderboard(targetTbodyId = 'leaderboard-body', targetLoader
             html = `<tr><td colspan="4" style="text-align:center; padding:20px; color:#999;">Henüz maç yapılmadı.</td></tr>`;
         } else {
             const normalizedData = normalizeKeys(data);
-            normalizedData.forEach((u, i) => {
-                const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : `<span class="rank-badge">${i + 1}</span>`));
+
+            // Kullanıcı bazlı istatistikleri ayıkla
+            const userStats = {};
+            normalizedData.forEach(u => {
                 const name = u.username || u.agent || u.name || 'Anonim';
-                const games = u.games || 0;
-                const avg = u.average || 0;
+                const score = parseInt(u.score || 0);
+                if (!userStats[name]) {
+                    userStats[name] = { maxScore: 0, games: 0, bestRate: '%0' };
+                }
+                userStats[name].games++;
+                if (score > userStats[name].maxScore) {
+                    userStats[name].maxScore = score;
+                    userStats[name].bestRate = u.average || u.successrate || '%0';
+                }
+            });
+
+            // En iyiden en kötüye sırala
+            const sortedUsers = Object.keys(userStats)
+                .map(name => ({ name, ...userStats[name] }))
+                .sort((a, b) => b.maxScore - a.maxScore)
+                .slice(0, targetTbodyId === 'home-leaderboard-body' ? 5 : 10);
+
+            sortedUsers.forEach((u, i) => {
+                const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : `<span class="rank-badge">${i + 1}</span>`));
+                const name = u.name;
+                const score = u.maxScore;
+                const games = u.games;
+                const rate = u.bestRate;
                 const isMe = (name === currentUser);
                 const bgStyle = isMe ? 'background:rgba(250, 187, 0, 0.15);' : '';
                 const textColor = isMe ? '#fabb00' : (targetTbodyId === 'home-leaderboard-body' ? '#333' : '#eee');
@@ -2651,7 +2624,7 @@ async function fetchLeaderboard(targetTbodyId = 'leaderboard-body', targetLoader
                     <td style="padding:8px 5px; text-align:center;">${medal}</td>
                     <td style="padding:8px 5px; font-weight:${isMe ? '800' : '600'}; color:${textColor}">${escapeHtml(name)}</td>
                     <td style="padding:8px 5px; text-align:center; color:${textColor}">${games}</td>
-                    <td style="padding:8px 5px; text-align:center; font-weight:800; color:${textColor}">${avg}</td>
+                    <td style="padding:8px 5px; text-align:center; font-weight:800; color:${textColor}">${rate}</td>
                 </tr>`;
             });
         }
@@ -3373,20 +3346,9 @@ async function fetchEvaluationsForFeedback() {
     }
 
     try {
-        const response = await fetch(SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-                action: 'fetchEvaluations',
-                targetAgent: targetAgent,
-                targetGroup: targetGroup,
-                username: currentUser,
-                token: getToken()
-            })
-        });
-        const data = await response.json();
-        if (data.result === "success") {
-            allEvaluationsData = (data.evaluations || []).reverse();
+        const d = await apiCall("fetchEvaluations", { targetAgent, targetGroup });
+        if (d.result === "success") {
+            allEvaluationsData = d.evaluations || []; // Ya reverse() ya da order DESC
         } else {
             allEvaluationsData = [];
         }
@@ -3419,49 +3381,33 @@ async function fetchEvaluationsForDashboard() {
         targetGroup = groupSelect ? groupSelect.value : 'all';
     }
 
-    async function fetchEvaluationsForDashboard() {
-        try {
-            console.log("[Pusula] Fetching evaluations from Supabase...");
-            const { data, error } = await sb
-                .from('Evaluations')
-                .select('*');
+    try {
+        console.log("[Pusula] Fetching evaluations from Supabase...");
+        const d = await apiCall("fetchEvaluations", { targetAgent, targetGroup });
 
-            if (error) throw error;
-
-            // Apps Script formatıyla eşitlemek için kolon isimlerini düzeltiyoruz
-            allEvaluationsData = (data || []).map(e => ({
-                id: e.id,
-                date: e.Date,
-                callDate: e.CallDate,
-                evaluator: e.Evaluator,
-                agent: e.AgentName,
-                group: e.Group,
-                callId: e.CallID,
-                score: e.Score,
-                details: e.Details,
-                feedbackStatus: e.FeedbackStatus,
-                feedbackNote: e.FeedbackNote
-            })).reverse();
-
+        if (d.result === 'success') {
+            allEvaluationsData = d.evaluations || [];
             console.log(`[Pusula] ${allEvaluationsData.length} evaluations loaded.`);
-        } catch (err) {
-            console.error("[Pusula] Evaluations Fetch Error:", err);
-            allEvaluationsData = [];
+        } else {
+            throw new Error(d.message);
         }
+    } catch (err) {
+        console.error("[Pusula] Evaluations Fetch Error:", err);
+        allEvaluationsData = [];
     }
+}
 
-    function safeParseDetails(details) {
-        if (!details) return [];
-        if (Array.isArray(details)) return details;
-        try {
-            if (typeof details === 'string') {
-                return JSON.parse(details);
-            }
-        } catch (e) {
-            console.warn("Details parse error:", e);
+function safeParseDetails(details) {
+    if (!details) return [];
+    if (Array.isArray(details)) return details;
+    try {
+        if (typeof details === 'string') {
+            return JSON.parse(details);
         }
-        return [];
+    } catch (e) {
+        console.warn("Details parse error:", e);
     }
+    return [];
 }
 function loadQualityDashboard() {
     // Verileri çek (silent mode), veri gelince grafikleri çiz
@@ -5565,37 +5511,46 @@ function editHomeBlock(kind) {
         Swal.fire("Kapalı", "Düzenleme modu kapalı. Önce 'Düzenlemeyi Aç' demelisin.", "info");
         return;
     }
-    if (kind !== 'quote') {
-        Swal.fire("Bilgi", "Bu alan artık otomatik güncelleniyor.", "info");
-        return;
-    }
-    const cur = String((homeBlocks && homeBlocks.quote && homeBlocks.quote.content) ? homeBlocks.quote.content : (localStorage.getItem('homeQuote') || '')).trim();
+    const curContent = String((homeBlocks && homeBlocks.quote && homeBlocks.quote.content) ? homeBlocks.quote.content : (localStorage.getItem('homeQuote') || '')).trim();
+    const curAuthor = String((homeBlocks && homeBlocks.quote && homeBlocks.quote.title) ? homeBlocks.quote.title : '').trim();
+
     Swal.fire({
-        title: "Günün Sözü",
-        input: "textarea",
-        inputValue: cur,
-        inputPlaceholder: "Bugünün sözünü yaz…",
+        title: "Günün Sözü Düzenle",
+        html: `
+            <div style="text-align:left; margin-bottom:10px;">
+                <label style="font-weight:bold; display:block; margin-bottom:5px;">Söz İçeriği:</label>
+                <textarea id="edit-quote-content" class="swal2-textarea" style="margin:0; width:100%; height:100px;">${escapeHtml(curContent)}</textarea>
+            </div>
+            <div style="text-align:left;">
+                <label style="font-weight:bold; display:block; margin-bottom:5px;">Yazar / Kaynak:</label>
+                <input id="edit-quote-author" class="swal2-input" style="margin:0; width:100%;" value="${escapeHtml(curAuthor)}">
+            </div>
+        `,
         showCancelButton: true,
         confirmButtonText: "Kaydet",
         cancelButtonText: "Vazgeç",
-        preConfirm: (val) => (val || '').trim()
+        preConfirm: () => {
+            return {
+                content: (document.getElementById('edit-quote-content').value || '').trim(),
+                author: (document.getElementById('edit-quote-author').value || '').trim()
+            };
+        }
     }).then(res => {
         if (!res.isConfirmed) return;
-        const val = res.value || '';
-        // local fallback
-        try { localStorage.setItem('homeQuote', val); } catch (e) { }
+        const { content, author } = res.value;
+
         // e-tabla (HomeBlocks)
-        apiCall('updateHomeBlock', { key: 'quote', title: 'Günün Sözü', content: val, visibleGroups: '' })
+        apiCall('updateHomeBlock', { key: 'quote', title: author, content: content, visibleGroups: '' })
             .then(() => {
                 homeBlocks = homeBlocks || {};
-                homeBlocks.quote = { key: 'quote', title: 'Günün Sözü', content: val, visibleGroups: '' };
+                homeBlocks.quote = { key: 'quote', title: author, content: content, visibleGroups: '' };
                 try { localStorage.setItem('homeBlocksCache', JSON.stringify(homeBlocks || {})); } catch (e) { }
                 renderHomePanels();
                 Swal.fire("Kaydedildi", "Günün sözü güncellendi.", "success");
             })
-            .catch(() => {
-                renderHomePanels();
-                Swal.fire("Kaydedildi", "Günün sözü güncellendi (yerel).", "success");
+            .catch(err => {
+                console.error("Home block update error:", err);
+                Swal.fire("Hata", "Veritabanı güncellenemedi.", "error");
             });
     });
 }
