@@ -678,13 +678,14 @@ async function apiCall(action, params = {}) {
             }
             case "getActiveUsers": {
                 // Feature: Real-time Users (Heartbeat tabanlı)
-                // Son 60 saniye içinde sinyal vermiş kullanıcıları getir
-                const heartbeatThreshold = new Date(Date.now() - 65 * 1000).toISOString();
+                // Son 24 saat içinde sinyal vermiş kullanıcıları getir (Offline görünümü için)
+                const heartbeatThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
                 const { data: activeUsers, error: uErr } = await sb
                     .from('Users')
                     .select('Username, Role, Group, last_seen')
-                    .gt('last_seen', heartbeatThreshold);
+                    .gt('last_seen', heartbeatThreshold)
+                    .order('last_seen', { ascending: false });
 
                 if (uErr) {
                     console.error("Active Users Error:", uErr);
@@ -1369,7 +1370,27 @@ let heartbeatInterval; // Yeni Heartbeat Timer
 async function sendHeartbeat() {
     if (!currentUser) return;
     try {
-        await sb.from('Users').update({ last_seen: new Date().toISOString() }).eq('Username', currentUser);
+        // Heartbeat gönderirken aynı zamanda force_logout kontrolü yap
+        const { data, error } = await sb.from('Users')
+            .update({ last_seen: new Date().toISOString() })
+            .eq('Username', currentUser)
+            .select('force_logout')
+            .single();
+
+        if (data && data.force_logout === true) {
+            // Eğer atıldıysa, flag'i false yap ve çıkışa zorla
+            await sb.from('Users').update({ force_logout: false }).eq('Username', currentUser);
+            Swal.fire({
+                icon: 'error',
+                title: 'Oturum Sonlandırıldı',
+                text: 'Yönetici tarafından sistemden çıkarıldınız.',
+                allowOutsideClick: false,
+                confirmButtonText: 'Tamam'
+            }).then(() => {
+                logout();
+            });
+        }
+
     } catch (e) { console.warn("Heartbeat failed", e); }
 }
 
@@ -7911,39 +7932,66 @@ async function openActiveUsersPanel() {
 }
 
 async function kickUser(username, token) {
-    const result = await Swal.fire({
-        title: 'Emin misiniz?',
-        html: `<strong>${username}</strong> kullanıcısını sistemden çıkartmak istediğinizden emin misiniz?`,
+    // Token parametresi artık kullanılmayacak (Legacy uyumu için parametrede duruyor)
+    const { isConfirmed } = await Swal.fire({
+        title: 'Kullanıcıyı At?',
+        text: `${username} kullanıcısı sistemden atılacak.`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'Evet, Çıkart',
-        cancelButtonText: 'Vazgeç',
-        confirmButtonColor: '#d32f2f'
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Evet, At'
     });
 
-    if (!result.isConfirmed) return;
+    if (isConfirmed) {
+        try {
+            // force_logout flag'ini true yap
+            const { error } = await sb.from('Users').update({ force_logout: true }).eq('Username', username);
 
-    try {
-        Swal.fire({ title: 'İşleniyor...', didOpen: () => { Swal.showLoading() } });
+            if (error) throw error;
 
-        const res = await apiCall("kickUser", { targetUsername: username, targetToken: token });
-
-        if (res && res.result === "success") {
-            Swal.fire({
-                icon: 'success',
-                title: 'Başarılı',
-                text: `${username} sistemden çıkartıldı.`,
-                timer: 2000
-            }).then(() => {
-                // Paneli yenile
-                openActiveUsersPanel();
-            });
-        } else {
-            Swal.fire("Hata", res.message || "Kullanıcı çıkartılamadı", "error");
+            Swal.fire('Başarılı', 'Kullanıcıya çıkış komutu gönderildi (max 30sn).', 'success');
+            // Listeyi yenile
+            showActiveUsers();
+        } catch (e) {
+            console.error(e);
+            Swal.fire('Hata', 'Kullanıcı atılamadı: ' + e.message, 'error');
         }
-    } catch (e) {
-        Swal.fire("Hata", "Bir hata oluştu: " + e.message, "error");
     }
+}
+const result = await Swal.fire({
+    title: 'Emin misiniz?',
+    html: `<strong>${username}</strong> kullanıcısını sistemden çıkartmak istediğinizden emin misiniz?`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Evet, Çıkart',
+    cancelButtonText: 'Vazgeç',
+    confirmButtonColor: '#d32f2f'
+});
+
+if (!result.isConfirmed) return;
+
+try {
+    Swal.fire({ title: 'İşleniyor...', didOpen: () => { Swal.showLoading() } });
+
+    const res = await apiCall("kickUser", { targetUsername: username, targetToken: token });
+
+    if (res && res.result === "success") {
+        Swal.fire({
+            icon: 'success',
+            title: 'Başarılı',
+            text: `${username} sistemden çıkartıldı.`,
+            timer: 2000
+        }).then(() => {
+            // Paneli yenile
+            openActiveUsersPanel();
+        });
+    } else {
+        Swal.fire("Hata", res.message || "Kullanıcı çıkartılamadı", "error");
+    }
+} catch (e) {
+    Swal.fire("Hata", "Bir hata oluştu: " + e.message, "error");
+}
 }
 
 // ============================================================
