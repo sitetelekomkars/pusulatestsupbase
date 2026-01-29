@@ -130,7 +130,7 @@ function normalizeKeys(obj) {
 
         // DATE
         if (kk === 'DATE' || kk === 'TARİH' || kk === 'TARIH') {
-            n.date = obj[k];
+            if (!n.date) n.date = obj[k]; // Zaten formatlanmışsa ezme
             n.dateISO = obj[k];
         }
 
@@ -352,21 +352,31 @@ async function apiCall(action, params = {}) {
                     if (!d) return false;
                     const p = d.split('.');
                     if (p.length < 3) return false;
-                    return `${p[1]}-${p[2].split(' ')[0]}` === params.targetPeriod;
+                    return `${p[1]}.${p[2].split(' ')[0]}` === params.targetPeriod;
                 });
 
-                const headers = ["Temsilci", "Değerlendiren", "Call ID", "Çağrı Tarihi", "Dönem", "Puan", "Detaylar", "Durum", "Geri Bildirim"];
-                const rows = filtered.map(e => [
-                    e.agentName || e.agent || '',
-                    e.evaluator || '',
-                    e.callId || '',
-                    e.callDate || '',
-                    e.period || '',
-                    e.score || 0,
-                    e.details || '',
-                    e.status || '',
-                    e.feedback || ''
-                ]);
+                const headers = ["Temsilci", "Değerlendiren", "Call ID", "Çağrı Tarihi", "Dinleme Tarihi", "Puan", "Detaylar", "Durum", "Geri Bildirim"];
+                const rows = filtered.map(e => {
+                    let dStr = "";
+                    try {
+                        const dObj = typeof e.details === 'string' ? JSON.parse(e.details) : e.details;
+                        if (Array.isArray(dObj)) {
+                            dStr = dObj.map(it => `${it.q}: ${it.score}/${it.max}${it.note ? ' [' + it.note + ']' : ''}`).join(' | ');
+                        } else { dStr = String(e.details || ''); }
+                    } catch (err) { dStr = String(e.details || ''); }
+
+                    return [
+                        e.agentName || e.agent || '',
+                        e.evaluator || '',
+                        e.callId || '',
+                        e.callDate || '',
+                        e.date || e.callDate || '',
+                        e.score || 0,
+                        dStr,
+                        e.status || '',
+                        e.feedback || ''
+                    ];
+                });
                 return { result: "success", headers, data: rows, fileName: `Evaluations_${params.targetPeriod}.xls` };
             }
             case "updateEvaluation": {
@@ -1313,13 +1323,12 @@ async function girisYap() {
 
             // Loglama: Google yerine doğrudan Supabase'e yazıyoruz
             try {
-                sb.from('Logs').insert([{
-                    Date: new Date(),
-                    Username: currentUser,
-                    Action: "Giriş",
-                    Detail: "Supabase Login",
-                    IP: globalUserIP || ""
-                }]).then(() => { });
+                // Bug 13 Fix: logAction kullan (Centralized)
+                apiCall("logAction", {
+                    action: "Giriş",
+                    details: "Supabase Login",
+                    ip: globalUserIP
+                });
             } catch (e) { console.warn("Log hatası:", e); }
         }
     } catch (err) {
@@ -4911,6 +4920,13 @@ async function addManualFeedbackPopup() {
         apiCall("logEvaluation", { ...formValues }).then(async d => {
             if (d.result === "success") {
                 Swal.fire({ icon: 'success', title: 'Kaydedildi', timer: 1500, showConfirmButton: false });
+
+                // Bug 13: Log kaydı ekle
+                apiCall("logAction", {
+                    action: "Değerlendirme Kaydı",
+                    details: `${formValues.agentName} | ${formValues.callId} | ${formValues.score}`
+                });
+
                 fetchEvaluationsForAgent(formValues.agentName);
                 fetchFeedbackLogs().then(() => { loadFeedbackList(); });
             } else {
