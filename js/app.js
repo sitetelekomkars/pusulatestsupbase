@@ -353,7 +353,6 @@ async function apiCall(action, params = {}) {
                     const d = e.callDate || e.date;
                     if (!d) return false;
 
-                    // Eğer nokta (01.2026) içeriyorsa tireye çevirip karşılaştır (01-2026)
                     if (d.includes('.')) {
                         const p = d.split('.');
                         if (p.length >= 3) {
@@ -362,7 +361,6 @@ async function apiCall(action, params = {}) {
                             return `${mm}-${yyyy}` === params.targetPeriod;
                         }
                     } else if (d.includes('-')) {
-                        // ISO formatı ise: "YYYY-MM-DD..."
                         const p = d.split('-');
                         if (p.length >= 2) {
                             const yyyy = p[0];
@@ -373,36 +371,70 @@ async function apiCall(action, params = {}) {
                     return false;
                 });
 
+                // --- DİNAMİK KIRILIM SÜTUNLARI (BUG FIX: Kırılım Kırılım Göster) ---
+                let dynamicHeaders = [];
+                let questionMap = new Set();
+
+                // 1. Tüm benzersiz kriterleri (soruları) topla
+                filtered.forEach(e => {
+                    try {
+                        const dObj = typeof e.details === 'string' ? JSON.parse(e.details) : e.details;
+                        if (Array.isArray(dObj)) {
+                            dObj.forEach(it => {
+                                if (it.q) questionMap.add(it.q);
+                            });
+                        }
+                    } catch (err) { }
+                });
+
+                const uniqueQuestions = Array.from(questionMap);
+                uniqueQuestions.forEach(q => {
+                    dynamicHeaders.push(q);
+                    dynamicHeaders.push(`Not (${q})`);
+                });
+
                 // Zengin Rapor Formatı (Old System Style)
                 const headers = [
                     "Log Tarihi", "Değerleyen", "Temsilci", "Grup", "Call ID",
                     "Puan", "Genel Geri Bildirim", "Durum", "Temsilci Notu",
-                    "Yönetici Cevabı", "Çağrı Tarihi", "Detaylar"
+                    "Yönetici Cevabı", "Çağrı Tarihi", ...dynamicHeaders
                 ];
 
                 const rows = filtered.map(e => {
-                    let dStr = "";
-                    try {
-                        const dObj = typeof e.details === 'string' ? JSON.parse(e.details) : e.details;
-                        if (Array.isArray(dObj)) {
-                            dStr = dObj.map(it => `${it.q}: ${it.score}/${it.max}${it.note ? ' [' + it.note + ']' : ''}`).join(' | ');
-                        } else { dStr = String(e.details || ''); }
-                    } catch (err) { dStr = String(e.details || ''); }
-
-                    return [
-                        e.date ? new Date(e.date).toLocaleString('tr-TR') : '', // Log Tarihi
+                    let baseRow = [
+                        e.date || '', // Log Tarihi (Zaten DD.MM.YYYY formatında)
                         e.evaluator || '',
                         e.agentName || e.agent || '',
                         e.group || '',
                         e.callId || '',
-                        e.score || 0, // Index 5 (Puan)
+                        e.score || 0,
                         e.feedback || '',
-                        e.status || e.durum || '', // Index 7 (Durum)
+                        e.status || e.durum || '',
                         e.agentNote || '',
                         e.managerReply || '',
-                        e.callDate || '',
-                        dStr
+                        e.callDate || ''
                     ];
+
+                    // Kriter detaylarını ayıkla
+                    let evalDetails = [];
+                    try {
+                        evalDetails = typeof e.details === 'string' ? JSON.parse(e.details) : (e.details || []);
+                        if (!Array.isArray(evalDetails)) evalDetails = [];
+                    } catch (err) { evalDetails = []; }
+
+                    // Her bir benzersiz soru için puan ve not sütunlarını doldur
+                    uniqueQuestions.forEach(q => {
+                        const match = evalDetails.find(it => it.q === q);
+                        if (match) {
+                            baseRow.push(match.score);
+                            baseRow.push(match.note || '');
+                        } else {
+                            baseRow.push('');
+                            baseRow.push('');
+                        }
+                    });
+
+                    return baseRow;
                 });
                 return { result: "success", headers, data: rows, fileName: `Evaluations_${params.targetPeriod}.xls` };
             }
@@ -3427,17 +3459,11 @@ function openQualityArea() {
 
         // Kullanıcı listesi boşsa çek, sonra filtreleri doldur
         if (adminUserList.length === 0) {
-            fetchUserListForAdmin().then(users => {
-                const groupSelect = document.getElementById('q-admin-group');
-                if (groupSelect) {
-                    const groups = [...new Set(users.map(u => u.group))].sort();
-                    groupSelect.innerHTML = `<option value="all">Tüm Gruplar</option>` + groups.map(g => `<option value="${g}">${g}</option>`).join('');
-                    updateAgentListBasedOnGroup();
-                }
-                populateDashboardFilters(); // Dashboard filtrelerini de doldur
+            fetchUserListForAdmin().then(() => {
+                populateAllAdminFilters();
             });
         } else {
-            populateDashboardFilters(); // Liste zaten varsa direkt doldur
+            populateAllAdminFilters();
         }
     } else {
         if (adminFilters) adminFilters.style.display = 'none';
@@ -3538,6 +3564,25 @@ function populateMonthFilterFull() {
     });
 }
 // YENİ: Dashboard Filtrelerini Doldurma
+// ✅ Tüm admin filtrelerini (Dashboard + Geçmiş) dolduran merkezi fonksiyon
+function populateAllAdminFilters() {
+    if (!isAdminMode) return;
+
+    // 1. Dashboard Filtreleri
+    populateDashboardFilters();
+
+    // 2. Değerlendirme Geçmişi Filtreleri
+    const groupSelect = document.getElementById('q-admin-group');
+    if (groupSelect && adminUserList.length > 0) {
+        const groups = [...new Set(adminUserList.map(u => u.group).filter(g => g))].sort();
+        groupSelect.innerHTML = `<option value="all">Tüm Gruplar</option>` + groups.map(g => `<option value="${g}">${g}</option>`).join('');
+        updateAgentListBasedOnGroup();
+    }
+
+    // 3. Geri Bildirim Filtreleri
+    populateFeedbackFilters();
+}
+
 function populateDashboardFilters() {
     const groupSelect = document.getElementById('q-dash-group');
     const agentSelect = document.getElementById('q-dash-agent');
