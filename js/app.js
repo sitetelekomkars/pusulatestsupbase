@@ -400,6 +400,7 @@ async function apiCall(action, params = {}) {
                     Name: fullName,
                     "Tam İsim": fullName,
                     "İsim": fullName,
+                    Role: role,
                     Group: group
                 };
                 if (password) {
@@ -868,11 +869,11 @@ async function apiCall(action, params = {}) {
                 return { result: error ? "error" : "success" };
             }
             case "submitAgentNote": {
-                // Bug 6 Fix: Not ekleme
+                // Bug 6 Fix: Not ekleme (Geliştirilmiş Eşleşme)
                 const { error } = await sb.from('Evaluations').update({
                     AgentNote: params.note,
                     Durum: params.status || 'Bekliyor'
-                }).eq('CallID', params.callId);
+                }).ilike('CallID', String(params.callId).replace('#', '').trim());
 
                 if (error) console.error("[Pusula Note Error]", error);
                 return { result: error ? "error" : "success", message: error ? error.message : "" };
@@ -1409,17 +1410,13 @@ async function girisYap() {
 
         if (loginErr) {
             console.error("[Pusula Login] Sorgu sırasında hata oluştu:", loginErr);
-            errorMsg.innerText = "Sistem Hatası: " + loginErr.message;
+            errorMsg.innerText = "Bağlantı Hatası: Sunucuya erişilemedi.";
             errorMsg.style.display = "block";
             return;
         }
 
         if (!user) {
-            console.error("[Pusula Login] '" + uName + "' kullanıcısı bulunamadı. Tabloyu ve sütun adını kontrol edin.");
-            // Alternatif: Tablodaki ilk 3 kullanıcı çekmeye çalışıp konsola yazalım (Sadece debug için)
-            const { data: testData } = await sb.from('Users').select('*').limit(3);
-            console.log("[Pusula Debug] Tablodaki örnek veriler:", testData);
-
+            dlog("[Pusula Login] Kullanıcı bulunamadı.");
             errorMsg.innerText = "Kullanıcı Adı veya Şifre Hatalı!";
             errorMsg.style.display = "block";
             return;
@@ -2776,12 +2773,12 @@ const _escapeHtml = escapeHtml;
 // ------------------------------------------------------------
 // Sağlamlaştırma (hata yönetimi + localStorage güvenli yazma)
 // ------------------------------------------------------------
-const DEBUG = (() => {
-    try { return localStorage.getItem('DEBUG') === '1'; } catch (e) { return false; }
-})();
-
-function dlog(...args) {
-    try { if (DEBUG) console.log(...args); } catch (e) { }
+// 🔒 GÜVENLİK & DEBUG: Sadece adminler için detaylı log
+function dlog(msg, data) {
+    if (isAdminMode || isLocAdmin) {
+        if (data) console.log(`[Pusula Debug] ${msg}`, data);
+        else console.log(`[Pusula Debug] ${msg}`);
+    }
 }
 
 function safeLocalStorageSet(key, value, maxBytes = 4 * 1024 * 1024) { // ~4MB
@@ -8423,77 +8420,121 @@ async function openUserManagementPanel() {
             }
         };
 
-    } catch (e) {
-        Swal.fire("Hata", e.message, "error");
     }
-}
-async function openMenuPermissions() {
-    try {
-        Swal.fire({ title: 'Yetkiler Yükleniyor...', didOpen: () => { Swal.showLoading() } });
 
-        const res = await apiCall("getRolePermissions", {});
-        if (!res || res.result !== "success") {
-            Swal.fire("Hata", "Yetki listesi alınamadı.", "error");
-            return;
-        }
+async function openLogsPanel() {
+        try {
+            Swal.fire({ title: 'Günlükler yükleniyor...', didOpen: () => { Swal.showLoading() } });
+            const res = await apiCall("getLogs", {});
+            if (!res || res.result !== "success") throw new Error("Loglar alınamadı.");
 
-        allRolePermissions = res.permissions || [];
+            const logs = res.logs || [];
+            const rowsHtml = logs.map((l, idx) => `
+            <tr style="border-bottom:1px solid #eee; font-size:0.8rem;">
+                <td style="padding:8px; color:#888;">${new Date(l.Date).toLocaleString('tr-TR')}</td>
+                <td style="padding:8px;"><strong>${escapeHtml(l.Username)}</strong></td>
+                <td style="padding:8px;"><span class="badge" style="background:#e3f2fd; color:#1976d2; padding:2px 6px; border-radius:4px;">${escapeHtml(l.Action)}</span></td>
+                <td style="padding:8px; color:#555;">${escapeHtml(l.Details)}</td>
+                <td style="padding:8px; color:#999; font-family:monospace;">${escapeHtml(l["İP ADRESİ"] || '-')}</td>
+            </tr>
+        `).join('');
 
-        // ✅ Dinamik Roller: Backend'den (Users sayfasından) gelen grupları kullan
-        const roles = res.groups || ["admin", "qusers", "users"];
-        let activeTabIndex = 0;
+            const tableHtml = `
+            <div style="max-height:500px; overflow:auto; border:1px solid #eee; border-radius:10px;">
+                <table style="width:100%; border-collapse:collapse; text-align:left;">
+                    <thead style="background:#f4f7f9; position:sticky; top:0;">
+                        <tr>
+                            <th style="padding:10px;">Tarih</th>
+                            <th style="padding:10px;">Kullanıcı</th>
+                            <th style="padding:10px;">Eylem</th>
+                            <th style="padding:10px;">Detay</th>
+                            <th style="padding:10px;">IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+        `;
 
-        const renderRbacContent = (roleIndex) => {
-            const role = roles[roleIndex];
-            const rolePerms = allRolePermissions.filter(p => p.role === role);
-
-            // ✅ Dinamik Sayfa Listesi (Arayüzdeki tüm data-menu-key öğelerini otomatik bulur)
-            const pageLabels = {
-                home: "Ana Sayfa", search: "Arama Çubuğu", news: "Duyurular", tech: "Teknik Sayfası",
-                persuasion: "İkna Sayfası", campaign: "Kampanya Sayfası", info: "Bilgi Sayfası",
-                broadcast: "Yayın Akışı", guide: "Spor Rehberi", return: "İade Asistanı",
-                telesales: "TeleSatış", game: "Oyun Merkezi", quality: "Kalite Paneli", shift: "Vardiyam"
-            };
-            const discoveredPages = [];
-            const processedKeys = new Set();
-            document.querySelectorAll('[data-menu-key]').forEach(el => {
-                const key = el.getAttribute('data-menu-key');
-                if (!processedKeys.has(key)) {
-                    discoveredPages.push({
-                        key: key,
-                        label: pageLabels[key] || (el.textContent.trim().replace(/\s+/g, ' ') || key),
-                        perms: ["View"]
-                    });
-                    processedKeys.add(key);
-                }
+            Swal.fire({
+                title: "📜 Sistem Logları",
+                html: tableHtml,
+                width: 1000,
+                showConfirmButton: true,
+                confirmButtonText: "Kapat"
             });
-            // Alfabetik sırala
-            discoveredPages.sort((a, b) => a.label.localeCompare(b.label, 'tr'));
+        } catch (e) {
+            Swal.fire('Hata', 'Loglar yüklenirken bir sorun oluştu.', 'error');
+        }
+    }
 
-            const resources = [
-                {
-                    cat: "Genel Yetkiler", items: [
-                        { key: "EditMode", label: "Düzenleme Modunu Açma", perms: ["Execute"] },
-                        { key: "AddContent", label: "Yeni İçerik Ekleme", perms: ["Execute"] },
-                        { key: "ImageUpload", label: "Görsel Yükleme", perms: ["Execute"] },
-                        { key: "Reports", label: "Rapor Çekme (Dışa Aktar)", perms: ["Execute"] },
-                        { key: "RbacAdmin", label: "Yetki Yönetimi", perms: ["Execute"] },
-                        { key: "ActiveUsers", label: "Aktif Kullanıcılar", perms: ["Execute"] }
-                    ]
-                },
-                {
-                    cat: "Sayfa Erişimi", items: discoveredPages
-                },
-                {
-                    cat: "Kalite Yönetimi", items: [
-                        { key: "Evaluation", label: "Değerlendirme Yapma", perms: ["Execute"] },
-                        { key: "Feedback", label: "Geri Bildirim Ekleme", perms: ["Execute"] },
-                        { key: "Training", label: "Eğitim Atama", perms: ["Execute"] }
-                    ]
-                }
-            ];
+    async function openMenuPermissions() {
+        try {
+            Swal.fire({ title: 'Yetkiler Yükleniyor...', didOpen: () => { Swal.showLoading() } });
 
-            let html = `
+            const res = await apiCall("getRolePermissions", {});
+            if (!res || res.result !== "success") {
+                Swal.fire("Hata", "Yetki listesi alınamadı.", "error");
+                return;
+            }
+
+            allRolePermissions = res.permissions || [];
+
+            // ✅ Dinamik Roller: Backend'den (Users sayfasından) gelen grupları kullan
+            const roles = res.groups || ["admin", "qusers", "users"];
+            let activeTabIndex = 0;
+
+            const renderRbacContent = (roleIndex) => {
+                const role = roles[roleIndex];
+                const rolePerms = allRolePermissions.filter(p => p.role === role);
+
+                // ✅ Dinamik Sayfa Listesi (Arayüzdeki tüm data-menu-key öğelerini otomatik bulur)
+                const pageLabels = {
+                    home: "Ana Sayfa", search: "Arama Çubuğu", news: "Duyurular", tech: "Teknik Sayfası",
+                    persuasion: "İkna Sayfası", campaign: "Kampanya Sayfası", info: "Bilgi Sayfası",
+                    broadcast: "Yayın Akışı", guide: "Spor Rehberi", return: "İade Asistanı",
+                    telesales: "TeleSatış", game: "Oyun Merkezi", quality: "Kalite Paneli", shift: "Vardiyam"
+                };
+                const discoveredPages = [];
+                const processedKeys = new Set();
+                document.querySelectorAll('[data-menu-key]').forEach(el => {
+                    const key = el.getAttribute('data-menu-key');
+                    if (!processedKeys.has(key)) {
+                        discoveredPages.push({
+                            key: key,
+                            label: pageLabels[key] || (el.textContent.trim().replace(/\s+/g, ' ') || key),
+                            perms: ["View"]
+                        });
+                        processedKeys.add(key);
+                    }
+                });
+                // Alfabetik sırala
+                discoveredPages.sort((a, b) => a.label.localeCompare(b.label, 'tr'));
+
+                const resources = [
+                    {
+                        cat: "Genel Yetkiler", items: [
+                            { key: "EditMode", label: "Düzenleme Modunu Açma", perms: ["Execute"] },
+                            { key: "AddContent", label: "Yeni İçerik Ekleme", perms: ["Execute"] },
+                            { key: "ImageUpload", label: "Görsel Yükleme", perms: ["Execute"] },
+                            { key: "Reports", label: "Rapor Çekme (Dışa Aktar)", perms: ["Execute"] },
+                            { key: "RbacAdmin", label: "Yetki Yönetimi", perms: ["Execute"] },
+                            { key: "ActiveUsers", label: "Aktif Kullanıcılar", perms: ["Execute"] }
+                        ]
+                    },
+                    {
+                        cat: "Sayfa Erişimi", items: discoveredPages
+                    },
+                    {
+                        cat: "Kalite Yönetimi", items: [
+                            { key: "Evaluation", label: "Değerlendirme Yapma", perms: ["Execute"] },
+                            { key: "Feedback", label: "Geri Bildirim Ekleme", perms: ["Execute"] },
+                            { key: "Training", label: "Eğitim Atama", perms: ["Execute"] }
+                        ]
+                    }
+                ];
+
+                let html = `
                 <div class="rbac-container">
                     <div class="rbac-header">
                         <div style="font-weight:700;color:var(--primary)">
@@ -8525,10 +8566,10 @@ async function openMenuPermissions() {
                                 ${resources.map(cat => `
                                     <tr class="rbac-category-row"><td colspan="2">${cat.cat}</td></tr>
                                     ${cat.items.map(item => {
-                const isEnabled = rolePerms.some(p => p.resource === item.key && p.value === true);
-                // HTML içinde çift tırnak çakışmasını önlemek için rol ismini güvenli hale getir
-                const safeRole = role.replace(/'/g, "\\'");
-                return `
+                    const isEnabled = rolePerms.some(p => p.resource === item.key && p.value === true);
+                    // HTML içinde çift tırnak çakışmasını önlemek için rol ismini güvenli hale getir
+                    const safeRole = role.replace(/'/g, "\\'");
+                    return `
                                             <tr>
                                                 <td class="rbac-resource-name">${item.label}</td>
                                                 <td style="text-align:center">
@@ -8540,230 +8581,230 @@ async function openMenuPermissions() {
                                                 </td>
                                             </tr>
                                         `;
-            }).join('')}
+                }).join('')}
                                 `).join('')}
                             </tbody>
                         </table>
                     </div>
                 </div>
             `;
-            return html;
-        };
+                return html;
+            };
 
-        // Modal içinden çağrılacak global fonksiyonlar
-        window.switchRbacRole = (idx) => {
-            activeTabIndex = idx;
-            Swal.update({ html: renderRbacContent(idx) });
-        };
+            // Modal içinden çağrılacak global fonksiyonlar
+            window.switchRbacRole = (idx) => {
+                activeTabIndex = idx;
+                Swal.update({ html: renderRbacContent(idx) });
+            };
 
-        window.toggleRbacPerm = (role, resource, val) => {
-            const idx = allRolePermissions.findIndex(p => p.role === role && p.resource === resource);
-            if (idx > -1) {
-                allRolePermissions[idx].value = val;
-            } else {
-                allRolePermissions.push({ role, resource, permission: "All", value: val });
-            }
-        };
-
-        Swal.fire({
-            title: "🛡️ Gelişmiş Yetki Yönetimi",
-            html: renderRbacContent(0),
-            width: 800,
-            showCancelButton: true,
-            cancelButtonText: "Vazgeç",
-            confirmButtonText: "Değişiklikleri Kaydet",
-            confirmButtonColor: "var(--success)",
-            preConfirm: async () => {
-                const results = [];
-                roles.forEach(r => {
-                    const rPerms = allRolePermissions.filter(p => p.role === r).map(p => ({
-                        resource: p.resource,
-                        permission: p.permission || "All",
-                        value: p.value
-                    }));
-                    results.push({ role: r, perms: rPerms });
-                });
-
-                try {
-                    Swal.showLoading();
-                    for (const resObj of results) {
-                        await apiCall("setRolePermissions", resObj);
-                    }
-                    return true;
-                } catch (e) {
-                    Swal.showValidationMessage(`Kayıt hatası: ${e.message}`);
+            window.toggleRbacPerm = (role, resource, val) => {
+                const idx = allRolePermissions.findIndex(p => p.role === role && p.resource === resource);
+                if (idx > -1) {
+                    allRolePermissions[idx].value = val;
+                } else {
+                    allRolePermissions.push({ role, resource, permission: "All", value: val });
                 }
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
-                Swal.fire("Başarılı", "Tüm yetkiler güncellendi. Kullanıcıların etkilenmesi için sayfayı yenilemeleri gerekebilir.", "success");
-            }
-        });
+            };
 
-    } catch (e) {
-        Swal.fire("Hata", "Bir hata oluştu: " + e.message, "error");
+            Swal.fire({
+                title: "🛡️ Gelişmiş Yetki Yönetimi",
+                html: renderRbacContent(0),
+                width: 800,
+                showCancelButton: true,
+                cancelButtonText: "Vazgeç",
+                confirmButtonText: "Değişiklikleri Kaydet",
+                confirmButtonColor: "var(--success)",
+                preConfirm: async () => {
+                    const results = [];
+                    roles.forEach(r => {
+                        const rPerms = allRolePermissions.filter(p => p.role === r).map(p => ({
+                            resource: p.resource,
+                            permission: p.permission || "All",
+                            value: p.value
+                        }));
+                        results.push({ role: r, perms: rPerms });
+                    });
+
+                    try {
+                        Swal.showLoading();
+                        for (const resObj of results) {
+                            await apiCall("setRolePermissions", resObj);
+                        }
+                        return true;
+                    } catch (e) {
+                        Swal.showValidationMessage(`Kayıt hatası: ${e.message}`);
+                    }
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire("Başarılı", "Tüm yetkiler güncellendi. Kullanıcıların etkilenmesi için sayfayı yenilemeleri gerekebilir.", "success");
+                }
+            });
+
+        } catch (e) {
+            Swal.fire("Hata", "Bir hata oluştu: " + e.message, "error");
+        }
     }
-}
 
-function hasPerm(resource, permission = "All") {
-    const rawRole = (getMyRole() || "").trim().toLowerCase();
-    const rawGroup = (localStorage.getItem("sSportGroup") || "").trim().toLowerCase();
+    function hasPerm(resource, permission = "All") {
+        const rawRole = (getMyRole() || "").trim().toLowerCase();
+        const rawGroup = (localStorage.getItem("sSportGroup") || "").trim().toLowerCase();
 
-    // Güçlü Normalizasyon (Türkçe karakter ve i̇ karmaşasını bitirir)
-    function clean(str) {
-        return String(str || "").toLowerCase()
-            .replace(/i̇/g, 'i').replace(/ı/g, 'i').replace(/ş/g, 's')
-            .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c').trim();
-    }
+        // Güçlü Normalizasyon (Türkçe karakter ve i̇ karmaşasını bitirir)
+        function clean(str) {
+            return String(str || "").toLowerCase()
+                .replace(/i̇/g, 'i').replace(/ı/g, 'i').replace(/ş/g, 's')
+                .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c').trim();
+        }
 
-    const cRole = clean(rawRole);
-    const cGroup = clean(rawGroup);
+        const cRole = clean(rawRole);
+        const cGroup = clean(rawGroup);
 
-    // 1. KULLANICI TALEBİ: LocAdmin (Rol veya Grup) sınırsız yetkilidir.
-    if (cRole === "locadmin" || cGroup === "locadmin") return true;
+        // 1. KULLANICI TALEBİ: LocAdmin (Rol veya Grup) sınırsız yetkilidir.
+        if (cRole === "locadmin" || cGroup === "locadmin") return true;
 
-    // 2. ÖNCELİK: GRUP (TAKIM) YETKİSİ
-    // Eğer bir grubu varsa (ob, chat, telesatış vb.), yetkiyi oradan al.
-    if (cGroup && cGroup !== "" && cGroup !== "all") {
-        const groupPerm = allRolePermissions.find(p =>
-            clean(p.role) === cGroup &&
+        // 2. ÖNCELİK: GRUP (TAKIM) YETKİSİ
+        // Eğer bir grubu varsa (ob, chat, telesatış vb.), yetkiyi oradan al.
+        if (cGroup && cGroup !== "" && cGroup !== "all") {
+            const groupPerm = allRolePermissions.find(p =>
+                clean(p.role) === cGroup &&
+                (p.resource === resource || p.resource === "All") &&
+                (p.permission === permission || p.permission === "All")
+            );
+            // Eğer grupta bir kayıt varsa (True veya False), direkt onu kullan.
+            if (groupPerm) return groupPerm.value;
+        }
+
+        // 3. FALLBACK: ROL YETKİSİ
+        // (Sadece grupta hiç tanım yoksa veya kullanıcı grupta değilse buraya düşer)
+        const rolePerm = allRolePermissions.find(p =>
+            clean(p.role) === cRole &&
             (p.resource === resource || p.resource === "All") &&
             (p.permission === permission || p.permission === "All")
         );
-        // Eğer grupta bir kayıt varsa (True veya False), direkt onu kullan.
-        if (groupPerm) return groupPerm.value;
+
+        return rolePerm ? rolePerm.value : false;
     }
 
-    // 3. FALLBACK: ROL YETKİSİ
-    // (Sadece grupta hiç tanım yoksa veya kullanıcı grupta değilse buraya düşer)
-    const rolePerm = allRolePermissions.find(p =>
-        clean(p.role) === cRole &&
-        (p.resource === resource || p.resource === "All") &&
-        (p.permission === permission || p.permission === "All")
-    );
+    // Login sonrası yetkileri arka planda yükle
+    async function loadPermissionsOnStartup() {
+        if (!currentUser) return;
+        const res = await apiCall("getRolePermissions", {});
+        if (res && res.result === "success") {
+            allRolePermissions = res.permissions || [];
+            applyPermissionsToUI();
 
-    return rolePerm ? rolePerm.value : false;
-}
+            // ✅ Akıllı Yönlendirme: Eğer Ana Sayfa (Home) yetkisi kapalıysa, yetkisi olan ilk sayfaya yönlendir.
+            if (!hasPerm("home", "View")) {
+                // Kontrol edilecek öncelikli sayfalar
+                const landingPages = [
+                    { key: "quality", action: openQualityArea },
+                    { key: "tech", action: () => openTechArea('wizard') },
+                    { key: "shift", action: () => filterCategory(null, "shift") },
+                    { key: "news", action: openNews },
+                    { key: "broadcast", action: openBroadcastFlow },
+                    { key: "telesales", action: () => filterCategory(null, "Telesatış") },
+                    { key: "persuasion", action: () => filterCategory(null, "İkna") },
+                    { key: "campaign", action: () => filterCategory(null, "Kampanya") },
+                    { key: "info", action: () => filterCategory(null, "Bilgi") }
+                ];
 
-// Login sonrası yetkileri arka planda yükle
-async function loadPermissionsOnStartup() {
-    if (!currentUser) return;
-    const res = await apiCall("getRolePermissions", {});
-    if (res && res.result === "success") {
-        allRolePermissions = res.permissions || [];
-        applyPermissionsToUI();
-
-        // ✅ Akıllı Yönlendirme: Eğer Ana Sayfa (Home) yetkisi kapalıysa, yetkisi olan ilk sayfaya yönlendir.
-        if (!hasPerm("home", "View")) {
-            // Kontrol edilecek öncelikli sayfalar
-            const landingPages = [
-                { key: "quality", action: openQualityArea },
-                { key: "tech", action: () => openTechArea('wizard') },
-                { key: "shift", action: () => filterCategory(null, "shift") },
-                { key: "news", action: openNews },
-                { key: "broadcast", action: openBroadcastFlow },
-                { key: "telesales", action: () => filterCategory(null, "Telesatış") },
-                { key: "persuasion", action: () => filterCategory(null, "İkna") },
-                { key: "campaign", action: () => filterCategory(null, "Kampanya") },
-                { key: "info", action: () => filterCategory(null, "Bilgi") }
-            ];
-
-            for (const page of landingPages) {
-                if (hasPerm(page.key, "View")) {
-                    page.action();
-                    console.log(`[Auth] Ana sayfa yetkisi yok, ${page.key} sayfasına yönlendirildi.`);
-                    break;
+                for (const page of landingPages) {
+                    if (hasPerm(page.key, "View")) {
+                        page.action();
+                        console.log(`[Auth] Ana sayfa yetkisi yok, ${page.key} sayfasına yönlendirildi.`);
+                        break;
+                    }
                 }
             }
         }
     }
-}
 
-/**
- * Kaydedilen yetkilere göre arayüzdeki butonları gizle/göster
- */
-function applyPermissionsToUI() {
-    const role = getMyRole();
-    // Sadece LocAdmin için yetki kısıtlaması yok (tam yetki)
-    // Admin kullanıcılar RBAC panelinden verilen yetkilere tabidir
-    if (role === "locadmin") return;
+    /**
+     * Kaydedilen yetkilere göre arayüzdeki butonları gizle/göster
+     */
+    function applyPermissionsToUI() {
+        const role = getMyRole();
+        // Sadece LocAdmin için yetki kısıtlaması yok (tam yetki)
+        // Admin kullanıcılar RBAC panelinden verilen yetkilere tabidir
+        if (role === "locadmin") return;
 
-    const editBtn = document.getElementById('dropdownQuickEdit');
-    if (editBtn && !hasPerm("EditMode")) editBtn.style.display = 'none';
+        const editBtn = document.getElementById('dropdownQuickEdit');
+        if (editBtn && !hasPerm("EditMode")) editBtn.style.display = 'none';
 
-    const addCardBtn = document.getElementById('dropdownAddCard');
-    if (addCardBtn && !hasPerm("AddContent")) addCardBtn.style.display = 'none';
+        const addCardBtn = document.getElementById('dropdownAddCard');
+        if (addCardBtn && !hasPerm("AddContent")) addCardBtn.style.display = 'none';
 
-    const imageBtn = document.getElementById('dropdownImage');
-    if (imageBtn && !hasPerm("ImageUpload")) imageBtn.style.display = 'none';
+        const imageBtn = document.getElementById('dropdownImage');
+        if (imageBtn && !hasPerm("ImageUpload")) imageBtn.style.display = 'none';
 
-    const reportBtns = document.querySelectorAll('.admin-btn');
-    reportBtns.forEach(btn => {
-        if (!hasPerm("Reports")) btn.style.display = 'none';
-    });
-
-    const permsBtn = document.getElementById('dropdownPerms');
-    if (permsBtn && !hasPerm("RbacAdmin")) permsBtn.style.display = 'none';
-
-    const activeUsersBtn = document.getElementById('dropdownActiveUsers');
-    if (activeUsersBtn && !hasPerm("ActiveUsers")) activeUsersBtn.style.display = 'none';
-
-    const userMgmtBtn = document.getElementById('dropdownUserMgmt');
-    if (userMgmtBtn && !hasPerm("UserAdmin")) userMgmtBtn.style.display = 'none';
-
-    const menuMap = {
-        "home": "home",
-        "search": "search",
-        "tech": "tech",
-        "telesales": "telesales",
-        "persuasion": "persuasion",
-        "campaign": "campaign",
-        "info": "info",
-        "news": "news",
-        "quality": "quality",
-        "shift": "shift",
-        "broadcast": "broadcast",
-        "guide": "guide",
-        "return": "return",
-        "game": "game"
-    };
-
-    Object.keys(menuMap).forEach(key => {
-        const elements = document.querySelectorAll(`[data-menu-key="${key}"]`);
-        elements.forEach(el => {
-            if (!hasPerm(menuMap[key], "View")) {
-                el.style.display = 'none';
-            } else {
-                el.style.display = '';
-            }
+        const reportBtns = document.querySelectorAll('.admin-btn');
+        reportBtns.forEach(btn => {
+            if (!hasPerm("Reports")) btn.style.display = 'none';
         });
 
-        // Hızlı kısayollar (ana sayfa chips) - data-shortcut-key ile de eşleşebilirler
-        const shortcuts = document.querySelectorAll(`[data-shortcut-key="${key}"]`);
-        shortcuts.forEach(sc => {
-            if (!hasPerm(menuMap[key], "View")) {
-                sc.style.display = 'none';
-            } else {
-                sc.style.display = '';
-            }
+        const permsBtn = document.getElementById('dropdownPerms');
+        if (permsBtn && !hasPerm("RbacAdmin")) permsBtn.style.display = 'none';
+
+        const activeUsersBtn = document.getElementById('dropdownActiveUsers');
+        if (activeUsersBtn && !hasPerm("ActiveUsers")) activeUsersBtn.style.display = 'none';
+
+        const userMgmtBtn = document.getElementById('dropdownUserMgmt');
+        if (userMgmtBtn && !hasPerm("UserAdmin")) userMgmtBtn.style.display = 'none';
+
+        const menuMap = {
+            "home": "home",
+            "search": "search",
+            "tech": "tech",
+            "telesales": "telesales",
+            "persuasion": "persuasion",
+            "campaign": "campaign",
+            "info": "info",
+            "news": "news",
+            "quality": "quality",
+            "shift": "shift",
+            "broadcast": "broadcast",
+            "guide": "guide",
+            "return": "return",
+            "game": "game"
+        };
+
+        Object.keys(menuMap).forEach(key => {
+            const elements = document.querySelectorAll(`[data-menu-key="${key}"]`);
+            elements.forEach(el => {
+                if (!hasPerm(menuMap[key], "View")) {
+                    el.style.display = 'none';
+                } else {
+                    el.style.display = '';
+                }
+            });
+
+            // Hızlı kısayollar (ana sayfa chips) - data-shortcut-key ile de eşleşebilirler
+            const shortcuts = document.querySelectorAll(`[data-shortcut-key="${key}"]`);
+            shortcuts.forEach(sc => {
+                if (!hasPerm(menuMap[key], "View")) {
+                    sc.style.display = 'none';
+                } else {
+                    sc.style.display = '';
+                }
+            });
         });
-    });
 
-    // Ana sayfa düzenleme butonlarını da yetkiye göre tazele
-    try {
-        if (currentCategory === 'home') renderHomePanels();
-    } catch (e) { }
+        // Ana sayfa düzenleme butonlarını da yetkiye göre tazele
+        try {
+            if (currentCategory === 'home') renderHomePanels();
+        } catch (e) { }
 
-    // Bildirimleri kontrol et
-    checkQualityNotifications();
-}
+        // Bildirimleri kontrol et
+        checkQualityNotifications();
+    }
 
-// --- KALİTE GERİ BİLDİRİM & NOT SİSTEMİ POPUPLARI ---
+    // --- KALİTE GERİ BİLDİRİM & NOT SİSTEMİ POPUPLARI ---
 
-async function openAgentNotePopup(callId, color) {
-    const { value: note } = await Swal.fire({
-        title: '💬 Görüş / Not Ekle',
-        html: `
+    async function openAgentNotePopup(callId, color) {
+        const { value: note } = await Swal.fire({
+            title: '💬 Görüş / Not Ekle',
+            html: `
         <div style="margin-top:5px; text-align:left;">
             <p style="font-size:0.9rem; color:#555; margin-bottom:10px;">
                 Bu değerlendirme ile ilgili eklemek istediğiniz bir not, teşekkür veya görüş varsa aşağıya yazabilirsiniz.
@@ -8771,41 +8812,101 @@ async function openAgentNotePopup(callId, color) {
             <textarea id="swal-agent-note" class="swal2-textarea" style="margin-top:0;" placeholder="Notunuzu buraya yazın..."></textarea>
         </div>
         `,
-        showCancelButton: true,
-        confirmButtonText: 'Gönder',
-        cancelButtonText: 'Vazgeç',
-        confirmButtonColor: '#f57c00',
-        preConfirm: () => {
-            const noteVal = document.getElementById('swal-agent-note').value;
-            if (!noteVal || !noteVal.trim()) {
-                Swal.showValidationMessage('Lütfen bir not yazın veya Vazgeç butonuna basın.');
-                return false;
+            showCancelButton: true,
+            confirmButtonText: 'Gönder',
+            cancelButtonText: 'Vazgeç',
+            confirmButtonColor: '#f57c00',
+            preConfirm: () => {
+                const noteVal = document.getElementById('swal-agent-note').value;
+                if (!noteVal || !noteVal.trim()) {
+                    Swal.showValidationMessage('Lütfen bir not yazın veya Vazgeç butonuna basın.');
+                    return false;
+                }
+                return noteVal.trim();
             }
-            return noteVal.trim();
-        }
-    });
+        });
 
-    if (note) {
-        Swal.fire({ title: 'Not Kaydediliyor...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
-        try {
-            const res = await apiCall("submitAgentNote", { callId: callId, username: currentUser, note: note, status: 'Bekliyor' });
-            if (res.result === 'success') {
-                Swal.fire('Başarılı', 'Görüşünüz yöneticiye iletildi.', 'success');
-                fetchEvaluationsForAgent(currentUser); // Listeyi yenile
-                checkQualityNotifications(); // Bildirimleri yenile
-            } else {
-                Swal.fire('Hata', 'Not kaydedilemedi.', 'error');
+        if (note) {
+            Swal.fire({ title: 'Not Kaydediliyor...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
+            try {
+                const res = await apiCall("submitAgentNote", { callId: callId, username: currentUser, note: note, status: 'Bekliyor' });
+                if (res.result === 'success') {
+                    Swal.fire('Başarılı', 'Görüşünüz yöneticiye iletildi.', 'success');
+                    fetchEvaluationsForAgent(currentUser); // Listeyi yenile
+                    checkQualityNotifications(); // Bildirimleri yenile
+                } else {
+                    Swal.fire('Hata', 'İşlem sırasında bir kısıtlama oluştu. Lütfen bağlantınızı kontrol edin.', 'error');
+                }
+            } catch (e) {
+                Swal.fire('Hata', 'Sistem hatası oluştu. Lütfen tekrar deneyin.', 'error');
             }
-        } catch (e) {
-            Swal.fire('Hata', 'Sunucu hatası.', 'error');
         }
     }
-}
 
-async function openAdminReplyPopup(callId, agentName, currentNote) {
-    const { value: formValues } = await Swal.fire({
-        title: 'Geri Bildirim Yanıtla',
-        html: `
+    // --- WIZARD EDITOR (ADMIN ONLY) ---
+    async function openWizardEditor(table, stepId) {
+        if (!isAdminMode) return;
+
+        let currentData = (table === 'WizardSteps') ? wizardStepsData[stepId] : techWizardData[stepId];
+        if (!currentData) { Swal.fire('Hata', 'Adım verisi bulunamadı.', 'error'); return; }
+
+        let optionsStr = (table === 'WizardSteps')
+            ? currentData.options.map(o => `${o.text} | ${o.next} | ${o.style || 'primary'}`).join(', ')
+            : (currentData.buttons || []).map(b => `${b.text} | ${b.next} | ${b.style || 'primary'}`).join(', ');
+
+        const { value: v } = await Swal.fire({
+            title: `🔧 Düzenle: ${stepId}`,
+            html: `
+            <div style="text-align:left; font-size:0.85rem;">
+                <label>Başlık</label><input id="w-title" class="swal2-input" value="${currentData.title || ''}">
+                <label>Metin</label><textarea id="w-text" class="swal2-textarea" style="height:80px;">${currentData.text || ''}</textarea>
+                <label>Script</label><textarea id="w-script" class="swal2-textarea" style="height:60px;">${currentData.script || ''}</textarea>
+                <label>Seçenekler (Format: Metin | NextID | Style , ...)</label>
+                <textarea id="w-options" class="swal2-textarea" style="height:80px;">${optionsStr}</textarea>
+                ${table === 'WizardSteps' ? `<label>Sonuç (red, green, yellow)</label><input id="w-result" class="swal2-input" value="${currentData.result || ''}">` : ''}
+                ${table === 'TechWizardSteps' ? `<label>Alert</label><input id="w-alert" class="swal2-input" value="${currentData.alert || ''}">` : ''}
+            </div>
+        `,
+            width: 600, showCancelButton: true, confirmButtonText: 'Kaydet',
+            preConfirm: () => ({
+                title: document.getElementById('w-title').value,
+                text: document.getElementById('w-text').value,
+                script: document.getElementById('w-script').value,
+                options: document.getElementById('w-options').value,
+                result: document.getElementById('w-result') ? document.getElementById('w-result').value : null,
+                alert: document.getElementById('w-alert') ? document.getElementById('w-alert').value : null
+            })
+        });
+
+        if (v) {
+            Swal.fire({ title: 'Kaydediliyor...', didOpen: () => Swal.showLoading() });
+            try {
+                const payload = {
+                    StepID: stepId,
+                    Title: v.title,
+                    Text: v.text,
+                    Script: v.script,
+                    Options: v.options
+                };
+                if (v.result !== null) payload.Result = v.result;
+                if (v.alert !== null) payload.Alert = v.alert;
+
+                const { error } = await sb.from(table).upsert(payload, { onConflict: 'StepID' });
+                if (error) throw error;
+
+                Swal.fire('Başarılı', 'Güncellendi. Yenileniyor...', 'success');
+                if (table === 'WizardSteps') { await loadWizardData(); renderStep(stepId); }
+                else { await loadTechWizardData(); twRenderStep(); }
+            } catch (e) {
+                Swal.fire('Hata', 'Kaydedilemedi: ' + e.message, 'error');
+            }
+        }
+    }
+
+    async function openAdminReplyPopup(callId, agentName, currentNote) {
+        const { value: formValues } = await Swal.fire({
+            title: 'Geri Bildirim Yanıtla',
+            html: `
         <div style="text-align:left; background:#f5f5f5; padding:10px; border-radius:5px; margin-bottom:10px; font-size:0.9rem;">
             <strong>Temsilci Notu:</strong><br>${escapeHtml(currentNote)}
         </div>
@@ -8815,68 +8916,68 @@ async function openAdminReplyPopup(callId, agentName, currentNote) {
             <option value="Bekliyor">⏳ İnceleme Devam Ediyor</option>
         </select>
         `,
-        showCancelButton: true,
-        confirmButtonText: 'Kaydet',
-        cancelButtonText: 'İptal',
-        preConfirm: () => {
-            return {
-                reply: document.getElementById('swal-manager-reply').value,
-                status: document.getElementById('swal-reply-status').value
-            };
-        }
-    });
-
-    if (formValues) {
-        Swal.fire({ title: 'Kaydediliyor...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
-        try {
-            const res = await apiCall("resolveAgentFeedback", {
-                callId: callId,
-                agentName: agentName,
-                reply: formValues.reply,
-                status: formValues.status,
-                username: currentUser
-            });
-            if (res.result === 'success') {
-                Swal.fire('Başarılı', 'Yanıt kaydedildi.', 'success');
-                // Admin modunda listeyi yenileme:
-                // Global refresh varsa onu çağır, yoksa en azından agent listesini yenile
-                if (typeof refreshQualityData === 'function') refreshQualityData();
-                fetchEvaluationsForAgent(agentName, true); // Silent refresh
-                checkQualityNotifications();
-            } else {
-                Swal.fire('Hata', 'Kaydedilemedi.', 'error');
+            showCancelButton: true,
+            confirmButtonText: 'Kaydet',
+            cancelButtonText: 'İptal',
+            preConfirm: () => {
+                return {
+                    reply: document.getElementById('swal-manager-reply').value,
+                    status: document.getElementById('swal-reply-status').value
+                };
             }
-        } catch (e) {
-            Swal.fire('Hata', 'Sunucu hatası.', 'error');
+        });
+
+        if (formValues) {
+            Swal.fire({ title: 'Kaydediliyor...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
+            try {
+                const res = await apiCall("resolveAgentFeedback", {
+                    callId: callId,
+                    agentName: agentName,
+                    reply: formValues.reply,
+                    status: formValues.status,
+                    username: currentUser
+                });
+                if (res.result === 'success') {
+                    Swal.fire('Başarılı', 'Yanıt kaydedildi.', 'success');
+                    // Admin modunda listeyi yenileme:
+                    // Global refresh varsa onu çağır, yoksa en azından agent listesini yenile
+                    if (typeof refreshQualityData === 'function') refreshQualityData();
+                    fetchEvaluationsForAgent(agentName, true); // Silent refresh
+                    checkQualityNotifications();
+                } else {
+                    Swal.fire('Hata', 'Kaydedilemedi.', 'error');
+                }
+            } catch (e) {
+                Swal.fire('Hata', 'Sunucu hatası.', 'error');
+            }
         }
     }
-}
 
-function checkQualityNotifications() {
-    apiCall("getQualityNotifications", { username: currentUser, role: getMyRole() })
-        .then(data => {
-            if (data.result === 'success') {
-                const notifs = data.notifications;
-                let totalCount = 0;
-                const qualityBtn = document.querySelector('[data-menu-key="quality"]');
+    function checkQualityNotifications() {
+        apiCall("getQualityNotifications", { username: currentUser, role: getMyRole() })
+            .then(data => {
+                if (data.result === 'success') {
+                    const notifs = data.notifications;
+                    let totalCount = 0;
+                    const qualityBtn = document.querySelector('[data-menu-key="quality"]');
 
-                if (!qualityBtn) return;
+                    if (!qualityBtn) return;
 
-                // Eğer varsa eski badge'i temizle
-                const oldBadge = qualityBtn.querySelector('.notif-badge');
-                if (oldBadge) oldBadge.remove();
+                    // Eğer varsa eski badge'i temizle
+                    const oldBadge = qualityBtn.querySelector('.notif-badge');
+                    if (oldBadge) oldBadge.remove();
 
-                if (isAdminMode || isLocAdmin) {
-                    totalCount = notifs.pendingFeedbackCount || 0;
-                } else {
-                    totalCount = notifs.unseenCount || 0;
-                }
+                    if (isAdminMode || isLocAdmin) {
+                        totalCount = notifs.pendingFeedbackCount || 0;
+                    } else {
+                        totalCount = notifs.unseenCount || 0;
+                    }
 
-                if (totalCount > 0) {
-                    const badge = document.createElement('span');
-                    badge.className = 'notif-badge';
-                    badge.innerText = totalCount;
-                    badge.style.cssText = `
+                    if (totalCount > 0) {
+                        const badge = document.createElement('span');
+                        badge.className = 'notif-badge';
+                        badge.innerText = totalCount;
+                        badge.style.cssText = `
                     position: absolute;
                     top: -5px;
                     right: -5px;
@@ -8889,9 +8990,9 @@ function checkQualityNotifications() {
                     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
                     animation: pulse 2s infinite;
                 `;
-                    qualityBtn.style.position = 'relative';
-                    qualityBtn.appendChild(badge);
+                        qualityBtn.style.position = 'relative';
+                        qualityBtn.appendChild(badge);
+                    }
                 }
-            }
-        }).catch(e => console.log('Notif check error', e));
-}
+            }).catch(e => console.log('Notif check error', e));
+    }
