@@ -400,6 +400,7 @@ async function apiCall(action, params = {}) {
                     Name: fullName,
                     "Tam İsim": fullName,
                     "İsim": fullName,
+                    Role: role,
                     Group: group
                 };
                 if (password) {
@@ -868,11 +869,11 @@ async function apiCall(action, params = {}) {
                 return { result: error ? "error" : "success" };
             }
             case "submitAgentNote": {
-                // Bug 6 Fix: Not ekleme
+                // Bug 6 Fix: Not ekleme (Geliştirilmiş Eşleşme)
                 const { error } = await sb.from('Evaluations').update({
                     AgentNote: params.note,
                     Durum: params.status || 'Bekliyor'
-                }).eq('CallID', params.callId);
+                }).ilike('CallID', String(params.callId).replace('#', '').trim());
 
                 if (error) console.error("[Pusula Note Error]", error);
                 return { result: error ? "error" : "success", message: error ? error.message : "" };
@@ -903,6 +904,32 @@ async function apiCall(action, params = {}) {
                     Durum: params.status || 'Tamamlandı'
                 }).eq('CallID', params.callId);
                 return { result: error ? "error" : "success" };
+            }
+            case "bulkUpdateBroadcast": {
+                // Sadece LocAdmin için (Güvenlik)
+                if (!isLocAdmin && !isAdminMode) return { result: "error", message: "Yetkisiz işlem." };
+
+                // 1. Mevcut tüm veriyi temizle
+                const { error: delErr } = await sb.from('YayinAkisi').delete().neq('id', 0);
+                if (delErr) throw delErr;
+
+                // 2. Yeni veriyi ekle
+                if (params.items && params.items.length > 0) {
+                    const { error: insErr } = await sb.from('YayinAkisi').insert(params.items);
+                    if (insErr) throw insErr;
+                }
+                saveLog("Yayın Akışı Toplu Güncelleme", `${params.items.length} kayıt eklendi.`);
+                return { result: "success" };
+            }
+            case "bulkUpdateShifts": {
+                if (!isLocAdmin && !isAdminMode) return { result: "error", message: "Yetkisiz işlem." };
+
+                // Params: { items: [ { Temsilci: '...', '2026-01-30': '...', ... }, ... ] }
+                const { error } = await sb.from('Vardiya').upsert(params.items, { onConflict: 'Temsilci' });
+                if (error) throw error;
+
+                saveLog("Vardiya Toplu Güncelleme", `${params.items.length} personel güncellendi.`);
+                return { result: "success" };
             }
             case "getBroadcastFlow": {
                 // ...existing...
@@ -1409,17 +1436,13 @@ async function girisYap() {
 
         if (loginErr) {
             console.error("[Pusula Login] Sorgu sırasında hata oluştu:", loginErr);
-            errorMsg.innerText = "Sistem Hatası: " + loginErr.message;
+            errorMsg.innerText = "Bağlantı Hatası: Sunucuya erişilemedi.";
             errorMsg.style.display = "block";
             return;
         }
 
         if (!user) {
-            console.error("[Pusula Login] '" + uName + "' kullanıcısı bulunamadı. Tabloyu ve sütun adını kontrol edin.");
-            // Alternatif: Tablodaki ilk 3 kullanıcı çekmeye çalışıp konsola yazalım (Sadece debug için)
-            const { data: testData } = await sb.from('Users').select('*').limit(3);
-            console.log("[Pusula Debug] Tablodaki örnek veriler:", testData);
-
+            dlog("[Pusula Login] Kullanıcı bulunamadı.");
             errorMsg.innerText = "Kullanıcı Adı veya Şifre Hatalı!";
             errorMsg.style.display = "block";
             return;
@@ -2583,6 +2606,7 @@ async function fetchBroadcastFlow() {
 async function openBroadcastFlow() {
     Swal.fire({
         title: "Yayın Akışı",
+        html: isAdminMode ? `<div style="text-align:right; margin-bottom:10px;"><button class="x-btn-admin" onclick="openBulkUpdateBroadcastPopup()" style="background:var(--secondary); font-size:0.8rem;"><i class="fas fa-file-import"></i> Toplu Güncelle (Excel)</button></div>` : '',
         didOpen: () => Swal.showLoading(),
         showConfirmButton: false
     });
@@ -2776,12 +2800,12 @@ const _escapeHtml = escapeHtml;
 // ------------------------------------------------------------
 // Sağlamlaştırma (hata yönetimi + localStorage güvenli yazma)
 // ------------------------------------------------------------
-const DEBUG = (() => {
-    try { return localStorage.getItem('DEBUG') === '1'; } catch (e) { return false; }
-})();
-
-function dlog(...args) {
-    try { if (DEBUG) console.log(...args); } catch (e) { }
+// 🔒 GÜVENLİK & DEBUG: Sadece adminler için detaylı log
+function dlog(msg, data) {
+    if (isAdminMode || isLocAdmin) {
+        if (data) console.log(`[Pusula Debug] ${msg}`, data);
+        else console.log(`[Pusula Debug] ${msg}`);
+    }
 }
 
 function safeLocalStorageSet(key, value, maxBytes = 4 * 1024 * 1024) { // ~4MB
@@ -6941,6 +6965,7 @@ async function openShiftArea(tab) {
     const adminFilters = document.getElementById('admin-filters');
     const assignBtn = document.getElementById('assign-training-btn');
     const manualFeedbackBtn = document.getElementById('manual-feedback-admin-btn');
+    const bulkShiftBtn = document.getElementById('bulk-shift-admin-btn');
 
     if (isAdminMode) {
         if (adminFilters) {
@@ -8427,6 +8452,53 @@ async function openUserManagementPanel() {
         Swal.fire("Hata", e.message, "error");
     }
 }
+
+async function openLogsPanel() {
+    try {
+        Swal.fire({ title: 'Günlükler yükleniyor...', didOpen: () => { Swal.showLoading() } });
+        const res = await apiCall("getLogs", {});
+        if (!res || res.result !== "success") throw new Error("Loglar alınamadı.");
+
+        const logs = res.logs || [];
+        const rowsHtml = logs.map((l, idx) => `
+            <tr style="border-bottom:1px solid #eee; font-size:0.8rem;">
+                <td style="padding:8px; color:#888;">${new Date(l.Date).toLocaleString('tr-TR')}</td>
+                <td style="padding:8px;"><strong>${escapeHtml(l.Username)}</strong></td>
+                <td style="padding:8px;"><span class="badge" style="background:#e3f2fd; color:#1976d2; padding:2px 6px; border-radius:4px;">${escapeHtml(l.Action)}</span></td>
+                <td style="padding:8px; color:#555;">${escapeHtml(l.Details)}</td>
+                <td style="padding:8px; color:#999; font-family:monospace;">${escapeHtml(l["İP ADRESİ"] || '-')}</td>
+            </tr>
+        `).join('');
+
+        const tableHtml = `
+            <div style="max-height:500px; overflow:auto; border:1px solid #eee; border-radius:10px;">
+                <table style="width:100%; border-collapse:collapse; text-align:left;">
+                    <thead style="background:#f4f7f9; position:sticky; top:0;">
+                        <tr>
+                            <th style="padding:10px;">Tarih</th>
+                            <th style="padding:10px;">Kullanıcı</th>
+                            <th style="padding:10px;">Eylem</th>
+                            <th style="padding:10px;">Detay</th>
+                            <th style="padding:10px;">IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+        `;
+
+        Swal.fire({
+            title: "📜 Sistem Logları",
+            html: tableHtml,
+            width: 1000,
+            showConfirmButton: true,
+            confirmButtonText: "Kapat"
+        });
+    } catch (e) {
+        Swal.fire('Hata', 'Loglar yüklenirken bir sorun oluştu.', 'error');
+    }
+}
+
 async function openMenuPermissions() {
     try {
         Swal.fire({ title: 'Yetkiler Yükleniyor...', didOpen: () => { Swal.showLoading() } });
@@ -8794,10 +8866,70 @@ async function openAgentNotePopup(callId, color) {
                 fetchEvaluationsForAgent(currentUser); // Listeyi yenile
                 checkQualityNotifications(); // Bildirimleri yenile
             } else {
-                Swal.fire('Hata', 'Not kaydedilemedi.', 'error');
+                Swal.fire('Hata', 'İşlem sırasında bir kısıtlama oluştu. Lütfen bağlantınızı kontrol edin.', 'error');
             }
         } catch (e) {
-            Swal.fire('Hata', 'Sunucu hatası.', 'error');
+            Swal.fire('Hata', 'Sistem hatası oluştu. Lütfen tekrar deneyin.', 'error');
+        }
+    }
+}
+
+// --- WIZARD EDITOR (ADMIN ONLY) ---
+async function openWizardEditor(table, stepId) {
+    if (!isAdminMode) return;
+
+    let currentData = (table === 'WizardSteps') ? wizardStepsData[stepId] : techWizardData[stepId];
+    if (!currentData) { Swal.fire('Hata', 'Adım verisi bulunamadı.', 'error'); return; }
+
+    let optionsStr = (table === 'WizardSteps')
+        ? currentData.options.map(o => `${o.text} | ${o.next} | ${o.style || 'primary'}`).join(', ')
+        : (currentData.buttons || []).map(b => `${b.text} | ${b.next} | ${b.style || 'primary'}`).join(', ');
+
+    const { value: v } = await Swal.fire({
+        title: `🔧 Düzenle: ${stepId}`,
+        html: `
+            <div style="text-align:left; font-size:0.85rem;">
+                <label>Başlık</label><input id="w-title" class="swal2-input" value="${currentData.title || ''}">
+                <label>Metin</label><textarea id="w-text" class="swal2-textarea" style="height:80px;">${currentData.text || ''}</textarea>
+                <label>Script</label><textarea id="w-script" class="swal2-textarea" style="height:60px;">${currentData.script || ''}</textarea>
+                <label>Seçenekler (Format: Metin | NextID | Style , ...)</label>
+                <textarea id="w-options" class="swal2-textarea" style="height:80px;">${optionsStr}</textarea>
+                ${table === 'WizardSteps' ? `<label>Sonuç (red, green, yellow)</label><input id="w-result" class="swal2-input" value="${currentData.result || ''}">` : ''}
+                ${table === 'TechWizardSteps' ? `<label>Alert</label><input id="w-alert" class="swal2-input" value="${currentData.alert || ''}">` : ''}
+            </div>
+        `,
+        width: 600, showCancelButton: true, confirmButtonText: 'Kaydet',
+        preConfirm: () => ({
+            title: document.getElementById('w-title').value,
+            text: document.getElementById('w-text').value,
+            script: document.getElementById('w-script').value,
+            options: document.getElementById('w-options').value,
+            result: document.getElementById('w-result') ? document.getElementById('w-result').value : null,
+            alert: document.getElementById('w-alert') ? document.getElementById('w-alert').value : null
+        })
+    });
+
+    if (v) {
+        Swal.fire({ title: 'Kaydediliyor...', didOpen: () => Swal.showLoading() });
+        try {
+            const payload = {
+                StepID: stepId,
+                Title: v.title,
+                Text: v.text,
+                Script: v.script,
+                Options: v.options
+            };
+            if (v.result !== null) payload.Result = v.result;
+            if (v.alert !== null) payload.Alert = v.alert;
+
+            const { error } = await sb.from(table).upsert(payload, { onConflict: 'StepID' });
+            if (error) throw error;
+
+            Swal.fire('Başarılı', 'Güncellendi. Yenileniyor...', 'success');
+            if (table === 'WizardSteps') { await loadWizardData(); renderStep(stepId); }
+            else { await loadTechWizardData(); twRenderStep(); }
+        } catch (e) {
+            Swal.fire('Hata', 'Kaydedilemedi: ' + e.message, 'error');
         }
     }
 }
