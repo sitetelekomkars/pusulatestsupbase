@@ -466,8 +466,16 @@ async function apiCall(action, params = {}) {
                     Görsel: params.image || null,
                     Durum: params.durum || 'Aktif'
                 };
-                const { error } = await sb.from('Teknik_Dokumanlar').upsert(payload, { onConflict: 'Başlık' });
-                return { result: error ? "error" : "success" };
+                if (params.id) payload.id = params.id; // ID varsa payload'a ekle
+
+                const { error } = await sb.from('Teknik_Dokumanlar').upsert(payload, { onConflict: 'id' }); // id üzerinden upsert
+                if (error) {
+                    console.error("[UPSERT ERROR]", error);
+                    // id ile başarısız olursa (yeni kayıt veya id değişimi?) Başlık denemesi yap (Geriye uyumluluk)
+                    const { error: error2 } = await sb.from('Teknik_Dokumanlar').upsert(payload, { onConflict: 'Başlık' });
+                    return { result: error2 ? "error" : "success", message: error2?.message };
+                }
+                return { result: "success" };
             }
             case "updateHomeBlock": {
                 // Supabase'de kolon adı 'Key' (Görüntülerden teyit edildi)
@@ -3073,82 +3081,8 @@ function twResetWizard() { twState.currentStep = 'start'; twState.history = []; 
 // --- YENİ KALİTE LMS MODÜLÜ (TAM EKRAN ENTEGRASYONU) ---
 // ==========================================================
 // Modülü Aç
-function openQualityArea() {
-    // Eski modalı kapat (eğer açıksa)
-    const oldModal = document.getElementById('quality-modal');
-    if (oldModal) oldModal.style.display = 'none';
-    // Tam ekranı aç
-    const fullScreen = document.getElementById('quality-fullscreen');
-    fullScreen.style.display = 'flex';
-    // Kullanıcı bilgisini güncelle
-    document.getElementById('q-side-name').innerText = currentUser;
-    document.getElementById('q-side-role').innerText = isAdminMode ? 'Yönetici' : 'Temsilci';
-    document.getElementById('q-side-avatar').innerText = currentUser.charAt(0).toUpperCase();
-    // Dönem filtresini doldur
-    populateMonthFilterFull();
-    // Yetki kontrolü (Admin butonlarını göster/gizle)
-    const adminFilters = document.getElementById('admin-filters');
-    const assignBtn = document.getElementById('assign-training-btn');
-    const manualFeedbackBtn = document.getElementById('manual-feedback-admin-btn');
-
-    if (isAdminMode) {
-        if (adminFilters) {
-            adminFilters.style.display = 'flex';
-            // Buton bazlı yetki kontrolü (Admin için dinamik)
-            const rptBtn = adminFilters.querySelector('.admin-btn'); // Rapor Butonu
-            if (rptBtn) {
-                if (isLocAdmin || hasPerm("Reports")) rptBtn.style.display = '';
-                else rptBtn.style.display = 'none';
-            }
-            const addBtn = adminFilters.querySelector('.add-btn'); // Ekle Butonu
-            if (addBtn) {
-                // Ekle butonu için "AddContent" veya genel Admin yetkisi kontrolü
-                if (isLocAdmin || hasPerm("AddContent")) addBtn.style.display = '';
-                else addBtn.style.display = 'none';
-            }
-        }
-
-        // Eğitim Atama Yetkisi
-        if (assignBtn) {
-            // Eğitim atama yetkisi "Trainings" veya genel "Quality" olabilir, şimdilik locadmin veya adminMode yetiyor gibi ama garanti olsun
-            assignBtn.style.display = 'block';
-        }
-
-        if (manualFeedbackBtn) manualFeedbackBtn.style.display = 'flex'; // Buna da yetki eklenebilir ama şimdilik kalsın
-
-        // Kullanıcı listesi boşsa çek, sonra filtreleri doldur
-        if (adminUserList.length === 0) {
-            fetchUserListForAdmin().then(users => {
-                const groupSelect = document.getElementById('q-admin-group');
-                if (groupSelect) {
-                    const groups = [...new Set(users.map(u => u.group))].sort();
-                    groupSelect.innerHTML = `<option value="all">Tüm Gruplar</option>` + groups.map(g => `<option value="${g}">${g}</option>`).join('');
-                    updateAgentListBasedOnGroup();
-                }
-                populateDashboardFilters(); // Dashboard filtrelerini de doldur
-            });
-        } else {
-            populateDashboardFilters(); // Liste zaten varsa direkt doldur
-        }
-    } else {
-        if (adminFilters) adminFilters.style.display = 'none';
-        if (assignBtn) assignBtn.style.display = 'none';
-        if (manualFeedbackBtn) manualFeedbackBtn.style.display = 'none';
-
-        // Admin değilse filtreleri gizle
-        const dashFilterArea = document.querySelector('#view-dashboard .q-view-header > div');
-        if (dashFilterArea && dashFilterArea.style.display !== 'none') {
-            // Burada basitçe dashboard filtre fonksiyonu admin kontrolü yapıyor.
-            populateDashboardFilters();
-        }
-    }
-    // Varsayılan sekmeyi aç
-    // Tıklanma simülasyonu ile ilk sekmeyi aktif et
-    const defaultTab = document.querySelector('.q-nav-item.active');
-    if (defaultTab) {
-        switchQualityTab('dashboard', defaultTab);
-    }
-}
+// Redundant openQualityArea removed. Using the definition at line 5724.
+// Leftover logic from removed openQualityArea cleaned up.
 // Modülü Kapat
 function closeFullQuality() {
     document.getElementById('quality-fullscreen').style.display = 'none';
@@ -4948,11 +4882,10 @@ function fetchUserListForAdmin() {
     return new Promise((resolve) => {
         apiCall("getUserList", {}).then(data => {
             if (data.result === "success") {
-                // Sadece rütbesi 'user' veya 'qusers' olanları (temsilcileri) göster
-                // Yönetim grubunu ve Admin/LocAdmin rütbelerini listeden temizle
+                // Temsilci listesini genişlet: Yönetim dışındaki herkesi al
                 adminUserList = data.users.filter(u => {
-                    const r = String(u.role || '').toLowerCase().trim();
-                    return (r === 'user' || r === 'qusers') && u.group !== 'Yönetim';
+                    const g = String(u.group || '').toLowerCase().trim();
+                    return g !== 'yönetim' && g !== 'yonetim';
                 });
                 resolve(adminUserList);
             }
@@ -7051,6 +6984,7 @@ async function __fetchTechDocs() {
     return rows
         .filter(r => (r.Durum || "").toString().trim().toLowerCase() !== "pasif")
         .map(r => ({
+            id: r.id || r.ID || r.Id || null, // ID eklendi
             categoryKey: __normalizeTechCategory(r.Kategori),
             kategori: (r.Kategori || "").trim(),
             baslik: (r.Başlık || r.Baslik || r.Title || r["Başlık"] || "").toString().trim(),
@@ -7294,10 +7228,10 @@ async function editTechDoc(tabKey, baslik) {
         }
     });
     if (!v) return;
-
     Swal.fire({ title: 'Kaydediliyor...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
     try {
         const d = await apiCall("upsertTechDoc", {
+            id: it.id, // ID eklendi
             keyKategori: it.kategori,
             keyBaslik: it.baslik,
             ...v
