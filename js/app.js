@@ -488,24 +488,26 @@ async function apiCall(action, params = {}) {
                         const found = dbCols.find(x => x.toLowerCase() === c.toLowerCase());
                         if (found) return found;
                     }
-                    return choices[0];
+                    return null;
                 };
 
                 const payload = {};
-                // Sadece ID varsa payload'a ekle (Düzenleme modu).
-                // Yoksa ekleme, DB (identity) otomatik üretecek.
-                if (params.id) payload[findCol(['id', 'ID'])] = params.id;
+                const add = (choices, val) => {
+                    const col = findCol(choices);
+                    if (col) payload[col] = val;
+                };
 
-                payload[findCol(['Kategori', 'Category'])] = params.kategori;
-                payload[findCol(['Başlık', 'Baslik', 'Title'])] = params.baslik;
-                payload[findCol(['İçerik', 'Icerik', 'Content'])] = params.icerik;
-                payload[findCol(['Adım', 'Adim', 'Step'])] = params.adim || '';
-                payload[findCol(['Not', 'Note'])] = params.not || '';
-                payload[findCol(['Link'])] = params.link || '';
-                payload[findCol(['Görsel', 'Gorsel', 'Image', 'Resim'])] = params.image || null;
-                payload[findCol(['Durum', 'Status'])] = params.durum || 'Aktif';
+                if (params.id) add(['id', 'ID'], params.id);
+                add(['Kategori', 'Category'], params.kategori);
+                add(['Başlık', 'Baslik', 'Title'], params.baslik);
+                add(['İçerik', 'Icerik', 'Content'], params.icerik);
+                add(['Adım', 'Adim', 'Step'], params.adim || '');
+                add(['Not', 'Note'], params.not || '');
+                add(['Link'], params.link || '');
+                add(['Görsel', 'Gorsel', 'Image', 'Resim'], params.image || null);
+                add(['Durum', 'Status'], params.durum || 'Aktif');
 
-                const { error } = await sb.from('Teknik_Dokumanlar').upsert(payload, { onConflict: findCol(['id', 'ID']) });
+                const { error } = await sb.from('Teknik_Dokumanlar').upsert(payload, { onConflict: findCol(['id', 'ID']) || 'id' });
                 if (error) {
                     console.error("[Pusula] upsertTechDoc error:", error);
                     return { result: "error", message: error.message };
