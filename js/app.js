@@ -729,16 +729,22 @@ window.v2_setScore = function (index, score, max, type) {
     if (targetBtn) targetBtn.classList.add('active');
 
     // Not alanını göster/gizle
+    const isFailed = Number(score) < Number(max);
     if (noteRow) {
-        if (score < max) {
-            noteRow.style.display = 'block';
-            itemEl.classList.add('failed');
-        } else {
-            noteRow.style.display = 'none';
-            const noteInp = document.getElementById(`note-${index}`);
-            if (noteInp) noteInp.value = '';
-            itemEl.classList.remove('failed');
-        }
+        noteRow.style.display = isFailed ? 'block' : 'none';
+    }
+
+    // Fallback: noteRow yoksa direkt input'u bulmayı dene (Edit modunda bazen wrapper olmayabilir ama artık ekleyeceğiz)
+    const noteInp = document.getElementById(`note-${index}`);
+    if (noteInp && !noteRow) {
+        noteInp.style.display = isFailed ? 'block' : 'none';
+    }
+
+    if (isFailed) {
+        itemEl.classList.add('failed');
+    } else {
+        if (noteInp) noteInp.value = '';
+        itemEl.classList.remove('failed');
     }
 
     // Buton verisini güncelle
@@ -757,16 +763,22 @@ window.v2_updateSlider = function (index, max) {
 
     if (valEl) valEl.innerText = `${val} / ${max}`;
 
+    const isFailed = Number(val) < Number(max);
     if (noteRow) {
-        if (val < max) {
-            noteRow.style.display = 'block';
-            itemEl.classList.add('failed');
-        } else {
-            noteRow.style.display = 'none';
-            const noteInp = document.getElementById(`note-${index}`);
-            if (noteInp) noteInp.value = '';
-            itemEl.classList.remove('failed');
-        }
+        noteRow.style.display = isFailed ? 'block' : 'none';
+    }
+
+    // Fallback
+    const noteInp = document.getElementById(`note-${index}`);
+    if (noteInp && !noteRow) {
+        noteInp.style.display = isFailed ? 'block' : 'none';
+    }
+
+    if (isFailed) {
+        itemEl.classList.add('failed');
+    } else {
+        if (noteInp) noteInp.value = '';
+        itemEl.classList.remove('failed');
     }
 
     window.v2_recalc();
@@ -5477,16 +5489,20 @@ async function editEvaluation(targetCallId) {
                                 ${mPts > 0 ? `<button type="button" class="eval-btn-v2 ${mAct} medium" data-score="${mPts}" onclick="v2_setScore(${i}, ${mPts}, ${pts}, 'medium')">Orta</button>` : ''}
                                 <button type="button" class="eval-btn-v2 ${bAct} bad" data-score="${bPts}" onclick="v2_setScore(${i}, ${bPts}, ${pts}, 'bad')">Kötü</button>
                             </div>
-                            <input type="text" id="note-${i}" class="eval-input-v2" value="${cNote}" placeholder="Not ekle..." style="display:${cVal < pts ? 'block' : 'none'}; width:150px; height:32px; padding:4px 10px; font-size:0.8rem;">
+                        </div>
+                        <div class="criteria-note-row" id="note-row-${i}" style="display:${cVal < pts ? 'block' : 'none'}; margin-top:8px;">
+                             <input type="text" id="note-${i}" class="eval-input-v2" value="${cNote}" placeholder="Not ekle..." style="width:100%; height:32px; padding:4px 10px; font-size:0.8rem;">
                         </div>
                     </div>`;
             } else if (isTelesatis) {
                 criteriaFieldsHtml += `
                     <div class="criteria-item-v2 ${cVal < pts ? 'failed' : ''}" id="criteria-${i}" data-max-score="${pts}">
                         <div class="criteria-top"><span class="criteria-name" title="${fullText}">${i + 1}. ${c.text}</span><span class="criteria-max" id="val-${i}">${cVal} / ${pts}</span></div>
-                        <div class="criteria-actions">
-                            <input type="range" class="custom-range" id="slider-${i}" min="0" max="${pts}" value="${cVal}" oninput="v2_updateSlider(${i}, ${pts})" style="width:100%; margin-right:15px;">
-                            <input type="text" id="note-${i}" class="eval-input-v2" value="${cNote}" placeholder="Not..." style="display:${cVal < pts ? 'block' : 'none'}; width:100px; height:32px; padding:4px 10px; font-size:0.8rem;">
+                        <div class="criteria-actions" style="flex-wrap: wrap;">
+                            <input type="range" class="custom-range" id="slider-${i}" min="0" max="${pts}" value="${cVal}" oninput="v2_updateSlider(${i}, ${pts})" style="width:100%;">
+                        </div>
+                        <div class="criteria-note-row" id="note-row-${i}" style="display:${cVal < pts ? 'block' : 'none'}; margin-top:8px; width: 100%;">
+                            <input type="text" id="note-${i}" class="eval-input-v2" value="${cNote}" placeholder="Not..." style="width:100%; height:32px; padding:4px 10px; font-size:0.8rem;">
                         </div>
                     </div>`;
             }
@@ -5785,6 +5801,7 @@ function openCardDetail(cardId) {
 /* -------------------------
    TELE SATIŞ FULLSCREEN
 --------------------------*/
+
 let telesalesOffers = [];
 let telesalesScriptsLoaded = false;
 function safeGetToken() {
