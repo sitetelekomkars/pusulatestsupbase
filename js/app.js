@@ -771,6 +771,11 @@ function checkSession() {
 
         checkAdmin(savedRole);
 
+        // ✅ Başarılı girişte yönetici listesini önceden çek
+        if (savedRole === "admin" || savedRole === "locadmin") {
+            try { fetchUserListForAdmin(); } catch (e) { }
+        }
+
         // ✅ Zorunlu şifre değişimi kontrolü (Sayfa yenilense de kaçamaz)
         if (localStorage.getItem("sSportForceChange") === "true") {
             changePasswordPopup(true);
@@ -957,22 +962,6 @@ function checkAdmin(role) {
     isEditingActive = false;
     document.body.classList.remove('editing');
 
-    async function loadPermissionsOnStartup() {
-        try {
-            const { data, error } = await sb.from('RolePermissions').select('*');
-            if (error) throw error;
-
-            // Rol bazlı filtrele ve UI uygula
-            const myRole = getMyRole();
-            const perms = data.filter(p => !p.Role || normalizeRole(p.Role) === myRole);
-
-            // Global'de sakla gerekiyorsa veya direkt uygula
-            applyPermissionsToUI(perms);
-        } catch (err) {
-            console.error("[Pusula] Permissions Fetch Error:", err);
-        }
-    }
-
 
     if (isAdminMode) {
         if (addCardDropdown) addCardDropdown.style.display = 'flex';
@@ -1001,6 +990,22 @@ function checkAdmin(role) {
 
     // RBAC Yetkilerini uygula
     try { applyPermissionsToUI(); } catch (e) { }
+}
+
+async function loadPermissionsOnStartup() {
+    try {
+        const { data, error } = await sb.from('RolePermissions').select('*');
+        if (error) throw error;
+
+        // Rol bazlı filtrele ve UI uygula
+        const myRole = getMyRole();
+        const perms = data.filter(p => !p.Role || normalizeRole(p.Role) === myRole);
+
+        // Global'de sakla gerekiyorsa veya direkt uygula
+        applyPermissionsToUI(perms);
+    } catch (err) {
+        console.error("[Pusula] Permissions Fetch Error:", err);
+    }
 }
 function logout() {
     currentUser = ""; isAdminMode = false; isEditingActive = false;
