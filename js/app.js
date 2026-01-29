@@ -906,30 +906,56 @@ async function apiCall(action, params = {}) {
                 return { result: error ? "error" : "success" };
             }
             case "bulkUpdateBroadcast": {
-                // Sadece LocAdmin için (Güvenlik)
+                // Sadece LocAdmin veya Admin için (Güvenlik)
                 if (!isLocAdmin && !isAdminMode) return { result: "error", message: "Yetkisiz işlem." };
 
-                // 1. Mevcut tüm veriyi temizle
-                const { error: delErr } = await sb.from('YayinAkisi').delete().neq('id', 0);
-                if (delErr) throw delErr;
+                try {
+                    // 1. Mevcut tüm veriyi temizle
+                    const { error: delErr } = await sb.from('YayinAkisi').delete().neq('id', 0);
+                    if (delErr) throw delErr;
 
-                // 2. Yeni veriyi ekle
-                if (params.items && params.items.length > 0) {
-                    const { error: insErr } = await sb.from('YayinAkisi').insert(params.items);
-                    if (insErr) throw insErr;
+                    // 2. Yeni veriyi ekle (Key normalize et: Supabase kolonlarıyla eşleştir)
+                    if (params.items && params.items.length > 0) {
+                        const normalizedItems = params.items.map(raw => {
+                            const n = {};
+                            const k = Object.keys(raw).map(key => key.toLowerCase().trim());
+
+                            // Map Saat -> Saat, Program -> Program, Kanal -> Kanal, Tarih -> Tarih
+                            Object.keys(raw).forEach(key => {
+                                const cleanKey = key.toLowerCase().trim();
+                                if (cleanKey === 'saat' || cleanKey === 'time') n.Saat = raw[key];
+                                else if (cleanKey === 'program' || cleanKey === 'baslik' || cleanKey === 'başlık' || cleanKey === 'event') n.Program = raw[key];
+                                else if (cleanKey === 'kanal' || cleanKey === 'platform' || cleanKey === 'channel') n.Kanal = raw[key];
+                                else if (cleanKey === 'tarih' || cleanKey === 'date') n.Tarih = raw[key];
+                                else n[key] = raw[key]; // Diğer kolonlar olduğu gibi
+                            });
+                            return n;
+                        });
+
+                        const { error: insErr } = await sb.from('YayinAkisi').insert(normalizedItems);
+                        if (insErr) throw insErr;
+                    }
+                    saveLog("Yayın Akışı Toplu Güncelleme", `${params.items.length} kayıt eklendi.`);
+                    return { result: "success" };
+                } catch (e) {
+                    console.error("[Pusula Bulk Broadcast] Hata:", e);
+                    return { result: "error", message: "Bağlantı veya Yetki Hatası: " + e.message };
                 }
-                saveLog("Yayın Akışı Toplu Güncelleme", `${params.items.length} kayıt eklendi.`);
-                return { result: "success" };
             }
             case "bulkUpdateShifts": {
                 if (!isLocAdmin && !isAdminMode) return { result: "error", message: "Yetkisiz işlem." };
 
-                // Params: { items: [ { Temsilci: '...', '2026-01-30': '...', ... }, ... ] }
-                const { error } = await sb.from('Vardiya').upsert(params.items, { onConflict: 'Temsilci' });
-                if (error) throw error;
+                try {
+                    // Vardiya tablosunda 'Temsilci' unique olmalı (Upsert için)
+                    const { error } = await sb.from('Vardiya').upsert(params.items, { onConflict: 'Temsilci' });
+                    if (error) throw error;
 
-                saveLog("Vardiya Toplu Güncelleme", `${params.items.length} personel güncellendi.`);
-                return { result: "success" };
+                    saveLog("Vardiya Toplu Güncelleme", `${params.items.length} personel güncellendi.`);
+                    return { result: "success" };
+                } catch (e) {
+                    console.error("[Pusula Bulk Shifts] Hata:", e);
+                    return { result: "error", message: "Veritabanı Hatası: " + e.message };
+                }
             }
             case "getBroadcastFlow": {
                 // ...existing...
@@ -1004,6 +1030,12 @@ window.__dataLoadedPromise = new Promise(r => { __dataLoadedResolve = r; });
 let techWizardData = {}; // Teknik Sihirbaz Verisi
 let currentUser = "";
 let globalUserIP = "";
+let isAdminMode = false;
+let isLocAdmin = false;
+let isEditingActive = false;
+let activeRole = "";
+let allRolePermissions = [];
+let adminUserList = [];
 
 // -------------------- HomeBlocks (Ana Sayfa blok içerikleri) --------------------
 let homeBlocks = {}; // { quote:{...}, ... }
@@ -8560,7 +8592,9 @@ async function openMenuPermissions() {
                         { key: "ImageUpload", label: "Görsel Yükleme", perms: ["Execute"] },
                         { key: "Reports", label: "Rapor Çekme (Dışa Aktar)", perms: ["Execute"] },
                         { key: "RbacAdmin", label: "Yetki Yönetimi", perms: ["Execute"] },
-                        { key: "ActiveUsers", label: "Aktif Kullanıcılar", perms: ["Execute"] }
+                        { key: "ActiveUsers", label: "Aktif Kullanıcılar", perms: ["Execute"] },
+                        { key: "UserAdmin", label: "Kullanıcı Yönetimi", perms: ["Execute"] },
+                        { key: "SystemLogs", label: "Sistem Logları", perms: ["Execute"] }
                     ]
                 },
                 {
@@ -8792,6 +8826,9 @@ function applyPermissionsToUI() {
 
     const userMgmtBtn = document.getElementById('dropdownUserMgmt');
     if (userMgmtBtn && !hasPerm("UserAdmin")) userMgmtBtn.style.display = 'none';
+
+    const logsBtn = document.getElementById('dropdownLogs');
+    if (logsBtn && !hasPerm("SystemLogs")) logsBtn.style.display = 'none';
 
     const menuMap = {
         "home": "home",
