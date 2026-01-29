@@ -93,9 +93,11 @@ function normalizeKeys(obj) {
         if (k === 'FeedbackType') n.feedbackType = obj[k];
 
         // İçerik / Başlık / Metin
-        if (k === 'Başlık' || k === 'Teklif Adı' || k === 'Title' || k === 'Key' || k === 'BlockId' || k === 'blockId') {
-            n.title = obj[k]; n.head = obj[k]; n.blockId = obj[k]; n.key = obj[k];
+        if (k === 'Başlık' || k === 'Teklif Adı' || k === 'Title') {
+            n.title = obj[k]; n.head = obj[k];
         }
+        if (k === 'Key') { n.key = obj[k]; }
+        if (k === 'BlockId' || k === 'blockId') { n.blockId = obj[k]; }
         if (k === 'İçerik' || k === 'Açıklama' || k === 'Description' || k === 'Metin' || k === 'Soru_Metinleri' || k === 'Soru' || k === 'Text' || k === 'Content') {
             n.content = obj[k]; n.text = obj[k]; n.description = obj[k]; n.questions = obj[k];
         }
@@ -118,7 +120,12 @@ function normalizeKeys(obj) {
         // Yayın Akışı (Special table keys)
         if (k === 'DATE' || k === 'Tarih' || k === 'tarih') { n.date = obj[k]; n.dateISO = obj[k]; }
         if (k === 'EVENT NAME - Turkish' || k === 'Mac' || k === 'mac' || k === 'Event' || k === 'event' || k === 'Title' || k === 'Başlık') { n.match = obj[k]; n.event = obj[k]; }
-        if (k === 'KO/ START TIME TSİ' || k === 'Saat' || k === 'saat' || k === 'Time' || k === 'time') n.time = obj[k];
+        if (k === 'Saat' || k === 'saat' || k === 'Time' || k === 'time') n.time = obj[k];
+        // Yayın Akışı saat kolon adı bazen satır sonu/boşluk içeriyor: "KO/ START TIME \n TSİ"
+        try {
+            const kk = String(k || '').replace(/\s+/g, ' ').trim().toUpperCase();
+            if (!n.time && kk.includes('KO/') && kk.includes('START TIME')) n.time = obj[k];
+        } catch (e) { }
         if (k === 'ANNOUNCER' || k === 'Kanal' || k === 'kanal' || k === 'Platform' || k === 'platform') { n.channel = obj[k]; n.announcer = obj[k]; }
 
         // StartEpoch hesaplama (Yayın Akışı için)
@@ -162,9 +169,9 @@ async function apiCall(action, params = {}) {
             case "getRolePermissions": {
                 const { data, error } = await sb.from('RolePermissions').select('*');
                 if (error) throw error;
-                // Grupları (rolleri) benzersiz şekilde ayıkla
-                const groups = [...new Set(data.map(p => p.Role))];
-                return { result: "success", permissions: data, groups: groups };
+                const perms = (data || []).map(normalizeKeys);
+                const groups = [...new Set(perms.map(p => p.role || p.Role).filter(Boolean))];
+                return { result: "success", permissions: perms, groups: groups };
             }
             case "setRolePermissions": {
                 const { role, perms } = params;
@@ -173,9 +180,9 @@ async function apiCall(action, params = {}) {
                 for (const p of perms) {
                     await sb.from('RolePermissions').upsert({
                         Role: role,
-                        Resource: p.resource,
-                        Permission: p.permission,
-                        Value: p.value
+                        Resource: p.resource || p.Resource,
+                        Permission: p.permission || p.Permission,
+                        Value: (typeof p.value !== 'undefined') ? p.value : p.Value
                     }, { onConflict: 'Role,Resource,Permission' });
                 }
                 return { result: "success" };
@@ -185,13 +192,13 @@ async function apiCall(action, params = {}) {
                 if (params.targetAgent && params.targetAgent !== 'all') {
                     query = query.eq('AgentName', params.targetAgent);
                 }
-                // Order by id descending as a baseline
+                // En yeni kayıtlar her zaman en üstte gelsin (ID descending)
                 const { data, error } = await query.order('id', { ascending: false });
                 if (error) throw error;
                 return { result: "success", evaluations: data.map(normalizeKeys) };
             }
             case "logEvaluation": {
-                const { error } = await sb.from('Evaluations').insert([{
+                const { data, error } = await sb.from('Evaluations').insert([{
                     AgentName: params.agentName,
                     Evaluator: currentUser,
                     CallID: params.callId,
@@ -204,16 +211,6 @@ async function apiCall(action, params = {}) {
                     Date: new Date().toLocaleString('tr-TR'),
                     Okundu: 0,
                     Durum: params.status || 'Tamamlandı'
-                }]);
-                if (error) throw error;
-                return { result: "success" };
-            }
-            case "logQuiz": {
-                const { error } = await sb.from('Quiz_Logs').insert([{
-                    Username: params.username || currentUser,
-                    Score: params.score,
-                    Total: params.total,
-                    Date: new Date().toISOString()
                 }]);
                 if (error) throw error;
                 return { result: "success" };
@@ -456,26 +453,22 @@ async function apiCall(action, params = {}) {
                 return { result: "success", categories: cats };
             }
             case "upsertTechDoc": {
+                // Teknik_Dokumanlar: Kategori, Başlık, İçerik, Görsel
+                // Başlık değiştiyse: eski kaydı sil (aksi halde yeni kayıt oluşur)
+                try {
+                    if (params.keyBaslik && params.baslik && String(params.keyBaslik) !== String(params.baslik)) {
+                        await sb.from('Teknik_Dokumanlar').delete().match({ Başlık: params.keyBaslik });
+                    }
+                } catch (e) { /* sessiz */ }
+
                 const payload = {
                     Kategori: params.kategori,
                     Başlık: params.baslik,
                     İçerik: params.icerik,
-                    Adım: params.adim || null,
-                    Not: params.not || null,
-                    Link: params.link || null,
-                    Görsel: params.image || null,
-                    Durum: params.durum || 'Aktif'
+                    Görsel: params.image || null
                 };
-                if (params.id) payload.id = params.id; // ID varsa payload'a ekle
-
-                const { error } = await sb.from('Teknik_Dokumanlar').upsert(payload, { onConflict: 'id' }); // id üzerinden upsert
-                if (error) {
-                    console.error("[UPSERT ERROR]", error);
-                    // id ile başarısız olursa (yeni kayıt veya id değişimi?) Başlık denemesi yap (Geriye uyumluluk)
-                    const { error: error2 } = await sb.from('Teknik_Dokumanlar').upsert(payload, { onConflict: 'Başlık' });
-                    return { result: error2 ? "error" : "success", message: error2?.message };
-                }
-                return { result: "success" };
+                const { error } = await sb.from('Teknik_Dokumanlar').upsert(payload, { onConflict: 'Başlık' });
+                return { result: error ? "error" : "success" };
             }
             case "updateHomeBlock": {
                 // Supabase'de kolon adı 'Key' (Görüntülerden teyit edildi)
@@ -499,9 +492,90 @@ async function apiCall(action, params = {}) {
                 return { result: error ? "error" : "success" };
             }
             case "getActiveUsers": {
-                // Aktif kullanıcıları izleyen bir tablo (ActiveUsers) olmalı.
-                // Şimdilik boş dönelim.
-                return { result: "success", users: [] };
+                // Aktif kullanıcı tanımı: Tokens.CreatedAt son 12 saat içinde olanlar
+                const since = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+
+                const { data: tData, error: tErr } = await sb
+                    .from('Tokens')
+                    .select('*')
+                    .gte('CreatedAt', since)
+                    .order('CreatedAt', { ascending: false });
+                if (tErr) throw tErr;
+
+                const tokens = (tData || []).map(normalizeKeys);
+                const usernames = [...new Set(tokens.map(t => t.Username || t.username).filter(Boolean))];
+
+                // Kullanıcı bilgileri (rol/grup)
+                let uMap = {};
+                if (usernames.length) {
+                    const { data: uData, error: uErr } = await sb.from('Users').select('*').in('Username', usernames);
+                    if (uErr) throw uErr;
+                    (uData || []).forEach(u => { uMap[String(u.Username)] = u; });
+                }
+
+                // IP bilgisi (opsiyonel) - Logs tablosundan en son IP
+                let ipMap = {};
+                try {
+                    if (usernames.length) {
+                        const { data: lData, error: lErr } = await sb
+                            .from('Logs')
+                            .select('*')
+                            .in('Username', usernames)
+                            .order('Date', { ascending: false })
+                            .limit(2000);
+                        if (!lErr && Array.isArray(lData)) {
+                            for (const row of lData) {
+                                const un = row.Username;
+                                if (!un || ipMap[un]) continue;
+                                const ip = row['İP ADRESİ'] || row['IP'] || row['Ip'] || row['ip'] || row.IPAddress || row.IpAddress;
+                                if (ip) ipMap[un] = ip;
+                            }
+                        }
+                    }
+                } catch (e) { /* sessiz */ }
+
+                const users = tokens
+                    .map(t => {
+                        const un = String(t.Username || t.username || '').trim();
+                        const u = uMap[un] || {};
+                        const created = t.CreatedAt || t.createdat || '';
+                        return {
+                            username: un,
+                            token: t.Token || t.token || '',
+                            role: String(u.Role || u.role || ''),
+                            group: String(u.Group || u.group || ''),
+                            loginTime: created ? new Date(created).toLocaleString('tr-TR') : '-',
+                            ip: ipMap[un] || '-'
+                        };
+                    })
+                    .filter(u => u.username);
+
+                return { result: "success", users: users };
+            }
+            case "kickUser": {
+                // Tokens tablosundan ilgili oturumu sil
+                const { targetUsername, targetToken } = params || {};
+                if (!targetUsername) return { result: 'error', message: 'Kullanıcı adı boş' };
+
+                let q = sb.from('Tokens').delete().eq('Username', targetUsername);
+                if (targetToken) q = q.eq('Token', targetToken);
+
+                const { error } = await q;
+                if (error) throw error;
+                return { result: 'success' };
+            }
+            case "logQuiz": {
+                // Quiz sonuçlarını Supabase QuizResults tablosuna yaz
+                const payload = {
+                    Username: params.username || currentUser,
+                    Score: params.score,
+                    TotalQuestions: params.total,
+                    SuccessRate: params.successRate,
+                    Date: new Date().toLocaleString('tr-TR')
+                };
+                const { error } = await sb.from('QuizResults').insert([payload]);
+                if (error) throw error;
+                return { result: 'success' };
             }
             case "getQualityNotifications": {
                 // Şimdilik sıfır dönelim
@@ -3013,12 +3087,10 @@ function finishPenaltyGame() {
     if (restartBtn) restartBtn.style.display = 'block';
 
     // Leaderboard log (mevcut backend uyumu)
-    // Leaderboard log (apiCall migration)
-    apiCall("logQuiz", { score: pScore * 10, total: 100 })
-        .finally(() => {
-            // lobby tablosunu güncel tut
-            setTimeout(fetchLeaderboard, 600);
-        });
+    apiCall('logQuiz', { username: currentUser, token: getToken(), score: pScore * 10, total: 100 }).finally(() => {
+        // lobby tablosunu güncel tut
+        setTimeout(fetchLeaderboard, 600);
+    });
 }
 
 
@@ -3081,8 +3153,82 @@ function twResetWizard() { twState.currentStep = 'start'; twState.history = []; 
 // --- YENİ KALİTE LMS MODÜLÜ (TAM EKRAN ENTEGRASYONU) ---
 // ==========================================================
 // Modülü Aç
-// Redundant openQualityArea removed. Using the definition at line 5724.
-// Leftover logic from removed openQualityArea cleaned up.
+function openQualityArea() {
+    // Eski modalı kapat (eğer açıksa)
+    const oldModal = document.getElementById('quality-modal');
+    if (oldModal) oldModal.style.display = 'none';
+    // Tam ekranı aç
+    const fullScreen = document.getElementById('quality-fullscreen');
+    fullScreen.style.display = 'flex';
+    // Kullanıcı bilgisini güncelle
+    document.getElementById('q-side-name').innerText = currentUser;
+    document.getElementById('q-side-role').innerText = isAdminMode ? 'Yönetici' : 'Temsilci';
+    document.getElementById('q-side-avatar').innerText = currentUser.charAt(0).toUpperCase();
+    // Dönem filtresini doldur
+    populateMonthFilterFull();
+    // Yetki kontrolü (Admin butonlarını göster/gizle)
+    const adminFilters = document.getElementById('admin-filters');
+    const assignBtn = document.getElementById('assign-training-btn');
+    const manualFeedbackBtn = document.getElementById('manual-feedback-admin-btn');
+
+    if (isAdminMode) {
+        if (adminFilters) {
+            adminFilters.style.display = 'flex';
+            // Buton bazlı yetki kontrolü (Admin için dinamik)
+            const rptBtn = adminFilters.querySelector('.admin-btn'); // Rapor Butonu
+            if (rptBtn) {
+                if (isLocAdmin || hasPerm("Reports")) rptBtn.style.display = '';
+                else rptBtn.style.display = 'none';
+            }
+            const addBtn = adminFilters.querySelector('.add-btn'); // Ekle Butonu
+            if (addBtn) {
+                // Ekle butonu için "AddContent" veya genel Admin yetkisi kontrolü
+                if (isLocAdmin || hasPerm("AddContent")) addBtn.style.display = '';
+                else addBtn.style.display = 'none';
+            }
+        }
+
+        // Eğitim Atama Yetkisi
+        if (assignBtn) {
+            // Eğitim atama yetkisi "Trainings" veya genel "Quality" olabilir, şimdilik locadmin veya adminMode yetiyor gibi ama garanti olsun
+            assignBtn.style.display = 'block';
+        }
+
+        if (manualFeedbackBtn) manualFeedbackBtn.style.display = 'flex'; // Buna da yetki eklenebilir ama şimdilik kalsın
+
+        // Kullanıcı listesi boşsa çek, sonra filtreleri doldur
+        if (adminUserList.length === 0) {
+            fetchUserListForAdmin().then(users => {
+                const groupSelect = document.getElementById('q-admin-group');
+                if (groupSelect) {
+                    const groups = [...new Set(users.map(u => u.group))].sort();
+                    groupSelect.innerHTML = `<option value="all">Tüm Gruplar</option>` + groups.map(g => `<option value="${g}">${g}</option>`).join('');
+                    updateAgentListBasedOnGroup();
+                }
+                populateDashboardFilters(); // Dashboard filtrelerini de doldur
+            });
+        } else {
+            populateDashboardFilters(); // Liste zaten varsa direkt doldur
+        }
+    } else {
+        if (adminFilters) adminFilters.style.display = 'none';
+        if (assignBtn) assignBtn.style.display = 'none';
+        if (manualFeedbackBtn) manualFeedbackBtn.style.display = 'none';
+
+        // Admin değilse filtreleri gizle
+        const dashFilterArea = document.querySelector('#view-dashboard .q-view-header > div');
+        if (dashFilterArea && dashFilterArea.style.display !== 'none') {
+            // Burada basitçe dashboard filtre fonksiyonu admin kontrolü yapıyor.
+            populateDashboardFilters();
+        }
+    }
+    // Varsayılan sekmeyi aç
+    // Tıklanma simülasyonu ile ilk sekmeyi aktif et
+    const defaultTab = document.querySelector('.q-nav-item.active');
+    if (defaultTab) {
+        switchQualityTab('dashboard', defaultTab);
+    }
+}
 // Modülü Kapat
 function closeFullQuality() {
     document.getElementById('quality-fullscreen').style.display = 'none';
@@ -4604,18 +4750,8 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
         });
 
         if (data.result === "success") {
-            // --- CHRONOLOGICAL SORTING FIX ---
-            // CallDate is "DD.MM.YYYY" string. We need to sort descending (newest first).
-            allEvaluationsData = data.evaluations.sort((a, b) => {
-                const parseDate = (d) => {
-                    if (!d) return 0;
-                    const p = String(d).split('.');
-                    if (p.length === 3) return new Date(p[2], p[1] - 1, p[0]).getTime();
-                    return new Date(d).getTime() || 0;
-                };
-                return parseDate(b.callDate) - parseDate(a.callDate);
-            });
-
+            // Server'dan zaten descending (en yeni en üstte) geliyor, reverse() gereksiz veya hataya sebep olabilir
+            allEvaluationsData = data.evaluations;
             if (silent) return; // Silent mode ise burada bitir (veri yüklendi)
             listEl.innerHTML = '';
 
@@ -4645,6 +4781,19 @@ async function fetchEvaluationsForAgent(forcedName, silent = false) {
                     return monthYear === selectedPeriodForList;
                 });
             }
+
+            
+            // Dinleme tarihine göre kronolojik (DESC) sırala
+            const parseEvalDate = (e) => {
+                const v = (e.date || e.callDate || '').toString().trim();
+                if (!v) return 0;
+                // dd.MM.yyyy
+                const m = v.match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+                if (m) return new Date(`${m[3]}-${m[2]}-${m[1]}T00:00:00`).getTime();
+                const d = new Date(v);
+                return isNaN(d) ? 0 : d.getTime();
+            };
+            filteredEvaluations.sort((a,b) => parseEvalDate(b) - parseEvalDate(a));
 
             if (filteredEvaluations.length === 0) {
                 listEl.innerHTML = '<p style="padding:20px; text-align:center; color:#666;">Kayıt yok.</p>';
@@ -4882,10 +5031,11 @@ function fetchUserListForAdmin() {
     return new Promise((resolve) => {
         apiCall("getUserList", {}).then(data => {
             if (data.result === "success") {
-                // Temsilci listesini genişlet: Yönetim dışındaki herkesi al
+                // Sadece rütbesi 'user' veya 'qusers' olanları (temsilcileri) göster
+                // Yönetim grubunu ve Admin/LocAdmin rütbelerini listeden temizle
                 adminUserList = data.users.filter(u => {
-                    const g = String(u.group || '').toLowerCase().trim();
-                    return g !== 'yönetim' && g !== 'yonetim';
+                    const r = String(u.role || '').toLowerCase().trim();
+                    return (r === 'user' || r === 'qusers') && u.group !== 'Yönetim';
                 });
                 resolve(adminUserList);
             }
@@ -5527,6 +5677,20 @@ function renderHomePanels() {
             quoteEl.style.display = '';
         } else {
             quoteEl.innerHTML = '<span style="color:#999">Bugün için bir söz eklenmemiş.</span>';
+            // Fallback: cache boşsa Supabase'den tekil çekmeyi bir kez dene
+            try {
+                if (sb) {
+                    sb.from('HomeBlocks').select('*').eq('Key', 'quote').single().then(({data, error}) => {
+                        if (!error && data) {
+                            const qn = normalizeKeys(data);
+                            homeBlocks = homeBlocks || {};
+                            homeBlocks.quote = qn;
+                            try { localStorage.setItem('homeBlocksCache', JSON.stringify(homeBlocks || {})); } catch(e) {}
+                            try { renderHomePanels(); } catch(e) {}
+                        }
+                    });
+                }
+            } catch (e) { }
         }
     }
 
@@ -5678,6 +5842,44 @@ async function openQualityArea() {
     if (av) av.innerText = (currentUser || 'U').trim().slice(0, 1).toUpperCase();
     if (nm) nm.innerText = currentUser || 'Kullanıcı';
     if (rl) rl.innerText = isAdminMode ? 'Yönetici' : 'Temsilci';
+    // Yetki kontrolü (Admin butonlarını göster/gizle)
+    const adminFilters = document.getElementById('admin-filters');
+    const assignBtn = document.getElementById('assign-training-btn');
+    const manualFeedbackBtn = document.getElementById('manual-feedback-admin-btn');
+
+    if (isAdminMode) {
+        if (adminFilters) {
+            adminFilters.style.display = 'flex';
+            // Buton bazlı yetki kontrolü
+            const rptBtn = adminFilters.querySelector('.admin-btn');
+            if (rptBtn) {
+                if (isLocAdmin || hasPerm('Reports')) rptBtn.style.display = '';
+                else rptBtn.style.display = 'none';
+            }
+            const addBtn = adminFilters.querySelector('.add-btn');
+            if (addBtn) {
+                if (isLocAdmin || hasPerm('AddContent')) addBtn.style.display = '';
+                else addBtn.style.display = 'none';
+            }
+        }
+        if (assignBtn) assignBtn.style.display = 'block';
+        if (manualFeedbackBtn) manualFeedbackBtn.style.display = 'flex';
+
+        // Grup filtresi dropdown'u admin kullanıcı listesi gelince dolacak
+        if (adminUserList.length) {
+            const groupSelect = document.getElementById('q-admin-group');
+            if (groupSelect) {
+                const groups = [...new Set(adminUserList.map(u => u.group).filter(Boolean))].sort();
+                groupSelect.innerHTML = `<option value="all">Tüm Gruplar</option>` + groups.map(g => `<option value="${g}">${g}</option>`).join('');
+                try { updateAgentListBasedOnGroup(); } catch (e) { }
+            }
+        }
+    } else {
+        if (adminFilters) adminFilters.style.display = 'none';
+        if (assignBtn) assignBtn.style.display = 'none';
+        if (manualFeedbackBtn) manualFeedbackBtn.style.display = 'none';
+    }
+
 
     if (adminUserList.length === 0) {
         Swal.fire({ title: 'Temsilci Listesi Yükleniyor...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
@@ -6187,6 +6389,44 @@ async function openShiftArea(tab) {
     if (av) av.innerText = (currentUser || 'U').trim().slice(0, 1).toUpperCase();
     if (nm) nm.innerText = currentUser || 'Kullanıcı';
     if (rl) rl.innerText = isAdminMode ? 'Yönetici' : 'Temsilci';
+    // Yetki kontrolü (Admin butonlarını göster/gizle)
+    const adminFilters = document.getElementById('admin-filters');
+    const assignBtn = document.getElementById('assign-training-btn');
+    const manualFeedbackBtn = document.getElementById('manual-feedback-admin-btn');
+
+    if (isAdminMode) {
+        if (adminFilters) {
+            adminFilters.style.display = 'flex';
+            // Buton bazlı yetki kontrolü
+            const rptBtn = adminFilters.querySelector('.admin-btn');
+            if (rptBtn) {
+                if (isLocAdmin || hasPerm('Reports')) rptBtn.style.display = '';
+                else rptBtn.style.display = 'none';
+            }
+            const addBtn = adminFilters.querySelector('.add-btn');
+            if (addBtn) {
+                if (isLocAdmin || hasPerm('AddContent')) addBtn.style.display = '';
+                else addBtn.style.display = 'none';
+            }
+        }
+        if (assignBtn) assignBtn.style.display = 'block';
+        if (manualFeedbackBtn) manualFeedbackBtn.style.display = 'flex';
+
+        // Grup filtresi dropdown'u admin kullanıcı listesi gelince dolacak
+        if (adminUserList.length) {
+            const groupSelect = document.getElementById('q-admin-group');
+            if (groupSelect) {
+                const groups = [...new Set(adminUserList.map(u => u.group).filter(Boolean))].sort();
+                groupSelect.innerHTML = `<option value="all">Tüm Gruplar</option>` + groups.map(g => `<option value="${g}">${g}</option>`).join('');
+                try { updateAgentListBasedOnGroup(); } catch (e) { }
+            }
+        }
+    } else {
+        if (adminFilters) adminFilters.style.display = 'none';
+        if (assignBtn) assignBtn.style.display = 'none';
+        if (manualFeedbackBtn) manualFeedbackBtn.style.display = 'none';
+    }
+
 
     await loadShiftData();
     switchShiftTab(tab || 'plan');
@@ -6984,7 +7224,6 @@ async function __fetchTechDocs() {
     return rows
         .filter(r => (r.Durum || "").toString().trim().toLowerCase() !== "pasif")
         .map(r => ({
-            id: r.id || r.ID || r.Id || null, // ID eklendi
             categoryKey: __normalizeTechCategory(r.Kategori),
             kategori: (r.Kategori || "").trim(),
             baslik: (r.Başlık || r.Baslik || r.Title || r["Başlık"] || "").toString().trim(),
@@ -7228,14 +7467,10 @@ async function editTechDoc(tabKey, baslik) {
         }
     });
     if (!v) return;
+
     Swal.fire({ title: 'Kaydediliyor...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
     try {
-        const d = await apiCall("upsertTechDoc", {
-            id: it.id, // ID eklendi
-            keyKategori: it.kategori,
-            keyBaslik: it.baslik,
-            ...v
-        });
+        const d = await apiCall('upsertTechDoc', { keyKategori: it.kategori, keyBaslik: it.baslik, ...v, username: currentUser, token: getToken() });
         if (d.result === 'success') {
             Swal.fire({ icon: 'success', title: 'Kaydedildi', timer: 1200, showConfirmButton: false });
             await loadTechDocsIfNeeded(true);
@@ -7263,12 +7498,7 @@ function deleteTechDoc(tabKey, baslik) {
             const all = await loadTechDocsIfNeeded(false);
             const it = all.find(x => x.categoryKey === tabKey && (x.baslik || '') === baslik);
             const keyKategori = it ? it.kategori : tabKey;
-
-            const d = await apiCall("deleteTechDoc", {
-                keyKategori: keyKategori,
-                keyBaslik: baslik
-            });
-
+            const d = await apiCall('deleteTechDoc', { keyKategori: keyKategori, keyBaslik: baslik, username: currentUser, token: getToken() });
             if (d.result === 'success') {
                 await loadTechDocsIfNeeded(true);
                 filterTechDocList(tabKey);
