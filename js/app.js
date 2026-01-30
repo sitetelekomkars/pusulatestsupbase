@@ -1,4 +1,10 @@
 
+// --- SUPABASE KONFİGÜRASYONU ---
+const SUPABASE_URL = "https://psauvjohywldldgppmxz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_ITFx76ndmOc3UJkNbHOSlQ_kD91kq45";
+const sb = (window.supabase && typeof window.supabase.createClient === 'function')
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+    : null;
 
 function formatWeekLabel(raw) {
     try {
@@ -73,12 +79,7 @@ function b64toBlob(b64Data, contentType = '', sliceSize = 512) {
     }
 }
 
-// --- SUPABASE BAĞLANTISI ---
-const SUPABASE_URL = "https://psauvjohywldldgppmxz.supabase.co";
-const SUPABASE_KEY = "sb_publishable_ITFx76ndmOc3UJkNbHOSlQ_kD91kq45";
-const sb = (window.supabase && typeof window.supabase.createClient === 'function')
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-    : null;
+// --- GOOGLE APPS SCRIPT BAĞLANTISI ---
 
 // ✅ YENİ: Mail Bildirim Ayarları (Google Apps Script Web App URL buraya gelecek)
 const GAS_MAIL_URL = "https://script.google.com/macros/s/AKfycbwZZbRVksffgpu_WvkgCoZehIBVTTTm5j5SEqffwheCU44Q_4d9b64kSmf40wL1SR8/exec"; // Burayı kendi Web App URL'niz ile güncelleyin
@@ -106,8 +107,12 @@ async function sendMailNotification(to, subject, body, cc = null, bcc = null) {
 async function saveLog(action, details) {
     if (!sb) return;
     try {
+        // Auth sessiaon'dan email veya id alabiliriz
+        const { data: { user } } = await sb.auth.getUser();
+        const username = user ? (user.user_metadata?.username || user.email) : (currentUser || localStorage.getItem("sSportUser") || '-');
+
         await sb.from('Logs').insert([{
-            Username: currentUser || localStorage.getItem("sSportUser") || '-',
+            Username: username,
             Action: action,
             Details: details,
             "İP ADRESİ": globalUserIP || '-',
@@ -392,39 +397,37 @@ async function apiCall(action, params = {}) {
                 saveLog("Kart Silme", `ID: ${params.id}`);
                 return { result: "success" };
             }
+            case "getUserList": {
+                const { data, error } = await sb.from('profiles').select('*');
+                if (error) return { result: "success", users: [] };
+                const users = (data || []).map(normalizeKeys);
+                return { result: "success", users: users };
+            }
             case "saveUser": {
-                const { id, username, fullName, role, group, password } = params;
-                const payload = {
-                    Username: username,
-                    FullName: fullName,
-                    Name: fullName,
-                    "Tam İsim": fullName,
-                    "İsim": fullName,
-                    Role: role,
-                    Group: group
-                };
-                if (password) {
-                    const hashed = CryptoJS.SHA256(password).toString();
-                    payload.Password = hashed;
-                    payload.ForceChange = '1';
-                }
+                // Not: Yeni kullanıcı ekleme işlemi Auth panelinden yapılmalı.
+                // Burada sadece mevcut profilleri (rol, grup vs.) güncelliyoruz.
+                const { id, username, fullName, role, group } = params;
+                if (!id) return { result: "error", message: "Yeni kullanıcı Auth panelinden eklenmelidir. Burada sadece profil düzenlenebilir." };
 
-                let res;
-                if (id) {
-                    res = await sb.from('Users').update(payload).eq('id', id);
-                    if (res.error) throw res.error;
-                    saveLog("Kullanıcı Güncelleme", `${username} (ID: ${id})`);
-                } else {
-                    res = await sb.from('Users').insert([payload]);
-                    if (res.error) throw res.error;
-                    saveLog("Yeni Kullanıcı Ekleme", `${username}`);
-                }
+                const payload = {
+                    username: username,
+                    full_name: fullName,
+                    role: role,
+                    group: group
+                };
+
+                const { error } = await sb.from('profiles').update(payload).eq('id', id);
+                if (error) throw error;
+
+                saveLog("Profil Güncelleme", `${username} (ID: ${id})`);
                 return { result: "success" };
             }
             case "deleteUser": {
-                const { error } = await sb.from('Users').delete().eq('id', params.id);
+                // Not: Auth kullanıcısını silmek için Admin yetkisi/API gerekir.
+                // Burada sadece profili siliyoruz veya bir hata dönüyoruz.
+                const { error } = await sb.from('profiles').delete().eq('id', params.id);
                 if (error) throw error;
-                saveLog("Kullanıcı Silme", `ID: ${params.id}`);
+                saveLog("Profil Silme", `ID: ${params.id}`);
                 return { result: "success" };
             }
             case "exportEvaluations": {
@@ -1284,308 +1287,140 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // (Duplicate openBroadcastFlow removed)
 
-// --- SESSION & LOGIN ---
-function checkSession() {
-    const savedUser = localStorage.getItem("sSportUser");
-    const savedToken = localStorage.getItem("sSportToken");
-    const savedRole = localStorage.getItem("sSportRole");
-    const savedGroup = localStorage.getItem("sSportGroup");
+// --- SESSION & LOGIN (ESKİ SİSTEM / USERS TABLOSU) ---
+async function checkSession() {
+    const localUser = localStorage.getItem("sSportUser");
+    const localToken = localStorage.getItem("sSportToken");
 
-    // ✅ Oturumun tarayıcı/PC kapat-aç sonrası ertesi güne sarkmaması için:
-    // - Aynı gün değilse otomatik çıkış
-    // - Ayrıca 12 saati geçtiyse otomatik çıkış
-    const todayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const sessionDay = localStorage.getItem("sSportSessionDay") || "";
-    const loginAt = parseInt(localStorage.getItem("sSportLoginAt") || "0", 10);
-    const maxAgeMs = 12 * 60 * 60 * 1000; // 12 saat
+    if (localUser && localToken) {
+        // Users tablosundan kullanıcıyı doğrula
+        const { data: user, error } = await sb.from('Users').select('*').ilike('Username', localUser).maybeSingle();
 
-    if (savedUser && savedToken) {
-        const isOtherDay = (!sessionDay || sessionDay !== todayKey);
-        const isTooOld = (!loginAt || (Date.now() - loginAt) > maxAgeMs);
+        if (user) {
+            currentUser = user.Username || user.username;
+            isAdminMode = (user.Role === 'admin' || user.Role === 'locadmin');
+            isLocAdmin = (user.Role === 'locadmin');
+            activeRole = user.Role;
 
-        if (isOtherDay || isTooOld) {
-            try { logout(); } catch (e) {
-                localStorage.removeItem("sSportUser");
-                localStorage.removeItem("sSportToken");
-                localStorage.removeItem("sSportRole");
-                localStorage.removeItem("sSportGroup");
-                localStorage.removeItem("sSportSessionDay");
-                localStorage.removeItem("sSportLoginAt");
-            }
-            return;
-        }
-
-        currentUser = savedUser;
-        document.getElementById("login-screen").style.display = "none";
-        document.getElementById("user-display").innerText = currentUser;
-        setHomeWelcomeUser(currentUser);
-
-        checkAdmin(savedRole);
-
-        // Heartbeat başlat
-        startSessionTimer();
-
-        // ✅ Başarılı girişte yönetici listesini önceden çek
-        if (savedRole === "admin" || savedRole === "locadmin") {
-            try { fetchUserListForAdmin(); } catch (e) { }
-        }
-
-        // ✅ Zorunlu şifre değişimi kontrolü (Sayfa yenilense de kaçamaz)
-        if (localStorage.getItem("sSportForceChange") === "true") {
-            changePasswordPopup(true);
-            return;
-        }
-
-
-        try {
-            if (savedGroup) {
-                const el = document.getElementById("t-side-role"); if (el) el.textContent = savedGroup;
-                const el2 = document.getElementById("tech-side-role"); if (el2) el2.textContent = savedGroup;
-            }
-        } catch (e) { }
-
-
-        // ✅ Oturum sayacı ve Heartbeat başlat
-        startSessionTimer();
-
-        // ✅ YENİ: Yenilemede de menü/blok yetkilerini uygula
-        try { loadHomeBlocks(); } catch (e) { }
-        try { loadPermissionsOnStartup(); } catch (e) { }
-        if (BAKIM_MODU) {
-            document.getElementById("maintenance-screen").style.display = "flex";
-        } else {
-            document.getElementById("main-app").style.display = "block";
-
-            loadContentData();
-            loadWizardData();
-            loadTechWizardData();
-
-            // qusers auto-open kaldırıldı (istek üzerine)
-        }
-    }
-}
-function enterBas(e) { if (e.key === "Enter") girisYap(); }
-async function girisYap() {
-    const uName = document.getElementById("usernameInput").value.trim().toLowerCase();
-    const uPass = document.getElementById("passInput").value.trim();
-    const loadingMsg = document.getElementById("loading-msg");
-    const errorMsg = document.getElementById("error-msg");
-    if (!uName || !uPass) { errorMsg.innerText = "Lütfen bilgileri giriniz."; errorMsg.style.display = "block"; return; }
-
-    loadingMsg.style.display = "block";
-    loadingMsg.innerText = "Supabase ile doğrulanıyor...";
-    errorMsg.style.display = "none";
-    document.querySelector('.login-btn').disabled = true;
-
-    if (!globalUserIP) {
-        try {
-            const ipResponse = await fetch('https://ipapi.co/json/');
-            const ipData = await ipResponse.json();
-            globalUserIP = `${ipData.ip} [${ipData.city || '-'}, ${ipData.region || '-'}]`;
-        } catch (e) { globalUserIP = ""; }
-    }
-
-    try {
-        const hashedPass = CryptoJS.SHA256(uPass).toString();
-
-        // --- SUPABASE LOGIN (Enhanced Diagnostics) ---
-        // 1. Önce tam eşleşme veya büyük/küçük harf duyarsız dene
-        let { data: user, error: loginErr } = await sb
-            .from('Users')
-            .select('*')
-            .ilike('Username', uName.trim())
-            .maybeSingle();
-
-        // 2. Eğer ilk sorguda bulunamadıysa, belki sütun adı küçük harftir?
-        if (!user && !loginErr) {
-            console.warn("[Pusula Login] 'Username' sütununda bulunamadı, 'username' (küçük harf) deneniyor...");
-            const { data: altUser } = await sb
-                .from('Users')
-                .select('*')
-                .ilike('username', uName.trim())
-                .maybeSingle();
-            user = altUser;
-        }
-
-        loadingMsg.style.display = "none";
-        document.querySelector('.login-btn').disabled = false;
-
-        if (loginErr) {
-            console.error("[Pusula Login] Sorgu sırasında hata oluştu:", loginErr);
-            errorMsg.innerText = "Bağlantı Hatası: Sunucuya erişilemedi.";
-            errorMsg.style.display = "block";
-            return;
-        }
-
-        if (!user) {
-            dlog("[Pusula Login] Kullanıcı bulunamadı.");
-            errorMsg.innerText = "Kullanıcı Adı veya Şifre Hatalı!";
-            errorMsg.style.display = "block";
-            return;
-        }
-
-        // Şifre kontrolü
-        if (user.Password !== hashedPass && user.password !== hashedPass) {
-            console.warn("[Pusula Login] Şifre eşleşmedi.");
-            saveLog("Giriş Denemesi (Hatalı Şifre)", uName);
-            errorMsg.innerText = "Kullanıcı Adı veya Şifre Hatalı!";
-            errorMsg.style.display = "block";
-            return;
-        }
-
-        saveLog("Sisteme Giriş", uName);
-
-        // Veri eşleme (Geriye uyumluluk için büyük harf/küçük harf karmaşasını çöz)
-        const data = {
-            Username: user.Username || user.username,
-            Role: user.Role || user.role,
-            Group: user.Group || user.group,
-            ForceChange: user.ForceChange ?? user.forcechange
-        };
-
-        // Oturum Verilerini Kaydet
-        currentUser = data.Username;
-        const sessionToken = "sb_" + Math.random().toString(36).substr(2) + Date.now().toString(36);
-
-        localStorage.setItem("sSportUser", currentUser);
-        localStorage.setItem("sSportToken", sessionToken);
-        localStorage.setItem("sSportRole", data.Role);
-        if (data.Group) localStorage.setItem("sSportGroup", data.Group);
-
-        // ✅ Tokens tablosuna kaydet (Single Session & Force Kick Altyapısı)
-        const { error: tokenError } = await sb.from('Tokens').upsert({
-            Username: currentUser,
-            Token: sessionToken,
-            Role: data.Role,
-            IP: globalUserIP || '-',
-            CreatedAt: new Date().toISOString()
-        }, { onConflict: 'Username' });
-
-        if (tokenError) {
-            console.error("[Pusula Token Sync] Hata:", tokenError);
-            // Eğer upsert hata veriyorsa, muhtemelen RLS veya Constraint hatasıdır.
-            // Kritik bir hata olduğu için kullanıcıyı uyaralım.
-            Swal.fire({
-                icon: 'warning',
-                title: 'Oturum Senkronizasyon Hatası',
-                text: 'Token tablosuna yazılamadı. Lütfen RLS politikalarını veya tablo izinlerini kontrol edin. Hata: ' + tokenError.message,
-                confirmButtonText: 'Devam Et'
-            });
-        }
-        localStorage.setItem("sSportSessionDay", new Date().toISOString().slice(0, 10));
-        localStorage.setItem("sSportLoginAt", String(Date.now()));
-
-        // Zorunlu Şifre Değişimi (Sadece değer tam olarak 0 ise)
-        const needsForceChange = (data.ForceChange === 0 || data.ForceChange === "0" || data.ForceChange === "0.0");
-
-        if (needsForceChange) {
-            localStorage.setItem("sSportForceChange", "true");
-            Swal.fire({
-                icon: 'warning', title: ' ⚠️  Güvenlik Uyarısı',
-                text: 'Yeni sistem için şifrenizi bir kez güncellemeniz gerekmektedir.',
-                allowOutsideClick: false, confirmButtonText: 'Şifremi Güncelle'
-            }).then(() => { changePasswordPopup(true); });
-        } else {
-            localStorage.removeItem("sSportForceChange");
             document.getElementById("login-screen").style.display = "none";
             document.getElementById("user-display").innerText = currentUser;
             setHomeWelcomeUser(currentUser);
-            checkAdmin(data.Role);
+
+            checkAdmin(activeRole);
+
+            // LocalStorage güncelle
+            localStorage.setItem("sSportUser", currentUser);
+            localStorage.setItem("sSportRole", activeRole);
+            localStorage.setItem("sSportGroup", user.Group || "");
+
+            // Heartbeat başlat
             startSessionTimer();
+
+            if (isAdminMode) {
+                try { fetchUserListForAdmin(); } catch (e) { }
+            }
+
+            try { loadHomeBlocks(); } catch (e) { }
+            try { loadPermissionsOnStartup(); } catch (e) { }
 
             if (BAKIM_MODU) {
                 document.getElementById("maintenance-screen").style.display = "flex";
             } else {
                 document.getElementById("main-app").style.display = "block";
-                loadPermissionsOnStartup().then(() => {
-                    loadHomeBlocks();
-                    loadContentData();
-                    loadWizardData();
-                    loadTechWizardData();
-                });
+                loadContentData();
+                loadWizardData();
+                loadTechWizardData();
             }
 
-            // Loglama: Google yerine doğrudan Supabase'e yazıyoruz
-            try {
-                // Bug 13 Fix: logAction kullan (Centralized)
-                apiCall("logAction", {
-                    action: "Giriş",
-                    details: "Supabase Login",
-                    ip: globalUserIP
-                });
-            } catch (e) { console.warn("Log hatası:", e); }
+            // UserPresence (Son görülme) güncelle
+            await sendHeartbeat();
+        } else {
+            console.warn("[Pusula] Oturum geçersiz veya kullanıcı bulunamadı.");
+            logout();
         }
+    }
+}
+function enterBas(e) { if (e.key === "Enter") girisYap(); }
+async function girisYap() {
+    const uName = document.getElementById("usernameInput").value.trim();
+    const uPass = document.getElementById("passInput").value.trim();
+    const loadingMsg = document.getElementById("loading-msg");
+    const errorMsg = document.getElementById("error-msg");
+
+    if (!uName || !uPass) {
+        errorMsg.innerText = "Lütfen kullanıcı adı ve şifrenizi giriniz.";
+        errorMsg.style.display = "block";
+        return;
+    }
+
+    loadingMsg.style.display = "block";
+    loadingMsg.innerText = "Giriş yapılıyor...";
+    errorMsg.style.display = "none";
+    document.querySelector('.login-btn').disabled = true;
+
+    try {
+        // Users tablosundan kullanıcıyı sorgula (Eski sistem)
+        const { data: user, error } = await sb.from('Users')
+            .select('*')
+            .ilike('Username', uName)
+            .eq('Password', uPass)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        if (!user) {
+            throw new Error("Kullanıcı adı veya şifre hatalı!");
+        }
+
+        // Başarılı Giriş
+        const newToken = "SSPORT_" + Math.random().toString(36).substr(2) + Date.now();
+        localStorage.setItem("sSportUser", user.Username);
+        localStorage.setItem("sSportToken", newToken);
+        localStorage.setItem("sSportRole", user.Role);
+
+        // Tokens tablosuna kaydet (Eski çakışma önleyici sistem)
+        await sb.from('Tokens').upsert({ Username: user.Username, Token: newToken }, { onConflict: 'Username' });
+
+        saveLog("Sisteme Giriş", user.Username);
+
+        // UI Güncelleme
+        await checkSession();
+
     } catch (err) {
         console.error("Login Error:", err);
         loadingMsg.style.display = "none";
         document.querySelector('.login-btn').disabled = false;
-        errorMsg.innerText = "Giriş yapılamadı: " + err.message;
+        errorMsg.innerText = err.message;
         errorMsg.style.display = "block";
     }
 }
 
 async function forgotPasswordPopup() {
-    const { value: username } = await Swal.fire({
-        title: 'Şifremi Unuttum',
-        input: 'text',
-        inputLabel: 'Kullanıcı Adınız',
-        inputPlaceholder: 'Örn: ahmet.yilmaz',
+    const { value: email } = await Swal.fire({
+        title: 'Şifre Sıfırlama',
+        input: 'email',
+        inputLabel: 'E-posta Adresiniz',
+        inputPlaceholder: 'E-postanızı girin',
         showCancelButton: true,
-        confirmButtonText: 'Şifre Gönder',
+        confirmButtonText: 'Sıfırlama Bağlantısı Gönder',
         cancelButtonText: 'İptal',
         inputValidator: (value) => {
-            if (!value) return 'Lütfen kullanıcı adınızı giriniz!';
+            if (!value) return 'Lütfen e-posta adresinizi giriniz!';
         }
     });
 
-    if (username) {
+    if (email) {
         Swal.fire({ title: 'İşleniyor...', didOpen: () => { Swal.showLoading() } });
 
         try {
-            // 1. Kullanıcıyı ve Email adresini bul
-            const { data: user, error: fetchErr } = await sb.from('Users')
-                .select('*')
-                .ilike('Username', username.trim())
-                .maybeSingle();
+            const { error } = await sb.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin
+            });
 
-            if (fetchErr || !user) {
-                Swal.fire('Hata', 'Kullanıcı bulunamadı.', 'error');
-                return;
-            }
+            if (error) throw error;
 
-            const email = user.Email || user.email;
-            if (!email || !email.includes('@')) {
-                Swal.fire('Bilgi', 'Hesabınıza tanımlı e-posta bulunamadı. Lütfen yöneticinizle irtibata geçin.', 'warning');
-                return;
-            }
-
-            // 2. Geçici Şifre Oluştur
-            const tempPass = Math.floor(100000 + Math.random() * 900000).toString();
-            const hashedPass = CryptoJS.SHA256(tempPass).toString();
-
-            // 3. Veritabanını Güncelle (Dinamik Kolon Tespiti)
-            const updatePayload = {};
-            if ("Password" in user) updatePayload.Password = hashedPass;
-            else if ("password" in user) updatePayload.password = hashedPass;
-            else updatePayload.Password = hashedPass;
-
-            if ("ForceChange" in user) updatePayload.ForceChange = '1';
-            else if ("forcechange" in user) updatePayload.forcechange = '1';
-            else updatePayload.ForceChange = '1';
-
-            const { error: updErr } = await sb.from('Users')
-                .update(updatePayload)
-                .ilike('Username', username.trim());
-
-            if (updErr) throw updErr;
-
-            // 4. Mail Gönder
-            const subject = "Pusula - Şifre Sıfırlama";
-            const body = `Merhaba ${username},\n\nSistem giriş şifreniz sıfırlandı.\n\nGeçici Şifreniz: ${tempPass}\n\nLütfen giriş yaptıktan sonra şifrenizi değiştirmeyi unutmayın.`;
-            await sendMailNotification(email, subject, body);
-            saveLog("Şifremi Unuttum", `${username} için geçici şifre gönderildi.`);
-
-            Swal.fire('Başarılı', 'Geçici şifreniz e-posta adresinize gönderildi. Lütfen gelen kutunuzu kontrol edin.', 'success');
+            saveLog("Şifre Sıfırlama İsteği", `${email} için sıfırlama e-postası gönderildi.`);
+            Swal.fire('Başarılı', 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.', 'success');
         } catch (e) {
             console.error("[Pusula] Forgot Pass Error:", e);
             Swal.fire('Hata', 'İşlem sırasında bir sorun oluştu: ' + (e.message || e), 'error');
@@ -1631,24 +1466,18 @@ function checkAdmin(role) {
     try { applyPermissionsToUI(); } catch (e) { }
 }
 
-function logout() {
-    currentUser = ""; isAdminMode = false; isEditingActive = false;
-    try { document.getElementById("user-display").innerText = "Misafir"; } catch (e) { }
-    setHomeWelcomeUser("Misafir");
-    document.body.classList.remove('editing');
-    localStorage.removeItem("sSportUser"); localStorage.removeItem("sSportToken"); localStorage.removeItem("sSportRole"); localStorage.removeItem("sSportGroup"); localStorage.removeItem("sSportSessionDay"); localStorage.removeItem("sSportLoginAt");
-    localStorage.removeItem("sSportForceChange"); // Bayrağı temizle
-    if (sessionTimeout) clearTimeout(sessionTimeout);
-    document.getElementById("main-app").style.display = "none";
-    document.getElementById("login-screen").style.display = "flex";
-    document.getElementById("passInput").value = "";
-    document.getElementById("usernameInput").value = "";
-    document.getElementById("error-msg").style.display = "none";
+async function logout() {
+    saveLog("Sistemden Çıkış", currentUser);
 
-    // Fullscreen'i kapat
-    document.getElementById('quality-fullscreen').style.display = 'none';
-    try { document.getElementById('tech-fullscreen').style.display = 'none'; } catch (e) { }
-    try { document.getElementById('telesales-fullscreen').style.display = 'none'; } catch (e) { }
+    // Supabase Auth Çıkışı
+    await sb.auth.signOut();
+
+    currentUser = "";
+    isAdminMode = false;
+    isLocAdmin = false;
+    activeRole = "";
+    localStorage.clear();
+    location.reload();
 }
 // --- HEARTBEAT SYSTEM ---
 let sessionInterval;
@@ -1657,21 +1486,24 @@ let heartbeatInterval; // Yeni Heartbeat Timer
 async function sendHeartbeat() {
     if (!currentUser) return;
     try {
-        // 1. Heartbeat gönderirken aynı zamanda force_logout kontrolü yap
-        const { data, error } = await sb.from('Users')
-            .update({ last_seen: new Date().toISOString() })
-            .eq('Username', currentUser)
-            .select('force_logout')
-            .single();
+        // UserPresence tablosuna heartbeat gönder (Upsert)
+        const { error } = await sb.from('UserPresence').upsert({
+            Username: currentUser,
+            LastSeen: new Date().toISOString(),
+            Status: 'Aktif',
+            IP: globalUserIP || null
+        }, { onConflict: 'Username' });
 
-        if (data && data.force_logout === true) {
-            await sb.from('Users').update({ force_logout: false }).eq('Username', currentUser);
+        if (error) console.warn("Heartbeat update failed:", error);
+
+        // Kicked Kontrolü (UserPresence tablosundan)
+        const { data } = await sb.from('UserPresence').select('Status').eq('Username', currentUser).single();
+        if (data && data.Status === 'Kicked') {
             Swal.fire({
                 icon: 'error', title: 'Oturum Sonlandırıldı',
                 text: 'Yönetici tarafından sistemden çıkarıldınız.',
                 allowOutsideClick: false, confirmButtonText: 'Tamam'
             }).then(() => { logout(); });
-            return;
         }
 
         // 2. Token Kontrolü (Single Session Enforcement)
@@ -1711,67 +1543,37 @@ function startSessionTimer() {
 }
 function openUserMenu() { toggleUserDropdown(); }
 async function changePasswordPopup(isMandatory = false) {
-    const { value: formValues } = await Swal.fire({
-        title: isMandatory ? 'Yeni Şifre Belirleyin' : 'Şifre Değiştir',
-        html: `${isMandatory ? '<p style="font-size:0.9rem; color:#d32f2f;">İlk giriş şifrenizi değiştirmeden devam edemezsiniz.</p>' : ''}<input id="swal-old-pass" type="password" class="swal2-input" placeholder="Eski Şifre (Mevcut)"><input id="swal-new-pass" type="password" class="swal2-input" placeholder="Yeni Şifre">`,
-        focusConfirm: false, showCancelButton: !isMandatory, allowOutsideClick: !isMandatory, allowEscapeKey: !isMandatory,
-        confirmButtonText: 'Değiştir', cancelButtonText: 'İptal',
-        preConfirm: () => {
-            const o = document.getElementById('swal-old-pass').value;
-            const n = document.getElementById('swal-new-pass').value;
-            if (!o || !n) { Swal.showValidationMessage('Alanlar boş bırakılamaz'); }
-            return [o, n]
+    const { value: newPass } = await Swal.fire({
+        title: 'Yeni Şifre Belirleyin',
+        input: 'password',
+        inputLabel: 'Yeni Şifre',
+        inputPlaceholder: 'Yeni şifrenizi girin',
+        showCancelButton: !isMandatory,
+        allowOutsideClick: !isMandatory,
+        confirmButtonText: 'Güncelle',
+        cancelButtonText: 'İptal',
+        inputValidator: (value) => {
+            if (!value || value.length < 6) return 'Şifre en az 6 karakter olmalıdır!';
         }
     });
-    if (formValues) {
-        Swal.fire({ title: 'İşleniyor...', didOpen: () => { Swal.showLoading() } });
+
+    if (newPass) {
+        Swal.fire({ title: 'Güncelleniyor...', didOpen: () => { Swal.showLoading() } });
         try {
-            const oldHashed = CryptoJS.SHA256(formValues[0]).toString();
-            const newHashed = CryptoJS.SHA256(formValues[1]).toString();
-
-            // 1. Önce eski şifreyi doğrula (Supabase'den tekrar çekerek)
-            const { data: userRecord, error: checkError } = await sb
-                .from('Users')
-                .select('*')
-                .ilike('Username', currentUser)
-                .single();
-
-            if (checkError) throw checkError;
-            if (!userRecord) throw new Error("Kullanıcı bulunamadı.");
-
-            const currentPassDB = userRecord.Password || userRecord.password;
-            if (currentPassDB !== oldHashed) {
-                throw new Error("Mevcut şifreniz hatalı!");
-            }
-
-            // 2. Yeni şifreyi güncelle (Hangi kolon varsa onu güncelle)
-            const updatePayload = {};
-            if ("Password" in userRecord) updatePayload.Password = newHashed;
-            else if ("password" in userRecord) updatePayload.password = newHashed;
-            else updatePayload.Password = newHashed; // Fallback to PascalCase
-
-            if ("ForceChange" in userRecord) updatePayload.ForceChange = '0';
-            else if ("forcechange" in userRecord) updatePayload.forcechange = '0';
-            else updatePayload.ForceChange = '0';
-
-            const { error: updateError } = await sb
-                .from('Users')
-                .update(updatePayload)
+            // Users tablosunda şifreyi güncelle (Eski sistem)
+            const { error } = await sb.from('Users')
+                .update({ Password: newPass })
                 .ilike('Username', currentUser);
 
-            if (updateError) throw updateError;
+            if (error) throw error;
 
             saveLog("Şifre Değiştirme", `${currentUser} şifresini güncelledi.`);
-
-            localStorage.removeItem("sSportForceChange"); // Başarılı olunca bayrağı kaldır
-            Swal.fire('Başarılı!', 'Şifreniz güncellendi. Yeniden giriş yapınız.', 'success').then(() => { logout(); });
+            Swal.fire('Başarılı!', 'Şifreniz güncellendi.', 'success');
         } catch (err) {
             console.error("Password change error:", err);
-            Swal.fire('Hata', err.message || 'Şifre değiştirme başarısız.', 'error').then(() => {
-                if (isMandatory) changePasswordPopup(true);
-            });
+            Swal.fire('Hata', err.message || 'Şifre güncelleme başarısız.', 'error');
         }
-    } else if (isMandatory) { changePasswordPopup(true); }
+    }
 }
 // --- DATA FETCHING (Supabase Optimized) ---
 async function loadContentData() {
