@@ -9012,6 +9012,86 @@ function parseTSV(text) {
     return { headers, rows };
 }
 
+async function showAdvancedMappingPopup(parts, entityFields, title) {
+    const headers = parts.headers;
+    const rows = parts.rows.slice(0, 5);
+
+    let html = `
+        <div style="font-size:0.85rem; color:#666; margin-bottom:15px; text-align:left;">
+            Excel'den gelen sütunları (üstteki başlıklar), sistemdekiler ile eşleştirin. Eşleşmeyenler aktarılmaz.
+        </div>
+        <div style="overflow-x:auto; border:1px solid #eee; border-radius:8px; margin-bottom:20px; background:#fff;">
+            <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+                <thead>
+                    <tr style="background:#f8f9fa;">
+                        ${headers.map((h, i) => `
+                            <th style="padding:10px; border:1px solid #eee; min-width:130px;">
+                                <div style="color:var(--primary); font-weight:700; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${h}">${h}</div>
+                                <select id="col-map-${i}" class="swal2-select" style="margin:0; width:100%; height:30px; font-size:0.7rem; padding:2px;">
+                                    <option value="">-- Atla --</option>
+                                    ${Object.keys(entityFields).map(f => `<option value="${f}">${entityFields[f]}</option>`).join('')}
+                                </select>
+                            </th>
+                        `).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map(row => `
+                        <tr>
+                            ${row.map(cell => `<td style="padding:6px; border:1px solid #eee; color:#444; text-align:center;">${escapeHtml(cell)}</td>`).join('')}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        ${parts.rows.length > 5 ? `<div style="text-align:right; font-size:0.75rem; color:#999; margin-top:-15px;">... ${parts.rows.length - 5} satır daha</div>` : ''}
+    `;
+
+    const { value: mapping } = await Swal.fire({
+        title: title,
+        html: html,
+        width: Math.min(window.innerWidth * 0.95, 1200),
+        showCancelButton: true,
+        confirmButtonText: 'Verileri Onayla ve Aktar',
+        cancelButtonText: 'Vazgeç',
+        didOpen: () => {
+            headers.forEach((h, i) => {
+                const select = document.getElementById(`col-map-${i}`);
+                const lowH = h.toLowerCase().replace(/i̇/g, 'i').trim();
+                for (const f in entityFields) {
+                    const label = entityFields[f].toLowerCase().replace(/i̇/g, 'i');
+                    if (lowH === label || lowH === f.toLowerCase() || lowH.includes(label)) {
+                        select.value = f;
+                        break;
+                    }
+                }
+            });
+        },
+        preConfirm: () => {
+            const map = {};
+            let hasAny = false;
+            headers.forEach((h, i) => {
+                const val = document.getElementById(`col-map-${i}`).value;
+                if (val) { map[i] = val; hasAny = true; }
+            });
+            if (!hasAny) { Swal.showValidationMessage("Lütfen en az bir sütun eşleştirin!"); return false; }
+            return map;
+        }
+    });
+
+    if (!mapping) return null;
+
+    return parts.rows.map(row => {
+        const obj = {};
+        for (const i in mapping) {
+            const field = mapping[i];
+            obj[field] = row[i] || "";
+        }
+        return obj;
+    });
+}
+
+
 async function showMappingPopup(headers, requiredFields, title = "Sütunları Eşleştir") {
     let html = `<div style="text-align:left; font-size:0.9rem;">
         <p style="margin-bottom:15px; color:#666;">Yüklediğiniz tablodaki sütunların, sistemdeki hangi alanlara karşılık geldiğini seçin.</p>`;
