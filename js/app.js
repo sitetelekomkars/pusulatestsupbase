@@ -911,10 +911,13 @@ async function apiCall(action, params = {}) {
 
                 try {
                     // 1. Mevcut tüm veriyi temizle
-                    const { error: delErr } = await sb.from('YayinAkisi').delete().neq('id', 0);
-                    if (delErr) throw delErr;
+                    const { error: delErr } = await sb.from('YayinAkisi').delete().neq('Program', '---REPLACE-ALL---');
+                    if (delErr) {
+                        // Eğer Program kolonu yoksa veya filter hatası olursa id ile dene
+                        await sb.from('YayinAkisi').delete().neq('id', -1);
+                    }
 
-                    // 2. Yeni veriyi ekle (Key normalize et: Supabase kolonlarıyla eşleştir)
+                    // 2. Yeni veriyi ekle
                     if (params.items && params.items.length > 0) {
                         const normalizedItems = params.items.map(raw => {
                             const n = {};
@@ -1036,6 +1039,12 @@ let isEditingActive = false;
 let activeRole = "";
 let allRolePermissions = [];
 let adminUserList = [];
+let sessionTimeout;
+let activeCards = [];
+let currentCategory = "home";
+let allEvaluationsData = [];
+let trainingData = [];
+let feedbackLogsData = [];
 
 // -------------------- HomeBlocks (Ana Sayfa blok içerikleri) --------------------
 let homeBlocks = {}; // { quote:{...}, ... }
@@ -1090,15 +1099,9 @@ function getMyRole() { return normalizeRole(localStorage.getItem("sSportRole") |
 
 
 // --------------------------------------------------------------------
-let activeRole = "";
-let isAdminMode = false;
-let isLocAdmin = false;
-let isEditingActive = false;
-let sessionTimeout;
-let activeCards = [];
-let currentCategory = "home";
-let adminUserList = [];
-let allEvaluationsData = [];
+function enterBas(e) {
+    if (e.key === 'Enter') girisYap();
+}
 let wizardStepsData = {};
 let trainingData = [];
 // YENİ: Chart instance'ı tutmak için
@@ -1666,26 +1669,16 @@ function checkAdmin(role) {
         if (imageDropdown) imageDropdown.style.display = 'flex';
         if (quickEditDropdown) {
             quickEditDropdown.style.display = 'flex';
-            // Yetki Yönetimi, Aktif Kullanıcılar, Kullanıcı Yönetimi, Loglar
-            const perms = document.getElementById('dropdownPerms');
-            if (perms) perms.style.display = 'flex';
-
-            const activeUsersBtn = document.getElementById('dropdownActiveUsers');
-            if (activeUsersBtn) activeUsersBtn.style.display = 'flex';
-
-            const userMgmtBtn = document.getElementById('dropdownUserMgmt');
-            if (userMgmtBtn) userMgmtBtn.style.display = 'flex';
-
-            const logsBtn = document.getElementById('dropdownLogs');
-            if (logsBtn) logsBtn.style.display = 'flex';
-
-            quickEditDropdown.innerHTML = '<i class="fas fa-pen" style="color:var(--secondary);"></i> Düzenlemeyi Aç';
-            quickEditDropdown.classList.remove('active');
+            // Yetkiler applyPermissionsToUI() ile granular olarak yönetilecek.
         }
     } else {
         if (addCardDropdown) addCardDropdown.style.display = 'none';
         if (imageDropdown) imageDropdown.style.display = 'none';
-        if (quickEditDropdown) quickEditDropdown.style.display = 'none';
+        if (quickEditDropdown) {
+            quickEditDropdown.style.display = 'none';
+            quickEditDropdown.innerHTML = '<i class="fas fa-pen" style="color:var(--secondary);"></i> Düzenlemeyi Aç';
+            quickEditDropdown.classList.remove('active');
+        }
 
         ['dropdownPerms', 'dropdownActiveUsers', 'dropdownUserMgmt', 'dropdownLogs'].forEach(id => {
             const el = document.getElementById(id);
@@ -2638,7 +2631,7 @@ async function fetchBroadcastFlow() {
 async function openBroadcastFlow() {
     Swal.fire({
         title: "Yayın Akışı",
-        html: isAdminMode ? `<div style="text-align:right; margin-bottom:10px;"><button class="x-btn-admin" onclick="openBulkUpdateBroadcastPopup()" style="background:var(--secondary); font-size:0.8rem;"><i class="fas fa-file-import"></i> Toplu Güncelle (Excel)</button></div>` : '',
+        html: isEditingActive ? `<div style="text-align:right; margin-bottom:10px;"><button class="x-btn-admin" onclick="openBulkUpdateBroadcastPopup()" style="background:var(--secondary); font-size:0.8rem;"><i class="fas fa-file-import"></i> Toplu Güncelle (Excel)</button></div>` : '',
         didOpen: () => Swal.showLoading(),
         showConfirmButton: false
     });
@@ -7009,7 +7002,7 @@ async function openShiftArea(tab) {
                 else rptBtn.style.display = 'none';
             }
             // Vardiya Yapıştır Butonu
-            if (isLocAdmin && !document.getElementById('btn-bulk-shift')) {
+            if (isEditingActive && !document.getElementById('btn-bulk-shift')) {
                 const b = document.createElement('button');
                 b.id = 'btn-bulk-shift';
                 b.className = 'admin-btn';
@@ -7018,6 +7011,8 @@ async function openShiftArea(tab) {
                 b.innerHTML = '<i class="fas fa-paste"></i> Vardiya Yapıştır';
                 b.onclick = openBulkUpdateShiftsPopup;
                 adminFilters.appendChild(b);
+            } else if (!isEditingActive && document.getElementById('btn-bulk-shift')) {
+                document.getElementById('btn-bulk-shift').remove();
             }
             const addBtn = adminFilters.querySelector('.add-btn');
             if (addBtn) {
@@ -8802,33 +8797,31 @@ function applyPermissionsToUI() {
     const role = getMyRole();
     // Sadece LocAdmin için yetki kısıtlaması yok (tam yetki)
     // Admin kullanıcılar RBAC panelinden verilen yetkilere tabidir
-    if (role === "locadmin") return;
-
     const editBtn = document.getElementById('dropdownQuickEdit');
-    if (editBtn && !hasPerm("EditMode")) editBtn.style.display = 'none';
+    if (editBtn) editBtn.style.display = hasPerm("EditMode") ? 'flex' : 'none';
 
     const addCardBtn = document.getElementById('dropdownAddCard');
-    if (addCardBtn && !hasPerm("AddContent")) addCardBtn.style.display = 'none';
+    if (addCardBtn) addCardBtn.style.display = hasPerm("AddContent") ? 'flex' : 'none';
 
     const imageBtn = document.getElementById('dropdownImage');
-    if (imageBtn && !hasPerm("ImageUpload")) imageBtn.style.display = 'none';
+    if (imageBtn) imageBtn.style.display = hasPerm("ImageUpload") ? 'flex' : 'none';
 
     const reportBtns = document.querySelectorAll('.admin-btn');
     reportBtns.forEach(btn => {
-        if (!hasPerm("Reports")) btn.style.display = 'none';
+        btn.style.display = hasPerm("Reports") ? '' : 'none';
     });
 
     const permsBtn = document.getElementById('dropdownPerms');
-    if (permsBtn && !hasPerm("RbacAdmin")) permsBtn.style.display = 'none';
+    if (permsBtn) permsBtn.style.display = hasPerm("RbacAdmin") ? 'flex' : 'none';
 
     const activeUsersBtn = document.getElementById('dropdownActiveUsers');
-    if (activeUsersBtn && !hasPerm("ActiveUsers")) activeUsersBtn.style.display = 'none';
+    if (activeUsersBtn) activeUsersBtn.style.display = hasPerm("ActiveUsers") ? 'flex' : 'none';
 
     const userMgmtBtn = document.getElementById('dropdownUserMgmt');
-    if (userMgmtBtn && !hasPerm("UserAdmin")) userMgmtBtn.style.display = 'none';
+    if (userMgmtBtn) userMgmtBtn.style.display = hasPerm("UserAdmin") ? 'flex' : 'none';
 
     const logsBtn = document.getElementById('dropdownLogs');
-    if (logsBtn && !hasPerm("SystemLogs")) logsBtn.style.display = 'none';
+    if (logsBtn) logsBtn.style.display = hasPerm("SystemLogs") ? 'flex' : 'none';
 
     const menuMap = {
         "home": "home",
