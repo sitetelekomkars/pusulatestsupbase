@@ -1294,18 +1294,12 @@ async function checkSession() {
         const user = session.user;
 
         // Profil bilgilerini çek (rol, grup vs.)
-        const { data: profile, error: profileErr } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
-
-        if (profileErr) {
-            console.error("[Pusula] Profil çekilirken hata oluştu:", profileErr);
-        }
+        const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
 
         if (!profile) {
             // Eğer profil yoksa (henüz oluşturulmamışsa)
-            console.warn("[Pusula] Profil bulunamadı. UID:", user.id);
-            Swal.fire('Hata', 'Profiliniz veritabanında bulunamadı. Lütfen yöneticiye başvurun.', 'error').then(() => {
-                logout();
-            });
+            console.warn("[Pusula] Profil bulunamadı. Kullanıcı yetkisiz olarak devam ediyor.");
+            logout();
             return;
         }
 
@@ -1367,44 +1361,26 @@ async function girisYap() {
     document.querySelector('.login-btn').disabled = true;
 
     try {
-        let loginEmail = uEmail;
-
-        // Eğer @ içermiyorsa (sadece kullanıcı adıysa) mailini bulalım
-        if (!uEmail.includes('@')) {
-            loadingMsg.innerText = "Kullanıcı bilgileri doğrulanıyor...";
-            const { data: prof } = await sb.from('profiles').select('email').ilike('username', uEmail).maybeSingle();
-
-            if (prof && prof.email) {
-                loginEmail = prof.email;
-            } else {
-                // Tahmin yürüt (Eski sistem uyumluluğu için)
-                loginEmail = `${uEmail}@sitetelekom.com.tr`;
-            }
-        }
-
-        console.log("[Pusula] Giriş denemesi:", loginEmail);
-
+        // Supabase Auth Girişi
         const { data, error } = await sb.auth.signInWithPassword({
-            email: loginEmail,
+            email: uEmail.includes('@') ? uEmail : `${uEmail}@ssportplus.com`,
             password: uPass
         });
 
         if (error) throw error;
 
         loadingMsg.innerText = "Profil yükleniyor...";
+
+        // Başarılı giriş sonrası checkSession tetikleyerek UI'ı güncelle
         await checkSession();
-        saveLog("Sisteme Giriş", loginEmail);
+
+        saveLog("Sisteme Giriş", uEmail);
 
     } catch (err) {
         console.error("Login Error:", err);
         loadingMsg.style.display = "none";
         document.querySelector('.login-btn').disabled = false;
-
-        let msg = "Giriş Hatalı!";
-        if (err.message.includes("Invalid login credentials")) msg = "Kullanıcı adı veya şifre hatalı!";
-        else if (err.message.includes("Email not confirmed")) msg = "E-posta adresi doğrulanmamış!";
-
-        errorMsg.innerText = msg;
+        errorMsg.innerText = "Giriş Hatalı: " + err.message;
         errorMsg.style.display = "block";
     }
 }
@@ -1519,8 +1495,20 @@ async function sendHeartbeat() {
             return;
         }
 
-        // Supabase Auth zaten eşzamanlı oturum yönetimini sağlar. 
-        // Özel bir kısıtlama gerekmiyorsa burası boş bırakılabilir veya ek güvenlik kontrolleri eklenebilir.
+        // 2. Token Kontrolü (Single Session Enforcement)
+        const localToken = localStorage.getItem("sSportToken");
+        const { data: tokenData } = await sb.from('Tokens')
+            .select('Token')
+            .eq('Username', currentUser)
+            .maybeSingle();
+
+        if (!tokenData || tokenData.Token !== localToken) {
+            Swal.fire({
+                icon: 'warning', title: 'Oturum Kesildi',
+                text: 'Oturumunuz başka bir cihazda açılmış veya sonlandırılmış olabilir.',
+                allowOutsideClick: false, confirmButtonText: 'Tamam'
+            }).then(() => { logout(); });
+        }
 
     } catch (e) { console.warn("Heartbeat failed", e); }
 }
@@ -8725,4 +8713,3 @@ function checkQualityNotifications() {
             }
         }).catch(e => console.log('Notif check error', e));
 }
-
