@@ -1367,8 +1367,21 @@ async function girisYap() {
     document.querySelector('.login-btn').disabled = true;
 
     try {
-        // Supabase Auth Girişi
-        const loginEmail = uEmail.includes('@') ? uEmail : `${uEmail}@sitetelekom.com.tr`;
+        let loginEmail = uEmail;
+
+        // Eğer @ içermiyorsa (sadece kullanıcı adıysa) mailini bulalım
+        if (!uEmail.includes('@')) {
+            loadingMsg.innerText = "Kullanıcı bilgileri doğrulanıyor...";
+            const { data: prof } = await sb.from('profiles').select('email').ilike('username', uEmail).maybeSingle();
+
+            if (prof && prof.email) {
+                loginEmail = prof.email;
+            } else {
+                // Tahmin yürüt (Eski sistem uyumluluğu için)
+                loginEmail = `${uEmail}@sitetelekom.com.tr`;
+            }
+        }
+
         console.log("[Pusula] Giriş denemesi:", loginEmail);
 
         const { data, error } = await sb.auth.signInWithPassword({
@@ -1379,17 +1392,19 @@ async function girisYap() {
         if (error) throw error;
 
         loadingMsg.innerText = "Profil yükleniyor...";
-
-        // Başarılı giriş sonrası checkSession tetikleyerek UI'ı güncelle
         await checkSession();
-
-        saveLog("Sisteme Giriş", uEmail);
+        saveLog("Sisteme Giriş", loginEmail);
 
     } catch (err) {
         console.error("Login Error:", err);
         loadingMsg.style.display = "none";
         document.querySelector('.login-btn').disabled = false;
-        errorMsg.innerText = "Giriş Hatalı: " + err.message;
+
+        let msg = "Giriş Hatalı!";
+        if (err.message.includes("Invalid login credentials")) msg = "Kullanıcı adı veya şifre hatalı!";
+        else if (err.message.includes("Email not confirmed")) msg = "E-posta adresi doğrulanmamış!";
+
+        errorMsg.innerText = msg;
         errorMsg.style.display = "block";
     }
 }
