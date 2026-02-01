@@ -80,6 +80,26 @@ const sb = (window.supabase && typeof window.supabase.createClient === 'function
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
     : null;
 
+// ✅ YENİ: Şifre Sıfırlama Linki Yakalama
+if (sb) {
+    sb.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+            console.log("[Auth] Şifre sıfırlama modu algılandı.");
+            // Sayfa yüklendiğinde hafif bir gecikme ile popup aç
+            setTimeout(() => {
+                // Eğer changePasswordPopup henuz define edilmediyse, document.ready beklemek gerekebilir.
+                // Fonksiyon hoisted ise sorun yok.
+                if (typeof changePasswordPopup === 'function') {
+                    changePasswordPopup(true); // Zorunlu modda aç (kapatılamaz)
+                } else {
+                    console.warn("changePasswordPopup bulunamadı, bekleniyor...");
+                    window.addEventListener('DOMContentLoaded', () => changePasswordPopup(true));
+                }
+            }, 1000);
+        }
+    });
+}
+
 // ✅ YENİ: Mail Bildirim Ayarları (Google Apps Script Web App URL buraya gelecek)
 const GAS_MAIL_URL = "https://script.google.com/macros/s/AKfycbwZZbRVksffgpu_WvkgCoZehIBVTTTm5j5SEqffwheCU44Q_4d9b64kSmf40wL1SR8/exec"; // Burayı kendi Web App URL'niz ile güncelleyin
 
@@ -343,7 +363,7 @@ async function apiCall(action, params = {}) {
                             const body = `Merhaba ${params.agentName},\n\nYeni bir kalite değerlendirmesi kaydedildi.\n\nÇağrı ID: ${params.callId}\nPuan: ${params.score}\nGeri Bildirim: ${params.feedback}\n\nDetayları Pusula üzerinden inceleyebilirsin.\nİyi çalışmalar.\nS Sport Plus Kalite Ekibi`;
 
                             // Kalite değerlendirmeleri için CC ve BCC ekle
-                            const cc = "kalite***@ssportplus.com";
+                            const cc = "kalite@ssportplus.com";
                             const bcc = "dogus.yalcinkaya@sitetelekom.com.tr";
 
                             // Fonksiyon tanımlıysa gönder, değilse konsola yaz
