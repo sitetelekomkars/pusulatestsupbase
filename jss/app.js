@@ -343,7 +343,7 @@ async function apiCall(action, params = {}) {
                             const body = `Merhaba ${params.agentName},\n\nYeni bir kalite değerlendirmesi kaydedildi.\n\nÇağrı ID: ${params.callId}\nPuan: ${params.score}\nGeri Bildirim: ${params.feedback}\n\nDetayları Pusula üzerinden inceleyebilirsin.\nİyi çalışmalar.\nS Sport Plus Kalite Ekibi`;
 
                             // Kalite değerlendirmeleri için CC ve BCC ekle
-                            const cc = "kalite@ssportplus.com";
+                            const cc = "kalite***@ssportplus.com";
                             const bcc = "dogus.yalcinkaya@sitetelekom.com.tr";
 
                             // Fonksiyon tanımlıysa gönder, değilse konsola yaz
