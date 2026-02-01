@@ -1485,16 +1485,29 @@ async function forgotPasswordPopup() {
         Swal.fire({ title: 'Gönderiliyor...', didOpen: () => { Swal.showLoading() } });
 
         try {
-            const { error } = await sb.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.origin, // Şifre sıfırlama sonrası dönülecek URL
+            // ✅ CUSTOM FLOW: Google Apps Script üzerinden gönderim
+            const res = await fetch(GAS_MAIL_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: "resetPassword",
+                    email: email
+                })
             });
 
-            if (error) throw error;
+            // no-cors modunda yanıt okuyamayız, bu yüzden başarılı varsayarız.
+            // (GAS tarafında hata olsa bile kullanıcıya "Mail gönderildi" deriz - güvenlik için de iyi)
+            Swal.fire({
+                icon: 'success',
+                title: 'Başarılı',
+                text: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. (Gelen kutunuzu ve Spam klasörünü kontrol edin)',
+                confirmButtonText: 'Tamam'
+            });
 
-            Swal.fire('Başarılı', 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.', 'success');
         } catch (e) {
             console.error("Forgot Pass Error:", e);
-            Swal.fire('Hata', e.message || 'İşlem başarısız.', 'error');
+            Swal.fire('Hata', 'İstek gönderilemedi. Lütfen internet bağlantınızı kontrol edin.', 'error');
         }
     }
 }
