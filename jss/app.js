@@ -83,15 +83,13 @@ const sb = (window.supabase && typeof window.supabase.createClient === 'function
 // ✅ YENİ: Mail Bildirim Ayarları (Google Apps Script Web App URL buraya gelecek)
 const GAS_MAIL_URL = "https://script.google.com/macros/s/AKfycbwZZbRVksffgpu_WvkgCoZehIBVTTTm5j5SEqffwheCU44Q_4d9b64kSmf40wL1SR8/exec"; // Burayı kendi Web App URL'niz ile güncelleyin
 
-async function sendMailNotification(to, subject, body, cc = null, bcc = null) {
+async function sendMailNotification(to, subject, body) {
     if (!GAS_MAIL_URL || GAS_MAIL_URL.includes("X0X0")) {
         console.warn("[Pusula Mail] Mail servisi URL'si ayarlanmamış.");
         return;
     }
     try {
         const payload = { action: "sendEmail", to, subject, body };
-        if (cc) payload.cc = cc;
-        if (bcc) payload.bcc = bcc;
 
         await fetch(GAS_MAIL_URL, {
             method: 'POST',
@@ -342,13 +340,9 @@ async function apiCall(action, params = {}) {
                             const subject = `Yeni Kalite Değerlendirmesi: ${params.callId}`;
                             const body = `Merhaba ${params.agentName},\n\nYeni bir kalite değerlendirmesi kaydedildi.\n\nÇağrı ID: ${params.callId}\nPuan: ${params.score}\nGeri Bildirim: ${params.feedback}\n\nDetayları Pusula üzerinden inceleyebilirsin.\nİyi çalışmalar.\nS Sport Plus Kalite Ekibi`;
 
-                            // Kalite değerlendirmeleri için CC ve BCC ekle
-                            const cc = "kalite@ssportplus.com";
-                            const bcc = "dogus.yalcinkaya@sitetelekom.com.tr";
-
                             // Fonksiyon tanımlıysa gönder, değilse konsola yaz
                             if (typeof sendMailNotification === 'function') {
-                                sendMailNotification(userData.email, subject, body, cc, bcc);
+                                sendMailNotification(userData.email, subject, body);
                             } else {
                                 console.warn("sendMailNotification fonksiyonu bulunamadı, mail atılamadı.");
                             }
