@@ -8852,6 +8852,14 @@ function checkQualityNotifications() {
 
 function toggleAIChat() {
     const chatBox = document.getElementById("ai-chat-box");
+    const container = document.getElementById("ai-widget-container");
+
+    // Sağ tık yasağını bu konteyner için del
+    if (container && !container.dataset.contextFixed) {
+        container.addEventListener('contextmenu', e => e.stopPropagation());
+        container.dataset.contextFixed = "true";
+    }
+
     const isVisible = chatBox.style.display === "flex";
     chatBox.style.display = isVisible ? "none" : "flex";
     if (!isVisible) {
@@ -8926,6 +8934,26 @@ function addAIMessage(text, sender) {
     }
 
     chatContainer.appendChild(div);
+
+    // Kopyalama butonu ekle
+    const copyBtn = document.createElement("button");
+    copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+    copyBtn.title = "Metni Kopyala";
+    copyBtn.style.cssText = `
+        background: none; border: none; cursor: pointer; color: #888; 
+        font-size: 12px; margin: 2px 5px 8px 5px; 
+        align-self: ${sender === "user" ? "flex-end" : "flex-start"};
+        opacity: 0.5; transition: 0.2s; outline: none;
+    `;
+    copyBtn.onmouseenter = () => copyBtn.style.opacity = "1";
+    copyBtn.onmouseleave = () => copyBtn.style.opacity = "0.5";
+    copyBtn.onclick = () => {
+        copyText(text);
+        copyBtn.innerHTML = '<i class="fas fa-check" style="color:#2f855a"></i>';
+        setTimeout(() => copyBtn.innerHTML = '<i class="fas fa-copy"></i>', 2000);
+    };
+    chatContainer.appendChild(copyBtn);
+
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
