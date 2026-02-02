@@ -8847,3 +8847,102 @@ function checkQualityNotifications() {
             }
         }).catch(e => console.log('Notif check error', e));
 }
+
+// --- AI ASİSTAN MEKANİZMASI ---
+
+function toggleAIChat() {
+    const chatBox = document.getElementById("ai-chat-box");
+    const isVisible = chatBox.style.display === "flex";
+    chatBox.style.display = isVisible ? "none" : "flex";
+    if (!isVisible) {
+        // Chat açıldığında inputa odaklan
+        setTimeout(() => document.getElementById("ai-input").focus(), 100);
+    }
+}
+
+function handleAIEnter(e) {
+    if (e.key === "Enter") sendAIMessage();
+}
+
+function sendAIMessage() {
+    const input = document.getElementById("ai-input");
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    // Kullanıcı mesajını ekle (Sağ taraf)
+    addAIMessage(msg, "user");
+    input.value = "";
+    input.focus();
+
+    // "Yazıyor..." göster
+    addAITyping();
+
+    // GAS API'ye istek at
+    // EĞER GAS_MAIL_URL TANIMLI DEĞİLSE BURAYA TAM URL YAZILABİLİR
+    // const GAS_URL = "https://script.google.com/macros/s/AKfycbwZZbRVksffgpu_WvkgCoZehIBVTTTm5j5SEqffwheCU44Q_4d9b64kSmf40wL1SR8/exec";
+
+    fetch(GAS_MAIL_URL, {
+        method: 'POST',
+        // mode: 'cors', // default
+        body: JSON.stringify({
+            action: "askGemini",
+            prompt: msg
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            removeAITyping();
+            if (data.result === "success") {
+                addAIMessage(data.reply, "system");
+            } else {
+                addAIMessage("Hata: " + (data.message || "Bilinmeyen hata"), "system");
+            }
+        })
+        .catch(error => {
+            console.error('AI Error:', error);
+            removeAITyping();
+            addAIMessage("Üzgünüm, bağlantı hatası oluştu. Lütfen sayfayı yenileyip tekrar deneyin.", "system");
+        });
+}
+
+function addAIMessage(text, sender) {
+    const chatContainer = document.getElementById("ai-messages");
+    const div = document.createElement("div");
+
+    // Markdown benzeri basit formatlama (satır başları)
+    let formattedText = text.replace(/\n/g, "<br>");
+
+    // Linkleri tıklanabilir yap (basit regex)
+    formattedText = formattedText.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
+
+    div.innerHTML = formattedText;
+
+    if (sender === "user") {
+        // Kullanıcı Mesajı (Sağ, Turuncu)
+        div.style.cssText = "background: #fca311; color: black; padding: 10px; border-radius: 10px; font-size: 14px; max-width: 80%; align-self: flex-end; box-shadow: 0 1px 3px rgba(0,0,0,0.1); word-wrap: break-word;";
+    } else {
+        // Sistem Mesajı (Sol, Beyaz)
+        div.style.cssText = "background: #fff; color: black; padding: 10px; border-radius: 10px; font-size: 14px; max-width: 80%; align-self: flex-start; box-shadow: 0 1px 3px rgba(0,0,0,0.1); word-wrap: break-word;";
+    }
+
+    chatContainer.appendChild(div);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function addAITyping() {
+    const chatContainer = document.getElementById("ai-messages");
+    // Varsa eskisini kaldır
+    removeAITyping();
+
+    const div = document.createElement("div");
+    div.id = "ai-typing-indicator";
+    div.innerHTML = "<i>Yazıyor...</i>";
+    div.style.cssText = "background: transparent; padding: 5px 10px; font-size: 12px; align-self: flex-start; color: #666; font-style: italic;";
+    chatContainer.appendChild(div);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function removeAITyping() {
+    const el = document.getElementById("ai-typing-indicator");
+    if (el) el.remove();
+}
