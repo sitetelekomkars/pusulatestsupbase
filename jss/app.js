@@ -669,7 +669,10 @@ async function apiCall(action, params = {}) {
                 const { data, error } = await sb.from('profiles').select('*');
                 if (error) return { result: "success", users: [] };
                 // Normalize keys for UI & 🕵️ LocAdmin Filtresi
-                const users = (data || []).filter(u => String(u.username || u.email).toLowerCase() !== 'locadmin').map(u => ({
+                const users = (data || []).filter(u =>
+                    String(u.username || u.email).toLowerCase() !== 'locadmin' &&
+                    String(u.role).toLowerCase() !== 'locadmin'
+                ).map(u => ({
                     id: u.id,
                     username: u.username || u.email,
                     name: u.full_name || u.username,
@@ -856,8 +859,11 @@ async function apiCall(action, params = {}) {
                     return { result: "error", message: "Veri çekilemedi: " + uErr.message };
                 }
 
-                // 🕵️ LocAdmin Filtresi
-                const users = (activeUsers || []).filter(u => String(u.username).toLowerCase() !== 'locadmin').map(u => ({
+                // 🕵️ LocAdmin Filtresi (Username ve Role kontrolü)
+                const users = (activeUsers || []).filter(u =>
+                    String(u.username).toLowerCase() !== 'locadmin' &&
+                    String(u.role).toLowerCase() !== 'locadmin'
+                ).map(u => ({
                     username: u.username,
                     role: u.role,
                     group: u.group || u.group_name, // Fallback
@@ -908,7 +914,9 @@ async function apiCall(action, params = {}) {
                     .order('Date', { ascending: false })
                     .limit(500);
                 if (error) throw error;
-                return { result: "success", logs: data };
+                // 🕵️ Ghost Mode: LocAdmin loglarını filtrele
+                const filteredLogs = (data || []).filter(l => String(l.Username).toLowerCase() !== 'locadmin');
+                return { result: "success", logs: filteredLogs };
             }
             case "resolveAgentFeedback": {
                 const { error } = await sb.from('Evaluations').update({
@@ -1602,10 +1610,37 @@ function startSessionTimer() {
         sendHeartbeat();
     }, 30000);
 
-    // 8 saat (28800000 ms) session timeout check
-    sessionTimeout = setTimeout(() => {
-        Swal.fire({ icon: 'warning', title: 'Oturum Süresi Doldu', text: 'Güvenlik nedeniyle otomatik çıkış yapıldı.', confirmButtonText: 'Tamam' }).then(() => { logout(); });
-    }, 28800000);
+    // --- PERSISTENT SESSION TIMEOUT (8 Saat) ---
+    const maxAge = 28800000; // 8 saat (milisaniye)
+    let loginTime = localStorage.getItem("sSportLoginTime");
+
+    // Eğer loginTime yoksa (ilk giriş), şu anı kaydet
+    if (!loginTime) {
+        loginTime = Date.now().toString();
+        localStorage.setItem("sSportLoginTime", loginTime);
+    }
+
+    const elapsed = Date.now() - parseInt(loginTime);
+    const remaining = maxAge - elapsed;
+
+    if (remaining <= 0) {
+        // Süre çoktan dolmuşsa
+        console.log("[Auth] Oturum süresi dolduğu için çıkış yapılıyor.");
+        logout();
+        Swal.fire({ icon: 'warning', title: 'Oturum Süresi Doldu', text: '8 saatlik güvenlik süreniz dolduğu için otomatik çıkış yapıldı.', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    // Kalan süre kadar timer kur
+    if (window.sessionTimeout) clearTimeout(window.sessionTimeout);
+    window.sessionTimeout = setTimeout(() => {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Oturum Süresi Doldu',
+            text: '8 saatlik güvenlik süreniz doldu, lütfen tekrar giriş yapın.',
+            confirmButtonText: 'Tamam'
+        }).then(() => { logout(); });
+    }, remaining);
 }
 function openUserMenu() { toggleUserDropdown(); }
 
@@ -8940,6 +8975,22 @@ function sendAIMessage() {
     const msg = input.value.trim();
     if (!msg) return;
 
+    // --- YENİ: Pusula İçeriklerinden Alakalı Olanları Seçme (v40) ---
+    let pusulaContext = "";
+    try {
+        const keywords = msg.toLowerCase().split(/\s+/).filter(word => word.length > 3);
+        const relevantCards = database.filter(card => {
+            const searchStr = (card.title + " " + card.text + " " + (card.category || "")).toLowerCase();
+            return keywords.some(key => searchStr.includes(key));
+        }).slice(0, 5); // En alakalı 5 kartı seç
+
+        if (relevantCards.length > 0) {
+            pusulaContext = "PUSULA SİSTEM KAYITLARI:\n" + relevantCards.map(c =>
+                `[Başlık: ${c.title}] - [Bilgi: ${c.text}] - [Kategori: ${c.category}]`
+            ).join('\n');
+        }
+    } catch (e) { console.warn("Pusula context hatası:", e); }
+
     // Kullanıcı mesajını ekle (Sağ taraf)
     addAIMessage(msg, "user");
     input.value = "";
@@ -8948,16 +8999,12 @@ function sendAIMessage() {
     // "Yazıyor..." göster
     addAITyping();
 
-    // GAS API'ye istek at
-    // EĞER GAS_MAIL_URL TANIMLI DEĞİLSE BURAYA TAM URL YAZILABİLİR
-    // const GAS_URL = "https://script.google.com/macros/s/AKfycbwZZbRVksffgpu_WvkgCoZehIBVTTTm5j5SEqffwheCU44Q_4d9b64kSmf40wL1SR8/exec";
-
     fetch(GAS_MAIL_URL, {
         method: 'POST',
-        // mode: 'cors', // default
         body: JSON.stringify({
             action: "askGemini",
-            prompt: msg
+            prompt: msg,
+            pusulaContext: pusulaContext // Yeni: Pusula kart bilgilerini bota iletiyoruz
         })
     })
         .then(response => response.json())
