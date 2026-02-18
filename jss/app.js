@@ -80,8 +80,12 @@ const sb = (window.supabase && typeof window.supabase.createClient === 'function
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
     : null;
 
-// ✅ YENİ: Mail Bildirim Ayarları (Google Apps Script Web App URL buraya gelecek)
-const GAS_MAIL_URL = "https://script.google.com/macros/s/AKfycbwZZbRVksffgpu_WvkgCoZehIBVTTTm5j5SEqffwheCU44Q_4d9b64kSmf40wL1SR8/exec"; // Burayı kendi Web App URL'niz ile güncelleyin
+// ✅ Mail Bildirim Ayarları (Google Apps Script Web App URL)
+const GAS_MAIL_URL = "https://script.google.com/macros/s/AKfycbwZZbRVksffgpu_WvkgCoZehIBVTTTm5j5SEqffwheCU44Q_4d9b64kSmf40wL1SR8/exec";
+
+// 🔐 Anti-Grafiti: GAS Secret Token (GAS tarafında aynı değer olmalı!)
+// Bu token'ı GAS kodundaki SECURITY_TOKEN ile eşleştir.
+const GAS_SECURITY_TOKEN = "pusula_gas_2026_gizli";
 
 async function sendMailNotification(to, eventType, data) {
     if (!GAS_MAIL_URL || GAS_MAIL_URL.includes("X0X0")) {
@@ -89,8 +93,16 @@ async function sendMailNotification(to, eventType, data) {
         return;
     }
     try {
-        // Artik subject ve body gondermiyoruz, backend (GAS) eventType'a gore olusturacak
-        const payload = { action: "sendEmail", to, eventType, data };
+        // 🔐 Replay Attack Koruması: Her istekte timestamp gönder
+        const timestamp = Date.now();
+        const payload = {
+            action: "sendEmail",
+            to,
+            eventType,
+            data,
+            token: GAS_SECURITY_TOKEN,   // GAS bu token'ı doğrulayacak
+            timestamp                     // GAS 60 sn tolerans uygulayacak
+        };
 
         await fetch(GAS_MAIL_URL, {
             method: 'POST',
